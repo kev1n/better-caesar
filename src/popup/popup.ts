@@ -17,10 +17,7 @@ ui.form.addEventListener("submit", async (event) => {
   try {
     const tab = await getActiveTab();
     if (!tab?.id) throw new Error("No active tab found.");
-    if (
-      !tab.url?.includes("caesar.ent.northwestern.edu") &&
-      !tab.url?.includes("caesar.northwestern.edu")
-    ) {
+    if (!tab.url?.includes("caesar.ent.northwestern.edu")) {
       throw new Error("Open CAESAR in the active tab first.");
     }
 
