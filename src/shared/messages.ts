@@ -17,14 +17,10 @@ export type LookupClassSuccess = {
   firstResultMeetingDates: string | null;
   firstResultGrading: string | null;
   firstResultStatus: string | null;
-  classCapacity: string | null;
-  enrollmentTotal: string | null;
-  availableSeats: string | null;
-  waitListCapacity: string | null;
-  waitListTotal: string | null;
-  enrollmentInfoNotes: string | null;
-  classNotes: string | null;
   nextActionForDetails: string | null;
+  searchPageId: string | null;
+  detailPageId: string | null;
+  detailResponseText: string | null;
 };
 
 export type LookupClassFailure = {

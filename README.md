@@ -16,11 +16,28 @@ This is the best pragmatic setup here because CAESAR is stateful (`ICSID`, `ICSt
 
 ## Project structure
 
-- `src/content/*`: PeopleSoft request + parse logic
+- `src/content/framework/*`: reusable augmentation template + runner
+- `src/content/augmentations/*`: independent page enhancements (plugin-style)
+- `src/content/peoplesoft/*`: PeopleSoft request + parse logic
 - `src/popup/*`: UI for class number lookup
 - `src/shared/*`: typed message contracts
 - `src/manifest.base.json`: shared manifest fields
 - `scripts/build.mjs`: emits browser-specific bundles/manifests
+
+## Augmentation architecture
+
+Each enhancement follows a template pattern:
+
+1. identify applicable pages
+2. collect target DOM nodes
+3. fetch any required data
+4. render the UI change
+
+Register plugins in `src/content/augmentations/registry.ts` so you can add many independent improvements without coupling them together.
+
+Boundary rule:
+- `src/content/peoplesoft/*` should stay generic (request orchestration + generic search/detail payloads).
+- Feature-specific extraction/parsing (like seats + notes) belongs inside that feature folder under `src/content/augmentations/*`.
 
 ## Commands
 

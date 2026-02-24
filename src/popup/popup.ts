@@ -66,14 +66,11 @@ function formatResponse(response: LookupClassResponse): string {
       firstResultMeetingDates: response.firstResultMeetingDates,
       firstResultGrading: response.firstResultGrading,
       firstResultStatus: response.firstResultStatus,
-      classCapacity: response.classCapacity,
-      enrollmentTotal: response.enrollmentTotal,
-      availableSeats: response.availableSeats,
-      waitListCapacity: response.waitListCapacity,
-      waitListTotal: response.waitListTotal,
-      enrollmentInfoNotes: response.enrollmentInfoNotes,
-      classNotes: response.classNotes,
-      nextActionForDetails: response.nextActionForDetails
+      nextActionForDetails: response.nextActionForDetails,
+      searchPageId: response.searchPageId,
+      detailPageId: response.detailPageId,
+      hasDetailPayload: Boolean(response.detailResponseText),
+      detailPayloadSize: response.detailResponseText?.length ?? 0
     },
     null,
     2
