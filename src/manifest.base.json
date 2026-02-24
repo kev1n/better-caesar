@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Better CAESER",
+  "description": "Augments Northwestern CAESAR class search with faster class-level lookups.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "Better CAESER",
+    "default_popup": "popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://caesar.ent.northwestern.edu/*",
+        "https://caesar.northwestern.edu/*"
+      ],
+      "js": ["content/index.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "host_permissions": [
+    "https://caesar.ent.northwestern.edu/*",
+    "https://caesar.northwestern.edu/*"
+  ],
+  "permissions": ["activeTab", "storage"]
+}

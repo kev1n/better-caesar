@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Better CAESER</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <h1>Better CAESER</h1>
+      <p class="subhead">Lookup a class by class number from the active CAESAR tab.</p>
+
+      <form id="lookup-form">
+        <label for="class-number">Class number</label>
+        <input id="class-number" name="classNumber" type="text" inputmode="numeric" required />
+        <button type="submit">Fetch</button>
+      </form>
+
+      <pre id="result" aria-live="polite">Ready.</pre>
+    </main>
+
+    <script src="./popup.js"></script>
+  </body>
+</html>

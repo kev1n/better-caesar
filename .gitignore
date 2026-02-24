@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+*.log
+.env
+.env.*
+.vscode
+.idea
+coverage
+*.tsbuildinfo
+base.curl
+*.curl

@@ -1,0 +1,18 @@
+{
+  "name": "better-caeser-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs --target all",
+    "build:chrome": "node scripts/build.mjs --target chrome",
+    "build:firefox": "node scripts/build.mjs --target firefox",
+    "dev": "node scripts/build.mjs --target chrome --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.292",
+    "esbuild": "^0.25.9",
+    "typescript": "^5.9.2"
+  }
+}
