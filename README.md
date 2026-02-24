@@ -74,6 +74,10 @@ Firefox:
 
 ## Current behavior
 
+- Enrollment navigation helper:
+  - Intercepts Shopping Cart / Enroll clicks and acquires a PeopleSoft traffic lock (aborts in-flight seat/notes lookups, then waits for idle before navigating).
+  - Applies an early term-page visual mask + spinner so the intermediate selector page is not shown during auto-continue.
+  - Adds a Tyrian term-switch dropdown across enrollment workflow pages (`Shopping Cart`, `Drop`, `Update`, `Swap`); selecting a term routes through term selector with the chosen term pre-selected.
 - Content script auto-detects shopping cart rows (`P_CLASS_NAME$N`) and injects a metadata card next to each class.
 - For each class number, it performs a CAESAR class search request and displays parsed metadata inline.
 - Responses are cached by class number to avoid duplicate requests in the same page session.

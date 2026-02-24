@@ -10,18 +10,10 @@ import {
   normalizeCareer,
   resolveActionUrl
 } from "./shared";
+import { fetchPeopleSoftGet } from "./http";
 
 export async function initializeSearchContext(): Promise<SearchContext> {
-  const res = await fetch(resolveActionUrl(SEARCH_ENTRY_URL), {
-    method: "GET",
-    credentials: "include"
-  });
-
-  if (!res.ok) {
-    throw new Error(`Failed to initialize class search context (${res.status}).`);
-  }
-
-  const html = await res.text();
+  const html = await fetchPeopleSoftGet(resolveActionUrl(SEARCH_ENTRY_URL));
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   const form = doc.forms.namedItem("win0");

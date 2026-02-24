@@ -158,7 +158,9 @@ export function injectStyles(): void {
       padding: 4px 0;
     }
   `;
-  document.head.appendChild(style);
+  const host = document.head ?? document.documentElement ?? document.body;
+  if (!host) return;
+  host.appendChild(style);
 }
 
 function buildSeatsCard(response: SeatsNotesSuccess): HTMLElement {
