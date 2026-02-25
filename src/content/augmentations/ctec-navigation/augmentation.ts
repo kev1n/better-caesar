@@ -1,75 +1,46 @@
 import type { Augmentation } from "../../framework";
 import { fetchPeopleSoft, fetchPeopleSoftGet } from "../../peoplesoft/http";
-import { decodeEntities } from "../../peoplesoft/shared";
-
-type CtecRowSeed = {
-  actionId: string;
-  term: string;
-  description: string;
-  instructor: string;
-};
-
-type CtecCourseSeed = {
-  actionId: string;
-  description: string;
-};
-
-type CtecSubjectContext = {
-  code: string;
-  label: string;
-};
-
-type CtecIndexedEntry = {
-  actionId: string;
-  term: string;
-  description: string;
-  instructor: string;
-  blueraUrl: string | null;
-  error: string | null;
-  searchText: string;
-};
-
-type CtecSubjectIndex = {
-  subjectCode: string;
-  subjectLabel: string;
-  builtAt: number;
-  sourceUrl: string;
-  entries: CtecIndexedEntry[];
-};
-
-type CtecIndexStore = {
-  version: 1;
-  subjects: Record<string, CtecSubjectIndex>;
-};
-
-type PanelRefs = {
-  root: HTMLElement;
-  title: HTMLElement;
-  meta: HTMLElement;
-  status: HTMLElement;
-  trace: HTMLElement;
-  subjectInput: HTMLInputElement;
-  careerSelect: HTMLSelectElement;
-  indexButton: HTMLButtonElement;
-  clearButton: HTMLButtonElement;
-  searchInput: HTMLInputElement;
-  results: HTMLElement;
-};
-
-const PAGE_ID = "NW_CTEC_RSLT2_FL";
-
-const STYLE_ID = "better-caeser-ctec-index-style";
-const PANEL_ID = "better-caeser-ctec-index-panel";
-
-const STORAGE_KEY = "better-caeser:ctec-index:v1";
-const LAST_SUBJECT_STORAGE_KEY = "better-caeser:ctec-index:last-subject";
-const REQUEST_OWNER = "ctec-navigation";
-const MAX_RESULTS = 75;
-const MAX_COURSES_PER_SUBJECT = 200;
-const MAX_ACTIVITY_LOG_LINES = 250;
-
-const DEFAULT_SUBJECT_CODE = "UNKNOWN";
-const DEFAULT_CAREER_CODE = "UGRD";
+import {
+  DEFAULT_CAREER_CODE,
+  DEFAULT_SUBJECT_CODE,
+  MAX_COURSES_PER_SUBJECT,
+  MAX_PARALLEL_CLASS_WORKERS,
+  PANEL_ID,
+  PROGRESS_REFRESH_INTERVAL_MS,
+  REQUEST_OWNER
+} from "./constants";
+import {
+  applyResponseState,
+  buildActionParams,
+  buildSubjectResultsUrl,
+  collectClassRows,
+  collectClassRowsFromText,
+  collectCourseRows,
+  createInitialVisualState,
+  dedupeEntries,
+  extractBlueraUrl,
+  extractPostUrl,
+  mapWithConcurrency,
+  normalizeCareerCode,
+  normalizeSearch,
+  normalizeSubjectCode,
+  readCareerFromUrl,
+  readSubjectContext,
+  resolveActionUrl,
+  serializeForm
+} from "./helpers";
+import { clearSubjectIndex, readLastSubject, readSubjectIndex, rememberLastSubject, writeSubjectIndex } from "./storage";
+import type {
+  ClassTask,
+  CourseProgress,
+  CtecIndexedEntry,
+  CtecRowSeed,
+  CtecSubjectContext,
+  CtecSubjectIndex,
+  IndexVisualState,
+  PanelRefs
+} from "./types";
+import { ensurePanel, getPanelRefs, hasCtecDisclaimer, injectStyles, renderCourseGrid, renderResultsToContainer } from "./ui";
 
 export class CtecNavigationAugmentation implements Augmentation {
   readonly id = "ctec-navigation";
@@ -79,10 +50,19 @@ export class CtecNavigationAugmentation implements Augmentation {
   private currentContext: CtecSubjectContext | null = null;
   private currentRows: CtecRowSeed[] = [];
   private currentIndex: CtecSubjectIndex | null = null;
-  private activityLog: string[] = [];
+  private visualState: IndexVisualState = createInitialVisualState();
+  private progressRenderTimer: number | null = null;
+  private lastProgressRenderAtMs = 0;
+  private initialized = false;
 
   run(doc: Document = document): void {
     if (!this.appliesToPage(doc)) return;
+
+    if (this.initialized) {
+      const existing = doc.getElementById(PANEL_ID);
+      if (existing) return;
+      this.initialized = false;
+    }
 
     injectStyles(doc);
     const panel = ensurePanel(doc);
@@ -97,6 +77,23 @@ export class CtecNavigationAugmentation implements Augmentation {
     this.bindEvents(refs);
     this.seedInputs(refs);
     this.render(refs);
+    this.initialized = true;
+
+    // --- Temporary probe: test Bluera access via background tab ---
+    this.probeBluera();
+  }
+
+  private probeBluera(): void {
+    const TEST_URL =
+      "https://northwestern.bluera.com/northwestern/rpvf-eng.aspx?lang=eng&redi=1&SelectedIDforPrint=3994a7578f3bc9ba6400d7d8bef882e48186720dd278264fd4f79fede1f0a57d4234ddddae8d97e877ec470662793b08&ReportType=2&regl=en-US";
+
+    console.log("[probe] Testing Bluera access via background tab...");
+    chrome.runtime.sendMessage(
+      { type: "probe-bluera-tab", url: TEST_URL },
+      (response) => {
+        console.log("[probe] Background tab result:", response);
+      }
+    );
   }
 
   private appliesToPage(doc: Document): boolean {
@@ -170,10 +167,10 @@ export class CtecNavigationAugmentation implements Augmentation {
 
     const careerCode = this.getActiveCareerCode(refs);
 
-    this.activityLog = [];
+    this.visualState = createInitialVisualState(subjectCode);
     this.isIndexing = true;
     this.indexingProgress = `Preparing index for ${subjectCode}...`;
-    this.logActivity("index_start", { subjectCode, careerCode });
+    this.queueProgressRender(true);
     this.refresh();
 
     try {
@@ -194,14 +191,10 @@ export class CtecNavigationAugmentation implements Augmentation {
         subjectContext = this.currentContext ?? { code: subjectCode, label: subjectCode };
         const actionUrl = resolveActionUrl(form.action);
         const baseParams = serializeForm(form);
-        this.logActivity("using_visible_rows", {
-          subjectCode: subjectContext.code,
-          subjectLabel: subjectContext.label,
-          rowCount: this.currentRows.length
-        });
-        entries = await this.indexRows(this.currentRows, actionUrl, baseParams);
+        entries = await this.indexClassTasks(
+          this.currentRows.map((row) => ({ row, actionUrl, params: baseParams, courseIndex: -1 }))
+        );
       } else {
-        this.logActivity("using_remote_subject_page", { subjectCode, careerCode });
         const remoteData = await this.fetchAndIndexRemoteSubject(subjectCode, careerCode);
         subjectContext = remoteData.context;
         entries = remoteData.entries;
@@ -213,7 +206,7 @@ export class CtecNavigationAugmentation implements Augmentation {
 
       const dedupedEntries = dedupeEntries(entries);
       this.indexingProgress = `Indexed ${dedupedEntries.length} rows for ${subjectCode}.`;
-      this.refresh();
+      this.queueProgressRender(true);
 
       const nextIndex: CtecSubjectIndex = {
         subjectCode,
@@ -226,74 +219,15 @@ export class CtecNavigationAugmentation implements Augmentation {
       writeSubjectIndex(subjectCode, nextIndex);
 
       this.currentIndex = nextIndex;
-      this.logActivity("index_complete", {
-        subjectCode,
-        indexedRows: dedupedEntries.length,
-        failedRows: dedupedEntries.filter((entry) => !entry.blueraUrl).length
-      });
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : String(reason);
       this.indexingProgress = `Index failed: ${message}`;
-      this.logActivity("index_failed", { subjectCode, error: message });
+      this.queueProgressRender(true);
     } finally {
       this.isIndexing = false;
+      this.queueProgressRender(true);
       this.refresh();
     }
-  }
-
-  private async indexRows(
-    rows: CtecRowSeed[],
-    actionUrl: string,
-    baseParams: URLSearchParams,
-    progressPrefix = ""
-  ): Promise<CtecIndexedEntry[]> {
-    const total = rows.length;
-    if (total === 0) return [];
-
-    let completed = 0;
-    this.indexingProgress = `${progressPrefix}Indexing 0/${total}...`;
-    this.refresh();
-
-    const tasks = rows.map(async (row) => {
-      let blueraUrl: string | null = null;
-      let error: string | null = null;
-      this.logActivity("class_request_start", row);
-
-      try {
-        const params = buildActionParams(baseParams, row.actionId);
-        const responseText = await fetchPeopleSoft(actionUrl, params, { owner: REQUEST_OWNER });
-        blueraUrl = extractBlueraUrl(responseText);
-        if (!blueraUrl) {
-          error = "No Bluera URL returned for this row.";
-        }
-      } catch (reason) {
-        error = reason instanceof Error ? reason.message : String(reason);
-      }
-
-      completed += 1;
-      this.indexingProgress = `${progressPrefix}Indexed ${completed}/${total}: ${row.description}`;
-      this.logActivity("class_request_done", {
-        actionId: row.actionId,
-        term: row.term,
-        description: row.description,
-        instructor: row.instructor,
-        blueraUrl,
-        error
-      });
-      this.refresh();
-
-      return {
-        actionId: row.actionId,
-        term: row.term,
-        description: row.description,
-        instructor: row.instructor,
-        blueraUrl,
-        error,
-        searchText: normalizeSearch([row.term, row.description, row.instructor].join(" "))
-      };
-    });
-
-    return Promise.all(tasks);
   }
 
   private async fetchAndIndexRemoteSubject(subjectCode: string, careerCode: string): Promise<{
@@ -302,11 +236,9 @@ export class CtecNavigationAugmentation implements Augmentation {
   }> {
     const resultsUrl = buildSubjectResultsUrl(subjectCode, careerCode);
     this.indexingProgress = `Loading ${subjectCode} results page...`;
-    this.logActivity("subject_results_request_start", { resultsUrl });
-    this.refresh();
+    this.queueProgressRender();
 
     const html = await fetchPeopleSoftGet(resultsUrl, { owner: REQUEST_OWNER });
-    this.logActivity("subject_results_request_done", { htmlLength: html.length });
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
     const form = doc.forms.namedItem("win0");
@@ -319,69 +251,211 @@ export class CtecNavigationAugmentation implements Augmentation {
       code: subjectCode,
       label: parsedContext.label || subjectCode
     };
-    this.logActivity("subject_context", context);
     const actionUrl = resolveActionUrl(form.action);
     const baseParams = serializeForm(form);
 
+    // If the page already has class rows (no course drill-down needed)
     const directRows = collectClassRows(doc);
     if (directRows.length > 0) {
-      this.logActivity("direct_class_rows_found", {
-        count: directRows.length,
-        sample: directRows.slice(0, 5)
-      });
-      const entries = await this.indexRows(directRows, actionUrl, baseParams);
+      this.updateVisualState((s) => { s.classesTotal += directRows.length; });
+      const entries = await this.indexClassTasks(
+        directRows.map((row) => ({ row, actionUrl, params: baseParams, courseIndex: -1 }))
+      );
       return { context, entries };
     }
 
     const courseRows = collectCourseRows(doc).slice(0, MAX_COURSES_PER_SUBJECT);
-    this.logActivity("course_rows_found", {
-      count: courseRows.length,
-      sample: courseRows.slice(0, 5)
+    const totalCourses = courseRows.length;
+
+    // Initialize per-course visual state
+    this.updateVisualState((s) => {
+      s.coursesTotal = totalCourses;
+      s.courses = courseRows.map((c, i) => ({
+        index: i,
+        description: c.description,
+        status: "queued",
+        classesTotal: 0,
+        classesCompleted: 0
+      }));
     });
-    if (courseRows.length === 0) {
+    this.queueProgressRender(true);
+
+    if (totalCourses === 0) {
       return { context, entries: [] };
     }
 
-    const entries: CtecIndexedEntry[] = [];
-    const totalCourses = courseRows.length;
+    // For each course sequentially:
+    //   1. Load the course page (stateful — changes ICStateNum)
+    //   2. Promise.all that course's class Bluera fetches
+    // Class fetches are scoped to their course's server state, so we
+    // can't mix classes from different courses in the same batch.
+    const allEntries: CtecIndexedEntry[] = [];
 
-    for (let index = 0; index < totalCourses; index += 1) {
+    for (let index = 0; index < courseRows.length; index++) {
       const course = courseRows[index];
+      this.setCourseStatus(index, "loading");
+      this.updateVisualState((s) => {
+        s.coursesStarted += 1;
+        s.inFlightCourses += 1;
+      });
       this.indexingProgress = `Loading course ${index + 1}/${totalCourses}: ${course.description}`;
-      this.logActivity("course_request_start", {
-        index: index + 1,
-        total: totalCourses,
-        actionId: course.actionId,
-        description: course.description
-      });
-      this.refresh();
+      this.queueProgressRender(true);
 
-      const courseRequest = buildActionParams(baseParams, course.actionId);
-      const courseResponse = await fetchPeopleSoft(actionUrl, courseRequest, { owner: REQUEST_OWNER });
-      const classRows = collectClassRowsFromText(courseResponse);
-      this.logActivity("course_request_done", {
-        index: index + 1,
-        total: totalCourses,
-        actionId: course.actionId,
-        description: course.description,
-        classRows: classRows.length,
-        sample: classRows.slice(0, 5)
-      });
-      if (classRows.length === 0) {
-        continue;
+      try {
+        const courseRequest = buildActionParams(baseParams, course.actionId);
+        const courseResponse = await fetchPeopleSoft(actionUrl, courseRequest, { owner: REQUEST_OWNER });
+        const classRows = collectClassRowsFromText(courseResponse);
+
+        const classParams = applyResponseState(baseParams, courseResponse);
+        const classActionUrl = extractPostUrl(courseResponse) ?? actionUrl;
+
+        this.updateVisualState((s) => {
+          s.coursesCompleted += 1;
+          s.inFlightCourses = Math.max(0, s.inFlightCourses - 1);
+          s.classesTotal += classRows.length;
+          s.courses[index].classesTotal = classRows.length;
+        });
+
+        if (classRows.length === 0) {
+          this.setCourseStatus(index, "done");
+          this.queueProgressRender(true);
+          continue;
+        }
+
+        // Index all classes for this course in parallel
+        this.setCourseStatus(index, "indexing");
+        this.indexingProgress = `Indexing ${classRows.length} classes for ${course.description}...`;
+        this.queueProgressRender(true);
+
+        const courseEntries = await Promise.all(
+          classRows.map(async (row) => {
+            this.updateVisualState((s) => {
+              s.classesStarted += 1;
+              s.inFlightClasses += 1;
+            });
+            this.queueProgressRender();
+
+            let blueraUrl: string | null = null;
+            let error: string | null = null;
+
+            try {
+              const params = buildActionParams(classParams, row.actionId);
+              const responseText = await fetchPeopleSoft(classActionUrl, params, { owner: REQUEST_OWNER });
+              blueraUrl = extractBlueraUrl(responseText);
+              if (!blueraUrl) {
+                error = "No Bluera URL returned for this row.";
+              }
+            } catch (reason) {
+              error = reason instanceof Error ? reason.message : String(reason);
+            }
+
+            this.updateVisualState((s) => {
+              s.classesCompleted += 1;
+              s.inFlightClasses = Math.max(0, s.inFlightClasses - 1);
+              if (blueraUrl) {
+                s.linksFound += 1;
+              } else {
+                s.linksMissing += 1;
+              }
+              const cp = s.courses[index];
+              cp.classesCompleted += 1;
+            });
+            this.queueProgressRender();
+
+            return {
+              actionId: row.actionId,
+              term: row.term,
+              description: row.description,
+              instructor: row.instructor,
+              blueraUrl,
+              error,
+              searchText: normalizeSearch([row.term, row.description, row.instructor].join(" "))
+            };
+          })
+        );
+
+        allEntries.push(...courseEntries);
+        this.setCourseStatus(index, "done");
+      } catch {
+        this.setCourseStatus(index, "error");
+        this.updateVisualState((s) => {
+          s.coursesCompleted += 1;
+          s.inFlightCourses = Math.max(0, s.inFlightCourses - 1);
+        });
       }
 
-      const classParams = applyResponseState(baseParams, courseResponse);
-      const classActionUrl = extractPostUrl(courseResponse) ?? actionUrl;
-      const prefix = `Course ${index + 1}/${totalCourses} - `;
-      const courseEntries = await this.indexRows(classRows, classActionUrl, classParams, prefix);
-      entries.push(...courseEntries);
+      this.indexingProgress = `Completed course ${index + 1}/${totalCourses}: ${course.description}`;
+      this.queueProgressRender(true);
     }
 
-    return {
-      context,
-      entries
-    };
+    return { context, entries: allEntries };
+  }
+
+  /**
+   * Index a flat list of class tasks using a shared worker pool.
+   * Used for visible-row and direct-class indexing (no course drill-down).
+   */
+  private async indexClassTasks(tasks: ClassTask[]): Promise<CtecIndexedEntry[]> {
+    if (tasks.length === 0) return [];
+
+    this.updateVisualState((s) => {
+      s.classesTotal += tasks.length;
+    });
+    this.queueProgressRender();
+
+    let completed = 0;
+
+    return mapWithConcurrency(tasks, MAX_PARALLEL_CLASS_WORKERS, async (task) => {
+      let blueraUrl: string | null = null;
+      let error: string | null = null;
+      this.updateVisualState((s) => {
+        s.classesStarted += 1;
+        s.inFlightClasses += 1;
+      });
+      this.queueProgressRender();
+
+      try {
+        const params = buildActionParams(task.params, task.row.actionId);
+        const responseText = await fetchPeopleSoft(task.actionUrl, params, { owner: REQUEST_OWNER });
+        blueraUrl = extractBlueraUrl(responseText);
+        if (!blueraUrl) {
+          error = "No Bluera URL returned for this row.";
+        }
+      } catch (reason) {
+        error = reason instanceof Error ? reason.message : String(reason);
+      }
+
+      completed += 1;
+      this.indexingProgress = `Indexed ${completed}/${tasks.length}: ${task.row.description}`;
+      this.updateVisualState((s) => {
+        s.classesCompleted += 1;
+        s.inFlightClasses = Math.max(0, s.inFlightClasses - 1);
+        if (blueraUrl) {
+          s.linksFound += 1;
+        } else {
+          s.linksMissing += 1;
+        }
+      });
+      this.queueProgressRender();
+
+      return {
+        actionId: task.row.actionId,
+        term: task.row.term,
+        description: task.row.description,
+        instructor: task.row.instructor,
+        blueraUrl,
+        error,
+        searchText: normalizeSearch([task.row.term, task.row.description, task.row.instructor].join(" "))
+      };
+    });
+  }
+
+  private setCourseStatus(index: number, status: CourseProgress["status"]): void {
+    this.updateVisualState((s) => {
+      if (index >= 0 && index < s.courses.length) {
+        s.courses[index].status = status;
+      }
+    });
   }
 
   private handleClearClick(refs: PanelRefs): void {
@@ -390,8 +464,9 @@ export class CtecNavigationAugmentation implements Augmentation {
 
     clearSubjectIndex(subjectCode);
     this.currentIndex = null;
+    this.visualState = createInitialVisualState(subjectCode);
     this.indexingProgress = `Cleared local cache for ${subjectCode}.`;
-    this.logActivity("cache_cleared", { subjectCode });
+    this.queueProgressRender(true);
     this.refresh();
   }
 
@@ -412,7 +487,7 @@ export class CtecNavigationAugmentation implements Augmentation {
     const subjectLabel =
       (this.currentIndex && `${this.currentIndex.subjectCode} - ${this.currentIndex.subjectLabel}`) ||
       (subjectCode ? `${subjectCode}` : "No subject selected");
-    refs.title.textContent = `Better CAESER CTEC Index (${subjectLabel})`;
+    refs.title.textContent = `Better CAESAR CTEC Index (${subjectLabel})`;
 
     const rowCount = this.currentRows.length;
     const hasVisibleRowsForActiveSubject =
@@ -436,822 +511,78 @@ export class CtecNavigationAugmentation implements Augmentation {
     refs.searchInput.placeholder = this.currentIndex
       ? "Search by course, instructor, term..."
       : "Index this subject first";
-
-    if (this.isIndexing) {
-      refs.status.textContent = this.indexingProgress;
-    } else {
-      refs.status.textContent = this.indexingProgress || "Ready.";
-    }
-
-    this.renderTrace(refs.trace);
+    this.renderProgress(refs);
 
     this.renderResults(refs);
   }
 
-  private logActivity(event: string, data?: unknown): void {
-    const stamp = new Date().toLocaleTimeString();
-    const payload = formatActivityData(data);
-    const line = payload ? `[${stamp}] ${event} ${payload}` : `[${stamp}] ${event}`;
-    this.activityLog.push(line);
-
-    if (this.activityLog.length > MAX_ACTIVITY_LOG_LINES) {
-      this.activityLog.splice(0, this.activityLog.length - MAX_ACTIVITY_LOG_LINES);
-    }
-
-    this.refreshTrace();
+  private updateVisualState(mutator: (state: IndexVisualState) => void): void {
+    mutator(this.visualState);
   }
 
-  private refreshTrace(): void {
+  private queueProgressRender(force = false): void {
+    if (force) {
+      if (this.progressRenderTimer !== null) {
+        window.clearTimeout(this.progressRenderTimer);
+        this.progressRenderTimer = null;
+      }
+      this.renderProgressNow();
+      return;
+    }
+
+    const elapsedMs = Date.now() - this.lastProgressRenderAtMs;
+    if (elapsedMs >= PROGRESS_REFRESH_INTERVAL_MS) {
+      this.renderProgressNow();
+      return;
+    }
+
+    if (this.progressRenderTimer !== null) return;
+
+    const waitMs = PROGRESS_REFRESH_INTERVAL_MS - elapsedMs;
+    this.progressRenderTimer = window.setTimeout(() => {
+      this.progressRenderTimer = null;
+      this.renderProgressNow();
+    }, waitMs);
+  }
+
+  private renderProgressNow(): void {
+    this.lastProgressRenderAtMs = Date.now();
     const panel = document.getElementById(PANEL_ID);
     if (!(panel instanceof HTMLElement)) return;
-    const trace = panel.querySelector<HTMLElement>("[data-part='trace']");
-    if (!trace) return;
 
-    this.renderTrace(trace);
+    const refs = getPanelRefs(panel);
+    if (!refs) return;
+    this.renderProgress(refs);
   }
 
-  private renderTrace(trace: HTMLElement): void {
-    const traceText =
-      this.activityLog.length > 0
-        ? this.activityLog.join("\n")
-        : "Processing trace will appear here while indexing.";
-    const traceIsNearBottom = trace.scrollTop + trace.clientHeight >= trace.scrollHeight - 24;
-    trace.textContent = traceText;
-    if (this.isIndexing || traceIsNearBottom) {
-      trace.scrollTop = trace.scrollHeight;
+  private renderProgress(refs: PanelRefs): void {
+    refs.status.textContent = this.indexingProgress || "Ready.";
+
+    const state = this.visualState;
+    const coursesPct =
+      state.coursesTotal > 0 ? Math.round((state.coursesCompleted / state.coursesTotal) * 100) : 0;
+    const classesPct =
+      state.classesTotal > 0 ? Math.round((state.classesCompleted / state.classesTotal) * 100) : 0;
+
+    refs.courseProgressFill.style.width = `${coursesPct}%`;
+    refs.classProgressFill.style.width = `${classesPct}%`;
+
+    // Render per-course grid
+    renderCourseGrid(refs.courseGrid, state);
+
+    if (!this.isIndexing) {
+      refs.progressSummary.textContent = "Progress will appear while indexing.";
+      refs.progressStats.textContent = "";
+      return;
     }
+
+    refs.progressSummary.textContent = `Courses ${state.coursesCompleted}/${state.coursesTotal} | Classes ${state.classesCompleted}/${state.classesTotal}`;
+    const elapsedSec = Math.max(0, Math.floor((Date.now() - state.startedAtMs) / 1000));
+    refs.progressStats.textContent = `In flight: ${state.inFlightCourses} courses, ${state.inFlightClasses} classes | Bluera found ${state.linksFound}, missing ${state.linksMissing} | ${elapsedSec}s elapsed`;
   }
 
   private renderResults(refs: PanelRefs): void {
-    refs.results.textContent = "";
-
-    if (!this.currentIndex) {
-      refs.results.textContent = "No cached results to search yet.";
-      return;
-    }
-
     const query = normalizeSearch(refs.searchInput.value);
-    const tokens = query.length > 0 ? query.split(/\s+/).filter(Boolean) : [];
-
-    const matches = this.currentIndex.entries.filter((entry) =>
-      tokens.every((token) => entry.searchText.includes(token))
-    );
-
-    if (matches.length === 0) {
-      refs.results.textContent = "No matches.";
-      return;
-    }
-
-    const visible = matches.slice(0, MAX_RESULTS);
-    const fragment = document.createDocumentFragment();
-
-    for (const entry of visible) {
-      fragment.appendChild(buildResultCard(entry));
-    }
-
-    refs.results.appendChild(fragment);
-
-    if (matches.length > MAX_RESULTS) {
-      const overflow = document.createElement("div");
-      overflow.className = "better-caeser-ctec-overflow";
-      overflow.textContent = `Showing first ${MAX_RESULTS} of ${matches.length} matches.`;
-      refs.results.appendChild(overflow);
-    }
+    renderResultsToContainer(refs.results, this.currentIndex, query);
   }
-}
-
-function getPageId(doc: Document): string | null {
-  const pageInfo =
-    doc.querySelector<HTMLElement>("#pt_pageinfo_win0") ?? doc.querySelector<HTMLElement>("#pt_pageinfo");
-  return pageInfo?.getAttribute("Page") ?? null;
-}
-
-function hasCtecDisclaimer(doc: Document): boolean {
-  return (
-    doc.querySelector<HTMLElement>(".ctec-disclaimer") !== null ||
-    doc.querySelector<HTMLElement>("[class*='ctec-disclaimer']") !== null
-  );
-}
-
-function ensurePanel(doc: Document): HTMLElement | null {
-  const existing = doc.getElementById(PANEL_ID);
-  if (existing instanceof HTMLElement) return existing;
-
-  const disclaimer =
-    doc.querySelector<HTMLElement>("#win0divNW_CTEC_WRK_HTMLAREA1") ??
-    doc.querySelector<HTMLElement>("#NW_CTEC_WRK_HTMLAREA1") ??
-    doc.querySelector<HTMLElement>(".ctec-disclaimer") ??
-    doc.querySelector<HTMLElement>("[class*='ctec-disclaimer']");
-  const anchor = disclaimer;
-  if (!anchor) return null;
-
-  const root = doc.createElement("section");
-  root.id = PANEL_ID;
-  root.className = "better-caeser-ctec-panel";
-
-  const title = doc.createElement("h2");
-  title.className = "better-caeser-ctec-title";
-  title.dataset.part = "title";
-
-  const meta = doc.createElement("div");
-  meta.className = "better-caeser-ctec-meta";
-  meta.dataset.part = "meta";
-
-  const controls = doc.createElement("div");
-  controls.className = "better-caeser-ctec-controls";
-
-  const subjectInput = doc.createElement("input");
-  subjectInput.type = "text";
-  subjectInput.className = "better-caeser-ctec-control-input";
-  subjectInput.placeholder = "Subject code (e.g., COMP_SCI)";
-  subjectInput.dataset.part = "subject";
-
-  const careerSelect = doc.createElement("select");
-  careerSelect.className = "better-caeser-ctec-control-select";
-  careerSelect.dataset.part = "career";
-
-  for (const value of ["UGRD", "TGS"]) {
-    const option = doc.createElement("option");
-    option.value = value;
-    option.textContent = value;
-    careerSelect.appendChild(option);
-  }
-
-  controls.appendChild(subjectInput);
-  controls.appendChild(careerSelect);
-
-  const actions = doc.createElement("div");
-  actions.className = "better-caeser-ctec-actions";
-
-  const indexButton = doc.createElement("button");
-  indexButton.type = "button";
-  indexButton.className = "better-caeser-ctec-btn better-caeser-ctec-btn-primary";
-  indexButton.dataset.part = "index";
-
-  const clearButton = doc.createElement("button");
-  clearButton.type = "button";
-  clearButton.className = "better-caeser-ctec-btn";
-  clearButton.dataset.part = "clear";
-  clearButton.textContent = "Clear this subject cache";
-
-  actions.appendChild(indexButton);
-  actions.appendChild(clearButton);
-
-  const status = doc.createElement("div");
-  status.className = "better-caeser-ctec-status";
-  status.dataset.part = "status";
-
-  const trace = doc.createElement("pre");
-  trace.className = "better-caeser-ctec-trace";
-  trace.dataset.part = "trace";
-
-  const searchInput = doc.createElement("input");
-  searchInput.type = "search";
-  searchInput.className = "better-caeser-ctec-search";
-  searchInput.dataset.part = "search";
-
-  const results = doc.createElement("div");
-  results.className = "better-caeser-ctec-results";
-  results.dataset.part = "results";
-
-  root.appendChild(title);
-  root.appendChild(meta);
-  root.appendChild(controls);
-  root.appendChild(actions);
-  root.appendChild(status);
-  root.appendChild(trace);
-  root.appendChild(searchInput);
-  root.appendChild(results);
-
-  anchor.insertAdjacentElement("afterend", root);
-  return root;
-}
-
-function getPanelRefs(root: HTMLElement): PanelRefs | null {
-  const title = root.querySelector<HTMLElement>("[data-part='title']");
-  const meta = root.querySelector<HTMLElement>("[data-part='meta']");
-  const status = root.querySelector<HTMLElement>("[data-part='status']");
-  const trace = root.querySelector<HTMLElement>("[data-part='trace']");
-  const subjectInput = root.querySelector<HTMLInputElement>("[data-part='subject']");
-  const careerSelect = root.querySelector<HTMLSelectElement>("[data-part='career']");
-  const indexButton = root.querySelector<HTMLButtonElement>("[data-part='index']");
-  const clearButton = root.querySelector<HTMLButtonElement>("[data-part='clear']");
-  const searchInput = root.querySelector<HTMLInputElement>("[data-part='search']");
-  const results = root.querySelector<HTMLElement>("[data-part='results']");
-
-  if (
-    !title ||
-    !meta ||
-    !status ||
-    !trace ||
-    !subjectInput ||
-    !careerSelect ||
-    !indexButton ||
-    !clearButton ||
-    !searchInput ||
-    !results
-  ) {
-    return null;
-  }
-
-  return {
-    root,
-    title,
-    meta,
-    status,
-    trace,
-    subjectInput,
-    careerSelect,
-    indexButton,
-    clearButton,
-    searchInput,
-    results
-  };
-}
-
-function collectClassRows(doc: Document): CtecRowSeed[] {
-  const rows = doc.querySelectorAll<HTMLTableRowElement>("tr.ps_grid-row[id^='NW_CT_PV4_DRV$0_row_']");
-  const seeds: CtecRowSeed[] = [];
-
-  for (const row of Array.from(rows)) {
-    const link = row.querySelector<HTMLAnchorElement>("a[id^='MYLINK1$']");
-    if (!link) continue;
-
-    const actionId = extractActionId(link);
-    if (!actionId) continue;
-
-    const term = cleanText(row.querySelector<HTMLElement>("[id^='MYDESCR2$']")?.textContent);
-    const description = cleanText(row.querySelector<HTMLElement>("[id^='MYDESCR$']")?.textContent);
-    const instructor = cleanText(row.querySelector<HTMLElement>("[id^='CTEC_INSTRUCTOR$']")?.textContent);
-
-    seeds.push({
-      actionId,
-      term,
-      description,
-      instructor
-    });
-  }
-
-  return seeds;
-}
-
-function collectClassRowsFromText(responseText: string): CtecRowSeed[] {
-  const actionIds = extractActionIds(responseText, "MYLINK1");
-  const rows: CtecRowSeed[] = [];
-
-  for (const actionId of actionIds) {
-    const index = actionId.match(/\$(\d+)$/)?.[1] ?? null;
-    if (!index) continue;
-
-    rows.push({
-      actionId,
-      term: extractFieldValue(responseText, `MYDESCR2$${index}`),
-      description: extractFieldValue(responseText, `MYDESCR$${index}`),
-      instructor: extractFieldValue(responseText, `CTEC_INSTRUCTOR$${index}`)
-    });
-  }
-
-  return rows;
-}
-
-function collectCourseRows(doc: Document): CtecCourseSeed[] {
-  const rows = doc.querySelectorAll<HTMLTableRowElement>("tr.ps_grid-row[id^='NW_CT_PV_DRV$0_row_']");
-  const seeds: CtecCourseSeed[] = [];
-
-  for (const row of Array.from(rows)) {
-    const link = row.querySelector<HTMLAnchorElement>("a[id^='MYLINK$']");
-    if (!link) continue;
-
-    const actionId = extractActionId(link);
-    if (!actionId) continue;
-
-    const description = cleanText(row.querySelector<HTMLElement>("[id^='MYLABEL$']")?.textContent);
-    seeds.push({ actionId, description });
-  }
-
-  return seeds;
-}
-
-function extractActionId(link: HTMLAnchorElement): string | null {
-  if (link.id.startsWith("MYLINK1$")) return link.id.trim();
-
-  const href = link.getAttribute("href") ?? "";
-  const match = href.match(/submitAction_win0\(document\.win0,'([^']+)'\)/i)?.[1] ?? null;
-  return match?.trim() ?? null;
-}
-
-function readSubjectContext(doc: Document, sourceUrl: string): CtecSubjectContext {
-  const urlCode = readSubjectCodeFromUrl(sourceUrl);
-
-  const subjectText = cleanText(doc.querySelector<HTMLElement>("#NW_CT_SUBJECT_V_DESCR50")?.textContent);
-  if (subjectText) {
-    const [left, right] = subjectText.split(/\s+-\s+/, 2);
-    const code = normalizeSubjectCode(left) || urlCode || DEFAULT_SUBJECT_CODE;
-    const label = right?.trim() || left.trim() || code;
-    return { code, label };
-  }
-
-  return {
-    code: urlCode || DEFAULT_SUBJECT_CODE,
-    label: urlCode || DEFAULT_SUBJECT_CODE
-  };
-}
-
-function readSubjectCodeFromUrl(rawUrl: string): string | null {
-  try {
-    const url = new URL(rawUrl, window.location.origin);
-    const subject = url.searchParams.get("SUBJECT");
-    return normalizeSubjectCode(subject);
-  } catch {
-    return null;
-  }
-}
-
-function normalizeSubjectCode(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const normalized = value.trim().toUpperCase();
-  if (!normalized) return null;
-  return normalized;
-}
-
-function normalizeCareerCode(value: string | null | undefined): string {
-  const normalized = (value ?? "").trim().toUpperCase();
-  if (normalized === "TGS") return "TGS";
-  return DEFAULT_CAREER_CODE;
-}
-
-function readCareerFromUrl(rawUrl: string): string | null {
-  try {
-    const url = new URL(rawUrl, window.location.origin);
-    const career = url.searchParams.get("ACAD_CAREER");
-    if (!career) return null;
-    return normalizeCareerCode(career);
-  } catch {
-    return null;
-  }
-}
-
-function buildSubjectResultsUrl(subjectCode: string, careerCode: string): string {
-  const url = new URL(
-    "/psc/csnu/EMPLOYEE/SA/c/NWCT.NW_CT_PUB_RSLT_FL.GBL",
-    window.location.origin
-  );
-  url.searchParams.set("Page", PAGE_ID);
-  url.searchParams.set("NW_CTEC_SRCH_CHOIC", "C");
-  url.searchParams.set("ACAD_CAREER", normalizeCareerCode(careerCode));
-  url.searchParams.set("SUBJECT", subjectCode);
-  url.searchParams.set("NoCrumbs", "yes");
-  url.searchParams.set("PortalKeyStruct", "yes");
-  return url.toString();
-}
-
-function readLastSubject(): string | null {
-  try {
-    const value = window.localStorage.getItem(LAST_SUBJECT_STORAGE_KEY);
-    return normalizeSubjectCode(value);
-  } catch {
-    return null;
-  }
-}
-
-function rememberLastSubject(subjectCode: string): void {
-  try {
-    window.localStorage.setItem(LAST_SUBJECT_STORAGE_KEY, subjectCode);
-  } catch {
-    // Ignore storage errors.
-  }
-}
-
-function buildActionParams(baseParams: URLSearchParams, actionId: string): URLSearchParams {
-  const params = new URLSearchParams(baseParams.toString());
-  params.set("ICAJAX", "1");
-  params.set("ICNAVTYPEDROPDOWN", "0");
-  params.set("ICType", "Panel");
-  params.set("ICElementNum", "0");
-  params.set("ICAction", actionId);
-  params.set("ICModelCancel", "0");
-  params.set("ICXPos", "0");
-  params.set("ICYPos", "0");
-  params.set("ResponsetoDiffFrame", "-1");
-  params.set("TargetFrameName", "None");
-  params.set("FacetPath", "None");
-  params.set("PrmtTbl", "");
-  params.set("PrmtTbl_fn", "");
-  params.set("PrmtTbl_fv", "");
-  params.set("TA_SkipFldNms", "");
-  params.set("ICFocus", "");
-  params.set("ICSaveWarningFilter", "0");
-  params.set("ICChanged", "0");
-  params.set("ICSkipPending", "0");
-  params.set("ICAutoSave", "0");
-  params.set("ICResubmit", "0");
-  params.set("ICActionPrompt", "false");
-  params.set("ICFind", "");
-  params.set("ICAddCount", "");
-  params.set("ICAppClsData", "");
-  return params;
-}
-
-function applyResponseState(baseParams: URLSearchParams, responseText: string): URLSearchParams {
-  const params = new URLSearchParams(baseParams.toString());
-
-  const parsedStateNum = responseText.match(/ICStateNum\.value\s*=\s*'?(\d+)'?/i)?.[1] ?? null;
-  if (parsedStateNum) {
-    params.set("ICStateNum", parsedStateNum);
-  }
-
-  const hiddenValues = extractHiddenInputs(responseText);
-  hiddenValues.forEach((value, key) => {
-    params.set(key, value);
-  });
-
-  return params;
-}
-
-function extractHiddenInputs(responseText: string): URLSearchParams {
-  const params = new URLSearchParams();
-  const hiddenInputRegex =
-    /<input[^>]*type=['"]hidden['"][^>]*name=['"]([^'"]+)['"][^>]*value=['"]([^'"]*)['"][^>]*>/gi;
-
-  let match: RegExpExecArray | null;
-  while ((match = hiddenInputRegex.exec(responseText)) !== null) {
-    const name = decodeEntities(match[1] ?? "");
-    const value = decodeEntities(match[2] ?? "");
-    if (!name) continue;
-    params.set(name, value);
-  }
-
-  return params;
-}
-
-function extractPostUrl(responseText: string): string | null {
-  const postUrl = responseText.match(/postUrl_win0\s*=\s*'([^']+)'/i)?.[1] ?? null;
-  if (!postUrl) return null;
-  return resolveActionUrl(postUrl);
-}
-
-function extractActionIds(responseText: string, prefix: "MYLINK" | "MYLINK1"): string[] {
-  const pattern = new RegExp(
-    `submitAction_win0\\(document\\.win0,'(${prefix}\\$\\d+)\\s*'\\)`,
-    "gi"
-  );
-  const unique = new Set<string>();
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(responseText)) !== null) {
-    const actionId = (match[1] ?? "").trim();
-    if (!actionId) continue;
-    unique.add(actionId);
-  }
-
-  return Array.from(unique);
-}
-
-function extractFieldValue(responseText: string, id: string): string {
-  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`id=['"]${escapedId}\\s*['"][\\s\\S]*?>\\s*([^<]+?)\\s*<`, "i");
-  const value = pattern.exec(responseText)?.[1] ?? "";
-  return cleanText(value);
-}
-
-function extractBlueraUrl(responseText: string): string | null {
-  const doPortalMatch =
-    responseText.match(/DoPortalUrl\('((?:\\'|[^'])+)'\)/i)?.[1] ??
-    responseText.match(/DoPortalUrl\("((?:\\"|[^"])+)"\)/i)?.[1] ??
-    null;
-
-  const rawValue = doPortalMatch
-    ? doPortalMatch
-    : responseText.match(/window\.open\('((?:\\'|[^'])+)'/i)?.[1] ?? null;
-  if (!rawValue) return null;
-
-  const unescaped = rawValue.replace(/\\'/g, "'").replace(/\\"/g, '"');
-  const decoded = decodeEntities(unescaped);
-  const trimmed = decoded.trim();
-  if (!trimmed) return null;
-
-  try {
-    return new URL(trimmed, window.location.origin).toString();
-  } catch {
-    return trimmed;
-  }
-}
-
-function resolveActionUrl(action: string): string {
-  try {
-    return new URL(action || window.location.href, window.location.origin).toString();
-  } catch {
-    return window.location.href;
-  }
-}
-
-function serializeForm(form: HTMLFormElement): URLSearchParams {
-  const params = new URLSearchParams();
-
-  for (const element of Array.from(form.elements)) {
-    if (
-      !(
-        element instanceof HTMLInputElement ||
-        element instanceof HTMLSelectElement ||
-        element instanceof HTMLTextAreaElement
-      )
-    ) {
-      continue;
-    }
-
-    if (!element.name || element.disabled) continue;
-
-    if (element instanceof HTMLInputElement) {
-      const type = element.type.toLowerCase();
-      if (type === "button" || type === "submit" || type === "reset" || type === "image") continue;
-
-      if (type === "radio") {
-        if (element.checked) params.set(element.name, element.value);
-        continue;
-      }
-
-      if (type === "checkbox") {
-        if (element.checked) {
-          params.set(element.name, element.value || "Y");
-        } else if (element.name.includes("$chk")) {
-          params.set(element.name, "");
-        }
-        continue;
-      }
-    }
-
-    params.set(element.name, element.value ?? "");
-  }
-
-  return params;
-}
-
-function readStore(): CtecIndexStore {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return { version: 1, subjects: {} };
-    }
-
-    const parsed = JSON.parse(raw) as Partial<CtecIndexStore>;
-    if (parsed.version !== 1 || !parsed.subjects || typeof parsed.subjects !== "object") {
-      return { version: 1, subjects: {} };
-    }
-
-    return {
-      version: 1,
-      subjects: parsed.subjects as Record<string, CtecSubjectIndex>
-    };
-  } catch {
-    return { version: 1, subjects: {} };
-  }
-}
-
-function writeStore(store: CtecIndexStore): void {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  } catch {
-    // Ignore storage errors.
-  }
-}
-
-function readSubjectIndex(subjectCode: string): CtecSubjectIndex | null {
-  const store = readStore();
-  const index = store.subjects[subjectCode];
-  return index ?? null;
-}
-
-function writeSubjectIndex(subjectCode: string, index: CtecSubjectIndex): void {
-  const store = readStore();
-  store.subjects[subjectCode] = index;
-  writeStore(store);
-}
-
-function clearSubjectIndex(subjectCode: string): void {
-  const store = readStore();
-  delete store.subjects[subjectCode];
-  writeStore(store);
-}
-
-function dedupeEntries(entries: CtecIndexedEntry[]): CtecIndexedEntry[] {
-  const byKey = new Map<string, CtecIndexedEntry>();
-
-  for (const entry of entries) {
-    const key = [
-      entry.actionId,
-      normalizeSearch(entry.term),
-      normalizeSearch(entry.description),
-      normalizeSearch(entry.instructor)
-    ].join("|");
-
-    if (!byKey.has(key)) {
-      byKey.set(key, entry);
-    }
-  }
-
-  return Array.from(byKey.values());
-}
-
-function buildResultCard(entry: CtecIndexedEntry): HTMLElement {
-  const card = document.createElement("article");
-  card.className = "better-caeser-ctec-result";
-
-  const heading = document.createElement("div");
-  heading.className = "better-caeser-ctec-result-heading";
-  heading.textContent = entry.description || "Untitled course";
-
-  const meta = document.createElement("div");
-  meta.className = "better-caeser-ctec-result-meta";
-  const pieces = [entry.term, entry.instructor].filter(Boolean);
-  meta.textContent = pieces.length > 0 ? pieces.join(" | ") : "No metadata";
-
-  const footer = document.createElement("div");
-  footer.className = "better-caeser-ctec-result-footer";
-
-  if (entry.blueraUrl) {
-    const link = document.createElement("a");
-    link.className = "better-caeser-ctec-link";
-    link.href = entry.blueraUrl;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = "Open Bluera evaluation";
-    footer.appendChild(link);
-  } else {
-    const error = document.createElement("span");
-    error.className = "better-caeser-ctec-error";
-    error.textContent = entry.error ?? "Bluera URL unavailable.";
-    footer.appendChild(error);
-  }
-
-  card.appendChild(heading);
-  card.appendChild(meta);
-  card.appendChild(footer);
-  return card;
-}
-
-function normalizeSearch(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function cleanText(value: string | null | undefined): string {
-  if (!value) return "";
-  return decodeEntities(value).replace(/\s+/g, " ").trim();
-}
-
-function formatActivityData(data: unknown): string {
-  if (typeof data === "undefined") return "";
-
-  try {
-    const json = JSON.stringify(data, (_key, value) => {
-      if (typeof value === "string" && value.length > 220) {
-        return `${value.slice(0, 217)}...`;
-      }
-      return value;
-    });
-    if (!json) return "";
-    return json.length > 700 ? `${json.slice(0, 697)}...` : json;
-  } catch {
-    const value = String(data);
-    return value.length > 700 ? `${value.slice(0, 697)}...` : value;
-  }
-}
-
-function injectStyles(doc: Document): void {
-  if (doc.getElementById(STYLE_ID)) return;
-
-  const style = doc.createElement("style");
-  style.id = STYLE_ID;
-  style.textContent = `
-    :root {
-      --bc-tyrian: #66023c;
-      --bc-tyrian-soft: #f6ecf2;
-      --bc-tyrian-mid: #d8b6c8;
-      --bc-tyrian-ink: #3f0126;
-    }
-    .better-caeser-ctec-panel {
-      margin: 10px 0 14px;
-      padding: 12px;
-      border: 1px solid var(--bc-tyrian-mid);
-      border-radius: 8px;
-      background: var(--bc-tyrian-soft);
-      display: grid;
-      gap: 8px;
-    }
-    .better-caeser-ctec-title {
-      margin: 0;
-      font-size: 15px;
-      line-height: 1.2;
-      color: var(--bc-tyrian);
-    }
-    .better-caeser-ctec-meta,
-    .better-caeser-ctec-status {
-      font-size: 12px;
-      color: var(--bc-tyrian-ink);
-    }
-    .better-caeser-ctec-trace {
-      margin: 0;
-      padding: 8px;
-      border: 1px solid var(--bc-tyrian-mid);
-      border-radius: 6px;
-      background: #fff;
-      color: var(--bc-tyrian-ink);
-      font-size: 11px;
-      line-height: 1.35;
-      max-height: 180px;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .better-caeser-ctec-controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .better-caeser-ctec-control-input,
-    .better-caeser-ctec-control-select {
-      border: 1px solid var(--bc-tyrian-mid);
-      border-radius: 6px;
-      font-size: 12px;
-      color: var(--bc-tyrian-ink);
-      padding: 6px 8px;
-      background: #fff;
-    }
-    .better-caeser-ctec-control-input {
-      min-width: 220px;
-      flex: 1 1 240px;
-    }
-    .better-caeser-ctec-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .better-caeser-ctec-btn {
-      border: 1px solid var(--bc-tyrian-mid);
-      background: #fff;
-      color: var(--bc-tyrian);
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 12px;
-      cursor: pointer;
-    }
-    .better-caeser-ctec-btn:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
-    }
-    .better-caeser-ctec-btn-primary {
-      border-color: var(--bc-tyrian);
-      background: var(--bc-tyrian);
-      color: #fff;
-    }
-    .better-caeser-ctec-search {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid var(--bc-tyrian-mid);
-      border-radius: 6px;
-      font-size: 13px;
-      box-sizing: border-box;
-    }
-    .better-caeser-ctec-results {
-      display: grid;
-      gap: 8px;
-      max-height: 360px;
-      overflow: auto;
-      padding-right: 2px;
-      font-size: 12px;
-      color: var(--bc-tyrian-ink);
-    }
-    .better-caeser-ctec-result {
-      padding: 8px;
-      border: 1px solid var(--bc-tyrian-mid);
-      border-radius: 6px;
-      background: #fff;
-      display: grid;
-      gap: 4px;
-    }
-    .better-caeser-ctec-result-heading {
-      font-weight: 600;
-      color: var(--bc-tyrian);
-    }
-    .better-caeser-ctec-result-meta {
-      color: var(--bc-tyrian-ink);
-    }
-    .better-caeser-ctec-link {
-      color: var(--bc-tyrian);
-      text-decoration: underline;
-      font-weight: 600;
-    }
-    .better-caeser-ctec-error {
-      color: #7a123f;
-    }
-    .better-caeser-ctec-overflow {
-      color: var(--bc-tyrian-ink);
-    }
-  `;
-
-  const host = doc.head ?? doc.documentElement ?? doc.body;
-  if (!host) return;
-  host.appendChild(style);
 }

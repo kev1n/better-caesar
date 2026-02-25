@@ -1,4 +1,4 @@
-const LOCK_KEY = "better-caeser:peoplesoft-lock";
+const LOCK_KEY = "better-caesar:peoplesoft-lock";
 const DEFAULT_LOCK_TTL_MS = 120_000;
 
 type LockState = {

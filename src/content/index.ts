@@ -12,7 +12,7 @@ function injectEarlyTermPageMask(): void {
   if (page !== "SSR_SSENRL_TERM") return;
 
   const style = document.createElement("style");
-  style.id = "better-caeser-early-term-mask";
+  style.id = "better-caesar-early-term-mask";
   style.textContent = `
     body > * { visibility: hidden !important; }
     body::before {

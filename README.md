@@ -1,4 +1,4 @@
-# Better CAESER Extension (Dual Target: Chrome + Firefox)
+# Better CAESAR Extension (Dual Target: Chrome + Firefox)
 
 This repo now has a single TypeScript WebExtension codebase that builds for both browsers:
 

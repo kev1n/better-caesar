@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Better CAESER",
+  "name": "Better CAESAR",
   "description": "Augments Northwestern CAESAR class search with faster class-level lookups.",
   "version": "0.1.0",
   "action": {
-    "default_title": "Better CAESER",
+    "default_title": "Better CAESAR",
     "default_popup": "popup/popup.html"
   },
   "content_scripts": [
@@ -15,9 +15,21 @@
       "js": ["content/index.js"],
       "run_at": "document_start",
       "all_frames": true
+    },
+    {
+      "matches": [
+        "https://northwestern.bluera.com/*"
+      ],
+      "js": ["content/bluera-probe.js"],
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
+  "permissions": ["scripting", "tabs"],
   "host_permissions": [
-    "https://caesar.ent.northwestern.edu/*"
+    "https://caesar.ent.northwestern.edu/*",
+    "https://northwestern.bluera.com/*",
+    "https://prd-nusso.it.northwestern.edu/*",
+    "https://fed.it.northwestern.edu/*"
   ]
 }

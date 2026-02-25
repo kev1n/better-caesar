@@ -10,3 +10,5 @@ coverage
 *.tsbuildinfo
 base.curl
 *.curl
+
+ctec-example.html

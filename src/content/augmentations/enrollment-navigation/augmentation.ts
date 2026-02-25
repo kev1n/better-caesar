@@ -22,18 +22,18 @@ type TermPickerState = {
 
 const TERM_PAGE_ID = "SSR_SSENRL_TERM";
 
-const CONTEXT_STORAGE_KEY = "better-caeser:enrollment-context:v1";
-const TARGET_TERM_VALUE_KEY = "better-caeser:target-term-value";
+const CONTEXT_STORAGE_KEY = "better-caesar:enrollment-context:v1";
+const TARGET_TERM_VALUE_KEY = "better-caesar:target-term-value";
 
 const CART_LINK_SELECTOR = "a[href*='SSR_SSENRL_CART.GBL?Page=SSR_SSENRL_CART&Action=A']";
 const TERM_RADIO_SELECTOR =
   "#SSR_DUMMY_RECV1\\$scroll\\$0 input[type='radio'][name^='SSR_DUMMY_RECV1$sels$']";
 const CONTINUE_BUTTON_SELECTOR = "#DERIVED_SSS_SCT_SSR_PB_GO";
 
-const STYLE_ID = "better-caeser-enrollment-nav-style";
-const TERM_SWITCHER_ID = "better-caeser-term-switcher";
-const SPINNER_OVERLAY_ID = "better-caeser-term-spinner-overlay";
-const DIRECT_HREF_DATASET_KEY = "betterCaeserDirectHref";
+const STYLE_ID = "better-caesar-enrollment-nav-style";
+const TERM_SWITCHER_ID = "better-caesar-term-switcher";
+const SPINNER_OVERLAY_ID = "better-caesar-term-spinner-overlay";
+const DIRECT_HREF_DATASET_KEY = "betterCaesarDirectHref";
 const NAV_LOCK_OWNER = "enrollment-navigation";
 
 export class EnrollmentNavigationAugmentation implements Augmentation {
@@ -158,14 +158,14 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
 
     const wrapper = doc.createElement("div");
     wrapper.id = TERM_SWITCHER_ID;
-    wrapper.className = "better-caeser-term-wrapper";
+    wrapper.className = "better-caesar-term-wrapper";
 
     const title = doc.createElement("div");
-    title.className = "better-caeser-term-helper";
-    title.textContent = "Better CAESER Term Switcher";
+    title.className = "better-caesar-term-helper";
+    title.textContent = "Better CAESAR Term Switcher";
 
     const select = doc.createElement("select");
-    select.className = "better-caeser-term-select";
+    select.className = "better-caesar-term-select";
     select.disabled = true;
 
     const loadingOption = doc.createElement("option");
@@ -174,7 +174,7 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
     select.appendChild(loadingOption);
 
     const status = doc.createElement("div");
-    status.className = "better-caeser-term-status";
+    status.className = "better-caesar-term-status";
     status.textContent = "";
 
     wrapper.appendChild(title);
@@ -638,13 +638,13 @@ function showTermSpinnerOverlay(doc: Document): void {
 
   const overlay = doc.createElement("div");
   overlay.id = SPINNER_OVERLAY_ID;
-  overlay.className = "better-caeser-term-overlay";
+  overlay.className = "better-caesar-term-overlay";
 
   const spinner = doc.createElement("div");
-  spinner.className = "better-caeser-term-spinner";
+  spinner.className = "better-caesar-term-spinner";
 
   const text = doc.createElement("div");
-  text.className = "better-caeser-term-overlay-text";
+  text.className = "better-caesar-term-overlay-text";
   text.textContent = "Switching term...";
 
   overlay.appendChild(spinner);
@@ -677,21 +677,21 @@ function injectStyles(doc: Document): void {
   const style = doc.createElement("style");
   style.id = STYLE_ID;
   style.textContent = `
-    .better-caeser-term-wrapper {
+    .better-caesar-term-wrapper {
       margin-top: 6px;
       display: grid;
       gap: 4px;
       justify-items: start;
       max-width: 320px;
     }
-    .better-caeser-term-helper {
+    .better-caesar-term-helper {
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.2px;
       color: #66023c;
     }
-    .better-caeser-term-select {
+    .better-caesar-term-select {
       width: 100%;
       background: #ffffff;
       color: #3f0126;
@@ -700,16 +700,16 @@ function injectStyles(doc: Document): void {
       font-size: 12px;
       padding: 6px 8px;
     }
-    .better-caeser-term-select:focus-visible {
+    .better-caesar-term-select:focus-visible {
       outline: 2px solid #8a2f5b;
       outline-offset: 2px;
     }
-    .better-caeser-term-status {
+    .better-caesar-term-status {
       min-height: 14px;
       font-size: 10px;
       color: #66023c;
     }
-    .better-caeser-term-overlay {
+    .better-caesar-term-overlay {
       position: fixed;
       inset: 0;
       z-index: 2147483647;
@@ -719,20 +719,20 @@ function injectStyles(doc: Document): void {
       gap: 12px;
       background: rgba(255, 255, 255, 0.98);
     }
-    .better-caeser-term-spinner {
+    .better-caesar-term-spinner {
       width: 28px;
       height: 28px;
       border-radius: 50%;
       border: 3px solid #e1c7d5;
       border-top-color: #66023c;
-      animation: better-caeser-spin 0.8s linear infinite;
+      animation: better-caesar-spin 0.8s linear infinite;
     }
-    .better-caeser-term-overlay-text {
+    .better-caesar-term-overlay-text {
       color: #66023c;
       font-size: 14px;
       font-weight: 700;
     }
-    @keyframes better-caeser-spin {
+    @keyframes better-caesar-spin {
       to { transform: rotate(360deg); }
     }
   `;

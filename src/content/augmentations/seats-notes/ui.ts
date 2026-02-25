@@ -100,7 +100,7 @@ export function injectStyles(): void {
       border-left: 2px solid var(--bc-tyrian-mid);
       vertical-align: top;
     }
-    .better-caeser-card {
+    .better-caesar-card {
       display: grid;
       gap: 6px;
       padding: 8px;
@@ -111,7 +111,7 @@ export function injectStyles(): void {
       font-size: 11px;
       line-height: 1.35;
     }
-    .better-caeser-pill {
+    .better-caesar-pill {
       display: inline-block;
       justify-self: start;
       padding: 2px 8px;
@@ -120,39 +120,39 @@ export function injectStyles(): void {
       color: var(--bc-good-ink);
       font-weight: 700;
     }
-    .better-caeser-lines {
+    .better-caesar-lines {
       display: grid;
       gap: 2px;
     }
-    .better-caeser-line {
+    .better-caesar-line {
       font-size: 11px;
       color: var(--bc-tyrian-ink);
     }
-    .better-caeser-note {
+    .better-caesar-note {
       display: grid;
       gap: 2px;
     }
-    .better-caeser-note-label {
+    .better-caesar-note-label {
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.25px;
       color: var(--bc-tyrian);
     }
-    .better-caeser-note-text {
+    .better-caesar-note-text {
       color: var(--bc-tyrian-ink);
       overflow-wrap: anywhere;
     }
-    .better-caeser-warning {
+    .better-caesar-warning {
       color: #8a2e00;
       border-top: 1px dashed #d99a66;
       padding-top: 4px;
       font-weight: 600;
     }
-    .better-caeser-muted {
+    .better-caesar-muted {
       color: #5c4c56;
     }
-    .better-caeser-error {
+    .better-caesar-error {
       color: #7a123f;
       font-size: 11px;
       padding: 4px 0;
@@ -165,15 +165,15 @@ export function injectStyles(): void {
 
 function buildSeatsCard(response: SeatsNotesSuccess): HTMLElement {
   const card = document.createElement("div");
-  card.className = "better-caeser-card";
+  card.className = "better-caesar-card";
 
   const primary = document.createElement("div");
-  primary.className = "better-caeser-pill";
+  primary.className = "better-caesar-pill";
   primary.textContent = buildPrimarySeatsLine(response) ?? "Seat counts unavailable";
   card.appendChild(primary);
 
   const details = document.createElement("div");
-  details.className = "better-caeser-lines";
+  details.className = "better-caesar-lines";
   appendLine(details, "Open seats", response.availableSeats ? `${response.availableSeats}` : null);
   appendLine(
     details,
@@ -189,21 +189,21 @@ function buildSeatsCard(response: SeatsNotesSuccess): HTMLElement {
 
 function buildNotesCard(response: SeatsNotesSuccess, classNumber: string): HTMLElement {
   const card = document.createElement("div");
-  card.className = "better-caeser-card";
+  card.className = "better-caesar-card";
 
   appendNote(card, "Enrollment Information", response.enrollmentInfoNotes);
   appendNote(card, "Class Notes", response.classNotes);
 
   if (!response.enrollmentInfoNotes && !response.classNotes) {
     const empty = document.createElement("div");
-    empty.className = "better-caeser-muted";
+    empty.className = "better-caesar-muted";
     empty.textContent = "No notes listed.";
     card.appendChild(empty);
   }
 
   if (response.criteriaClassNumber && response.criteriaClassNumber !== classNumber) {
     const mismatch = document.createElement("div");
-    mismatch.className = "better-caeser-warning";
+    mismatch.className = "better-caesar-warning";
     mismatch.textContent = `Criteria mismatch: ${response.criteriaClassNumber}`;
     card.appendChild(mismatch);
   }
@@ -224,7 +224,7 @@ function buildPrimarySeatsLine(response: SeatsNotesSuccess): string | null {
 function appendLine(container: HTMLElement, label: string, value: string | null): void {
   if (!value) return;
   const line = document.createElement("div");
-  line.className = "better-caeser-line";
+  line.className = "better-caesar-line";
   line.textContent = `${label}: ${value}`;
   container.appendChild(line);
 }
@@ -232,14 +232,14 @@ function appendLine(container: HTMLElement, label: string, value: string | null)
 function appendNote(container: HTMLElement, label: string, value: string | null): void {
   if (!value) return;
   const block = document.createElement("div");
-  block.className = "better-caeser-note";
+  block.className = "better-caesar-note";
 
   const labelEl = document.createElement("div");
-  labelEl.className = "better-caeser-note-label";
+  labelEl.className = "better-caesar-note-label";
   labelEl.textContent = label;
 
   const textEl = document.createElement("div");
-  textEl.className = "better-caeser-note-text";
+  textEl.className = "better-caesar-note-text";
   textEl.textContent = value;
 
   block.appendChild(labelEl);
@@ -249,7 +249,7 @@ function appendNote(container: HTMLElement, label: string, value: string | null)
 
 function buildError(text: string): HTMLElement {
   const el = document.createElement("div");
-  el.className = "better-caeser-error";
+  el.className = "better-caesar-error";
   el.textContent = text;
   return el;
 }
