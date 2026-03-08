@@ -24,7 +24,6 @@ const staticAssets = [
 const entryPoints = {
   background: "src/background.ts",
   "content/index": "src/content/index.ts",
-  "content/bluera-probe": "src/content/bluera-probe.ts",
   "popup/popup": "src/popup/popup.ts"
 };
 

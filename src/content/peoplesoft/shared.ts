@@ -5,6 +5,7 @@ export const DEFAULT_CLASS_FIELD = "SSR_CLSRCH_WRK_CLASS_NBR$8";
 export const DEFAULT_TERM_FIELD = "CLASS_SRCH_WRK2_STRM$35$";
 export const DEFAULT_CAREER_FIELD = "SSR_CLSRCH_WRK_ACAD_CAREER$2";
 export const DEFAULT_INSTITUTION_FIELD = "CLASS_SRCH_WRK2_INSTITUTION$31$";
+export const CAESAR_ORIGIN = "https://caesar.ent.northwestern.edu";
 
 export type CareerCode = "UGRD" | "TGS";
 
@@ -18,8 +19,8 @@ export type SearchContext = {
 };
 
 export function resolveActionUrl(pathOrUrl: string): string {
-  if (pathOrUrl) return new URL(pathOrUrl, window.location.origin).toString();
-  return window.location.href;
+  if (pathOrUrl) return new URL(pathOrUrl, CAESAR_ORIGIN).toString();
+  return CAESAR_ORIGIN;
 }
 
 export function decodeEntities(value: string): string {

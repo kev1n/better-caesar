@@ -1,5 +1,6 @@
 import { type LookupClassMessage } from "../../shared/messages";
 import {
+  CAESAR_ORIGIN,
   DEFAULT_CAREER_FIELD,
   DEFAULT_CLASS_FIELD,
   DEFAULT_INSTITUTION_FIELD,
@@ -56,7 +57,7 @@ export function readContextCodes(): {
 
   for (const rawUrl of candidates) {
     try {
-      const url = new URL(rawUrl, window.location.origin);
+      const url = new URL(rawUrl, CAESAR_ORIGIN);
       const term = url.searchParams.get("STRM");
       const career = url.searchParams.get("ACAD_CAREER");
       const institution = url.searchParams.get("INSTITUTION");

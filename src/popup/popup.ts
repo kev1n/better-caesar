@@ -5,6 +5,7 @@ const CTEC_INDEX_KEY = "better-caesar:ctec-index:v1";
 const FEATURES: { id: string; label: string }[] = [
   { id: "seats-notes", label: "Seats & Notes" },
   { id: "ctec-links", label: "CTEC Links" },
+  { id: "paper-ctec", label: "paper.nu CTEC" },
   { id: "ctec-navigation", label: "CTEC Navigator" },
   { id: "enrollment-navigation", label: "Enrollment Terms" }
 ];

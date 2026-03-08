@@ -23,6 +23,30 @@ export type CtecIndexedEntry = {
   blueraUrl: string | null;
   error: string | null;
   searchText: string;
+  reportSummary?: CtecReportSummary | null;
+};
+
+export type CtecReportScalarMetric = {
+  mean: number;
+  responseCount: number;
+};
+
+export type CtecReportHoursMetric = {
+  mean: number;
+  responseCount: number;
+};
+
+export type CtecReportSummary = {
+  url: string;
+  parsedAt: number;
+  metrics: {
+    instruction?: CtecReportScalarMetric;
+    course?: CtecReportScalarMetric;
+    learned?: CtecReportScalarMetric;
+    challenging?: CtecReportScalarMetric;
+    stimulating?: CtecReportScalarMetric;
+    hours?: CtecReportHoursMetric;
+  };
 };
 
 export type CtecSubjectIndex = {

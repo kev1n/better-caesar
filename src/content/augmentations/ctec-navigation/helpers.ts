@@ -8,6 +8,8 @@ import type {
   IndexVisualState
 } from "./types";
 
+const CAESAR_ORIGIN = "https://caesar.ent.northwestern.edu";
+
 export function normalizeSubjectCode(value: string | null | undefined): string | null {
   if (!value) return null;
   const normalized = value.trim().toUpperCase();
@@ -35,7 +37,7 @@ export function cleanText(value: string | null | undefined): string {
 
 export function readCareerFromUrl(rawUrl: string): string | null {
   try {
-    const url = new URL(rawUrl, window.location.origin);
+    const url = new URL(rawUrl, CAESAR_ORIGIN);
     const career = url.searchParams.get("ACAD_CAREER");
     if (!career) return null;
     return normalizeCareerCode(career);
@@ -46,7 +48,7 @@ export function readCareerFromUrl(rawUrl: string): string | null {
 
 export function readSubjectCodeFromUrl(rawUrl: string): string | null {
   try {
-    const url = new URL(rawUrl, window.location.origin);
+    const url = new URL(rawUrl, CAESAR_ORIGIN);
     const subject = url.searchParams.get("SUBJECT");
     return normalizeSubjectCode(subject);
   } catch {
@@ -74,7 +76,7 @@ export function readSubjectContext(doc: Document, sourceUrl: string): CtecSubjec
 export function buildSubjectResultsUrl(subjectCode: string, careerCode: string): string {
   const url = new URL(
     "/psc/csnu/EMPLOYEE/SA/c/NWCT.NW_CT_PUB_RSLT_FL.GBL",
-    window.location.origin
+    CAESAR_ORIGIN
   );
   url.searchParams.set("Page", PAGE_ID);
   url.searchParams.set("NW_CTEC_SRCH_CHOIC", "C");
@@ -87,9 +89,9 @@ export function buildSubjectResultsUrl(subjectCode: string, careerCode: string):
 
 export function resolveActionUrl(action: string): string {
   try {
-    return new URL(action || window.location.href, window.location.origin).toString();
+    return new URL(action || window.location.href, CAESAR_ORIGIN).toString();
   } catch {
-    return window.location.href;
+    return CAESAR_ORIGIN;
   }
 }
 
@@ -209,7 +211,7 @@ export function extractBlueraUrl(responseText: string): string | null {
   }
 
   try {
-    return new URL(trimmed, window.location.origin).toString();
+    return new URL(trimmed, CAESAR_ORIGIN).toString();
   } catch {
     return trimmed;
   }

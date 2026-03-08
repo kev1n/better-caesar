@@ -9,6 +9,8 @@ export type CtecLinkParams = {
 export type CtecLinkEntry = {
   term: string;
   url: string;
+  instructor: string;
+  description: string;
 };
 
 export type CtecLinkData =

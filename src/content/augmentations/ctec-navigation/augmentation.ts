@@ -79,22 +79,6 @@ export class CtecNavigationAugmentation implements Augmentation {
     this.seedInputs(refs);
     this.render(refs);
     this.initialized = true;
-
-    // --- Temporary probe: test Bluera access via background tab ---
-    this.probeBluera();
-  }
-
-  private probeBluera(): void {
-    const TEST_URL =
-      "https://northwestern.bluera.com/northwestern/rpvf-eng.aspx?lang=eng&redi=1&SelectedIDforPrint=3994a7578f3bc9ba6400d7d8bef882e48186720dd278264fd4f79fede1f0a57d4234ddddae8d97e877ec470662793b08&ReportType=2&regl=en-US";
-
-    console.log("[probe] Testing Bluera access via background tab...");
-    chrome.runtime.sendMessage(
-      { type: "probe-bluera-tab", url: TEST_URL },
-      (response) => {
-        console.log("[probe] Background tab result:", response);
-      }
-    );
   }
 
   private appliesToPage(doc: Document): boolean {

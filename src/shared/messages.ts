@@ -4,6 +4,29 @@ export type LookupClassMessage = {
   careerHint?: "UGRD" | "TGS";
 };
 
+export type FetchTextMessage = {
+  type: "fetch-text";
+  url: string;
+  method?: "GET" | "POST";
+  headers?: Record<string, string>;
+  body?: string;
+};
+
+export type FetchTextSuccess = {
+  ok: true;
+  status: number;
+  text: string;
+  finalUrl: string;
+};
+
+export type FetchTextFailure = {
+  ok: false;
+  error: string;
+  status?: number;
+};
+
+export type FetchTextResponse = FetchTextSuccess | FetchTextFailure;
+
 export type LookupClassSuccess = {
   ok: true;
   requestedClassNumber: string;

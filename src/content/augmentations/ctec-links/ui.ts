@@ -8,8 +8,9 @@ export function injectStyles(): void {
   style.textContent = `
     .${CTEC_CELL_CLASS} {
       padding: 4px 8px;
-      min-width: 120px;
-      max-width: 200px;
+      min-width: 180px;
+      max-width: 260px;
+      width: 180px;
       vertical-align: top;
       border-left: 2px solid #d8b6c8;
     }
@@ -129,6 +130,9 @@ export function renderCtecLinksWidget(
       root.appendChild(count);
 
       const INITIAL_SHOWN = 3;
+      const distinctInstructors = new Set(data.entries.map((e) => e.instructor));
+      const multiInstructor = distinctInstructors.size > 1;
+
       const renderLinks = (entries: typeof data.entries) => {
         for (const entry of entries) {
           const a = document.createElement("a");
@@ -136,7 +140,11 @@ export function renderCtecLinksWidget(
           a.href = entry.url;
           a.target = "_blank";
           a.rel = "noopener noreferrer";
-          a.textContent = `\u2197 ${entry.term}`;
+          let label = `\u2197 ${entry.term}`;
+          if (multiInstructor) label += ` \u2014 ${lastName(entry.instructor)}`;
+          const title = courseShortTitle(entry.description);
+          if (title) label += ` (${title})`;
+          a.textContent = label;
           root.appendChild(a);
         }
       };
@@ -255,4 +263,23 @@ export function isCtecCellDone(container: HTMLElement): boolean {
 
 export function markCtecCellDone(container: HTMLElement): void {
   container.dataset.ctecDone = "1";
+}
+
+// Returns the last word of a name — used for compact multi-instructor labels.
+// "Bridget McMullan" → "McMullan"
+function lastName(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts[parts.length - 1] ?? name;
+}
+
+// Extracts a short course title from a CTEC description.
+// "COMP_SCI 396-0-8 Special Topics: AI for Hybrid Narrative" → "AI for Hybrid Narrative"
+// "DSGN 240-0-20 Introduction to Solid Modeling" → "Introduction to Solid Modeling"
+function courseShortTitle(description: string): string {
+  // Strip leading "SUBJECT NNN-N-N " prefix
+  const stripped = description.replace(/^\S+\s+[\d][\d-]*\s*/, "").trim();
+  // Prefer the part after the last colon (subtitle), if one exists
+  const colonIdx = stripped.lastIndexOf(":");
+  const title = colonIdx >= 0 ? stripped.slice(colonIdx + 1).trim() : stripped;
+  return title.length > 40 ? title.slice(0, 38) + "\u2026" : title;
 }

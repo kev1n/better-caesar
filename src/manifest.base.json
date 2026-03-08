@@ -18,16 +18,19 @@
     },
     {
       "matches": [
-        "https://northwestern.bluera.com/*"
+        "https://www.paper.nu/*",
+        "https://paper.nu/*"
       ],
-      "js": ["content/bluera-probe.js"],
-      "run_at": "document_idle",
+      "js": ["content/index.js"],
+      "run_at": "document_start",
       "all_frames": true
     }
   ],
-  "permissions": ["scripting", "tabs", "storage"],
+  "permissions": ["storage"],
   "host_permissions": [
     "https://caesar.ent.northwestern.edu/*",
+    "https://www.paper.nu/*",
+    "https://paper.nu/*",
     "https://northwestern.bluera.com/*",
     "https://prd-nusso.it.northwestern.edu/*",
     "https://fed.it.northwestern.edu/*"

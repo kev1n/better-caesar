@@ -25,6 +25,18 @@ export function normalizeInstructor(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+// Extract the last-name token from each comma-separated name in an instructor string.
+// "John Hartman,Stacey Wolcott" → ["hartman", "wolcott"]
+export function extractLastNameTokens(instructor: string): string[] {
+  return instructor
+    .split(",")
+    .map((n) => {
+      const parts = normalizeInstructor(n.trim()).split(" ").filter((t) => t.length > 0);
+      return parts[parts.length - 1] ?? "";
+    })
+    .filter((t) => t.length > 1);
+}
+
 // Regex matching catalog number as a standalone token in normalized text.
 // e.g. catalog "395" matches "comm st 395 0 21" but NOT "comm st 3950".
 function catalogTokenRegex(catalogNumber: string): RegExp {
@@ -48,12 +60,11 @@ export function entryMatchesCourse(
   if (!catalogTokenRegex(catalogNumber).test(entry.searchText)) return false;
 
   if (!instructor) return true;
-  const normEntry = normalizeInstructor(entry.instructor);
-  const normQuery = normalizeInstructor(instructor);
-
-  const tokens = normQuery.split(" ").filter((t) => t.length > 2);
-  if (tokens.length === 0) return true;
-  return tokens.some((token) => normEntry.includes(token));
+  const lastNames = extractLastNameTokens(instructor);
+  if (lastNames.length === 0) return true;
+  const entryParts = normalizeInstructor(entry.instructor).split(" ");
+  const entryLast = entryParts[entryParts.length - 1] ?? "";
+  return lastNames.some((ln) => entryLast === ln);
 }
 
 // Used by fetcher to find the matching course row in the CTEC subject page.

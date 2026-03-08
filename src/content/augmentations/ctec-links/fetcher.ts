@@ -16,7 +16,7 @@ import type { CtecIndexedEntry, CtecSubjectIndex } from "../ctec-navigation/type
 import { fetchPeopleSoft, fetchPeopleSoftGet } from "../../peoplesoft/http";
 import { runPeopleSoftTask } from "../../peoplesoft";
 import { CTEC_AUTH_URL, REQUEST_OWNER } from "./constants";
-import { courseDescMatchesCatalog, entryMatchesCourse, isAuthResponse, normalizeInstructor, termToSortKey } from "./helpers";
+import { courseDescMatchesCatalog, entryMatchesCourse, extractLastNameTokens, isAuthResponse, termToSortKey } from "./helpers";
 import type { CtecLinkData, CtecLinkEntry, CtecLinkParams } from "./types";
 
 const NOT_FOUND_ACTION_ID = "BC_NOT_FOUND";
@@ -145,7 +145,7 @@ function buildFoundResult(entries: CtecIndexedEntry[]): CtecLinkData {
 
   const withUrls: CtecLinkEntry[] = sorted
     .filter((e): e is CtecIndexedEntry & { blueraUrl: string } => e.blueraUrl !== null)
-    .map((e) => ({ term: e.term, url: e.blueraUrl }));
+    .map((e) => ({ term: e.term, url: e.blueraUrl, instructor: e.instructor, description: e.description }));
 
   if (withUrls.length === 0) return { state: "not-found" };
 
@@ -236,13 +236,13 @@ async function fetchCourseEntries(
   const allClassRows = collectClassRowsFromText(courseResponse);
   if (allClassRows.length === 0) return { type: "not-found" };
 
-  const normInstructor = normalizeInstructor(instructor);
-  const instrTokens = normInstructor.split(" ").filter((t) => t.length > 2);
+  const instrLastNames = extractLastNameTokens(instructor);
   const classRows =
-    instrTokens.length > 0
+    instrLastNames.length > 0
       ? allClassRows.filter((r) => {
-          const normRow = normalizeInstructor(r.instructor);
-          return instrTokens.some((tok) => normRow.includes(tok));
+          const rParts = r.instructor.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ");
+          const rLast = rParts[rParts.length - 1] ?? "";
+          return instrLastNames.some((ln) => rLast === ln);
         })
       : allClassRows;
 

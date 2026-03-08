@@ -2,6 +2,7 @@ import {
   getCurrentPeopleSoftTaskSignal,
   PeopleSoftTaskCancelledError
 } from "./traffic";
+import { fetchTextViaBackground } from "../remote-fetch";
 
 type RequestOptions = {
   owner?: string;
@@ -15,6 +16,19 @@ export async function fetchPeopleSoft(
   const signal = getCurrentPeopleSoftTaskSignal();
 
   try {
+    if (shouldUseBackgroundFetch()) {
+      throwIfAborted(signal);
+      const text = await fetchTextViaBackground(actionUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+        },
+        body: params.toString()
+      });
+      throwIfAborted(signal);
+      return text;
+    }
+
     const res = await fetch(actionUrl, {
       method: "POST",
       credentials: "include",
@@ -50,6 +64,13 @@ export async function fetchPeopleSoftGet(url: string, options?: RequestOptions):
   const signal = getCurrentPeopleSoftTaskSignal();
 
   try {
+    if (shouldUseBackgroundFetch()) {
+      throwIfAborted(signal);
+      const text = await fetchTextViaBackground(url, { method: "GET" });
+      throwIfAborted(signal);
+      return text;
+    }
+
     const res = await fetch(url, {
       method: "GET",
       credentials: "include",
@@ -75,4 +96,21 @@ export async function fetchPeopleSoftGet(url: string, options?: RequestOptions):
 
     throw error;
   }
+}
+
+function shouldUseBackgroundFetch(): boolean {
+  return window.location.hostname !== "caesar.ent.northwestern.edu";
+}
+
+function throwIfAborted(signal: AbortSignal | null): void {
+  if (!signal?.aborted) return;
+
+  const reason = signal.reason;
+  if (reason instanceof PeopleSoftTaskCancelledError) {
+    throw reason;
+  }
+
+  throw new PeopleSoftTaskCancelledError(
+    reason instanceof Error ? reason.message : "PeopleSoft task canceled."
+  );
 }
