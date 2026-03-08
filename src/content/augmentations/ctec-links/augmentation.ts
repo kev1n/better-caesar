@@ -1,4 +1,5 @@
 import type { Augmentation } from "../../framework";
+import { isRetryablePeopleSoftTaskError } from "../../peoplesoft";
 import { extractCareerHint, extractClassNumber } from "../seats-notes/helpers";
 import { CLASS_LINK_SELECTOR, CLASS_ROW_SELECTOR, PAGE_ID } from "./constants";
 import { fetchCtecLinks, getCtecLinksFromCache } from "./fetcher";
@@ -99,6 +100,11 @@ export class CtecLinksAugmentation implements Augmentation {
       })
       .catch((err: unknown) => {
         this.inFlight.delete(key);
+        if (isRetryablePeopleSoftTaskError(err)) {
+          renderFetchButton(target.container, () => this.kick(target, key));
+          return;
+        }
+
         const errData: CtecLinkData = {
           state: "error",
           message: err instanceof Error ? err.message : "Unknown error"

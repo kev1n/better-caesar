@@ -1,5 +1,5 @@
 import { TemplateAugmentation } from "../../framework";
-import { lookupClass } from "../../peoplesoft";
+import { isRetryablePeopleSoftTaskError, lookupClass } from "../../peoplesoft";
 import { CLASS_LINK_SELECTOR } from "./constants";
 import { extractCareerHint, extractClassNumber, queryTargetTables } from "./helpers";
 import { toFailure, toSeatsNotesResult } from "./parser";
@@ -66,13 +66,27 @@ export class SeatsNotesAugmentation extends TemplateAugmentation<RowTarget, Seat
   }
 
   protected async fetchData(target: RowTarget): Promise<SeatsNotesResult> {
-    return lookupClass({
-      type: "lookup-class",
-      classNumber: target.classNumber,
-      careerHint: target.careerHint
-    })
-      .then((lookupResponse) => toSeatsNotesResult(lookupResponse))
-      .catch((error: unknown) => toFailure(error));
+    try {
+      const lookupResponse = await lookupClass(
+        {
+          type: "lookup-class",
+          classNumber: target.classNumber,
+          careerHint: target.careerHint
+        },
+        {
+          priority: "background",
+          owner: "seats-notes"
+        }
+      );
+
+      return toSeatsNotesResult(lookupResponse);
+    } catch (error) {
+      if (isRetryablePeopleSoftTaskError(error)) {
+        throw error;
+      }
+
+      return toFailure(error);
+    }
   }
 
   protected renderSuccess(target: RowTarget, data: SeatsNotesResult): void {

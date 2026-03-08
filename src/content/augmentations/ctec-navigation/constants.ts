@@ -10,7 +10,7 @@ export const REQUEST_OWNER = "ctec-navigation";
 export const MAX_RESULTS = 75;
 export const MAX_COURSES_PER_SUBJECT = 200;
 export const MAX_PARALLEL_COURSE_LOADERS = 6;
-export const MAX_PARALLEL_CLASS_WORKERS = 10;
+export const MAX_PARALLEL_CLASS_WORKERS = 1;
 export const PROGRESS_REFRESH_INTERVAL_MS = 200;
 
 export const DEFAULT_SUBJECT_CODE = "UNKNOWN";

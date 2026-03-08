@@ -25,30 +25,28 @@ const TERM_PAGE_ID = "SSR_SSENRL_TERM";
 const CONTEXT_STORAGE_KEY = "better-caesar:enrollment-context:v1";
 const TARGET_TERM_VALUE_KEY = "better-caesar:target-term-value";
 
-const CART_LINK_SELECTOR = "a[href*='SSR_SSENRL_CART.GBL?Page=SSR_SSENRL_CART&Action=A']";
 const TERM_RADIO_SELECTOR =
   "#SSR_DUMMY_RECV1\\$scroll\\$0 input[type='radio'][name^='SSR_DUMMY_RECV1$sels$']";
 const CONTINUE_BUTTON_SELECTOR = "#DERIVED_SSS_SCT_SSR_PB_GO";
 
 const STYLE_ID = "better-caesar-enrollment-nav-style";
 const TERM_SWITCHER_ID = "better-caesar-term-switcher";
-const SPINNER_OVERLAY_ID = "better-caesar-term-spinner-overlay";
-const DIRECT_HREF_DATASET_KEY = "betterCaesarDirectHref";
+const SPINNER_OVERLAY_ID = "better-caesar-term-auto-continue-overlay";
 const NAV_LOCK_OWNER = "enrollment-navigation";
 
 export class EnrollmentNavigationAugmentation implements Augmentation {
   readonly id = "enrollment-navigation";
 
-  private clickInterceptorInstalled = false;
-  private autoSubmitTriggered = false;
-  private termStateCache: { fetchedAt: number; promise: Promise<TermPickerState | null> } | null = null;
-  private navigationInFlight = false;
+  private waitingForLoad = false;
+  private lastSubmittedSignature: string | null = null;
+  private termStateCache: {
+    fetchedAt: number;
+    promise: Promise<TermPickerState | null>;
+  } | null = null;
 
   run(doc: Document = document): void {
     injectStyles(doc);
     this.persistContextFromKnownSources(doc);
-    this.rewriteEnrollmentLinks(doc);
-    this.installClickInterceptor();
 
     const pageId = getPageId(doc);
     if (isEnrollmentWorkflowPage(doc, pageId)) {
@@ -56,9 +54,14 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
       this.injectTermSwitcher(doc);
     }
 
-    if (pageId === TERM_PAGE_ID) {
-      this.autoContinueTermPage(doc);
+    if (pageId !== TERM_PAGE_ID) {
+      this.waitingForLoad = false;
+      this.lastSubmittedSignature = null;
+      hideTermSpinnerOverlay(doc);
+      return;
     }
+
+    this.autoContinueTermPage(doc);
   }
 
   private persistContextFromKnownSources(doc: Document): void {
@@ -70,84 +73,6 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
       persistContext(context);
       return;
     }
-  }
-
-  private rewriteEnrollmentLinks(doc: Document): void {
-    const context = this.readStoredContext();
-    const links = doc.querySelectorAll<HTMLAnchorElement>(CART_LINK_SELECTOR);
-
-    for (const link of Array.from(links)) {
-      const href = link.getAttribute("href");
-      if (!href || href.startsWith("javascript:")) continue;
-
-      let targetUrl: URL;
-      try {
-        targetUrl = new URL(href, window.location.origin);
-      } catch {
-        continue;
-      }
-
-      if (context) {
-        targetUrl = applyContextToCartUrl(targetUrl, context);
-      }
-
-      link.dataset[DIRECT_HREF_DATASET_KEY] = targetUrl.toString();
-
-      const rewritten = isRelativeHref(href)
-        ? `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`
-        : targetUrl.toString();
-
-      if (href !== rewritten) {
-        link.setAttribute("href", rewritten);
-      }
-    }
-  }
-
-  private installClickInterceptor(): void {
-    if (this.clickInterceptorInstalled) return;
-
-    document.addEventListener(
-      "click",
-      (event) => {
-        if (!(event.target instanceof Element)) return;
-        if (event.defaultPrevented) return;
-        if (event.button !== 0) return;
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
-        const anchor = event.target.closest<HTMLAnchorElement>(CART_LINK_SELECTOR);
-        if (!anchor) return;
-
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-
-        if (this.navigationInFlight) return;
-        this.navigationInFlight = true;
-
-        const directHref = anchor.dataset[DIRECT_HREF_DATASET_KEY];
-        const termSelectorUrl = buildTermSelectorUrl(document);
-
-        void this.startLockedNavigation(() => {
-          clearTargetTermSelection();
-          if (directHref) {
-            window.location.assign(directHref);
-            return;
-          }
-
-          if (termSelectorUrl) {
-            window.location.assign(termSelectorUrl);
-            return;
-          }
-
-          window.location.assign(anchor.href);
-        }).finally(() => {
-          this.navigationInFlight = false;
-        });
-      },
-      true
-    );
-
-    this.clickInterceptorInstalled = true;
   }
 
   private injectTermSwitcher(doc: Document): void {
@@ -175,14 +100,13 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
 
     const status = doc.createElement("div");
     status.className = "better-caesar-term-status";
-    status.textContent = "";
 
     wrapper.appendChild(title);
     wrapper.appendChild(select);
     wrapper.appendChild(status);
     anchor.insertAdjacentElement("afterend", wrapper);
 
-    void this.getTermPickerState().then((state) => {
+    void this.getTermPickerState(doc).then((state) => {
       select.textContent = "";
 
       if (!state || state.options.length === 0) {
@@ -206,7 +130,7 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
         ? state.options.find(
             (option) =>
               normalizeText(option.term) === normalizeText(currentSignature.term) &&
-              normalizeText(option.career) === normalizeText(currentSignature.career)
+              normalizeText(option.career) === normalizeText(currentSignature.career),
           )
         : null;
 
@@ -221,70 +145,70 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
 
         status.textContent = "Switching term...";
         select.disabled = true;
-
         setTargetTermSelection(selected.value);
 
         void this.startLockedNavigation(() => {
           window.location.assign(state.termSelectorUrl);
         }).catch((error: unknown) => {
-          const text = error instanceof Error ? error.message : "Unknown error.";
-          status.textContent = `Switch failed: ${text}`;
+          clearTargetTermSelection();
+          status.textContent =
+            error instanceof Error ? `Switch failed: ${error.message}` : "Switch failed.";
           select.disabled = false;
         });
       });
     });
   }
 
-  private async getTermPickerState(): Promise<TermPickerState | null> {
+  private async getTermPickerState(doc: Document): Promise<TermPickerState | null> {
     const now = Date.now();
     if (this.termStateCache && now - this.termStateCache.fetchedAt < 30_000) {
       return this.termStateCache.promise;
     }
 
-    const promise = this.fetchTermPickerState();
+    const promise = this.fetchTermPickerState(doc);
     this.termStateCache = { fetchedAt: now, promise };
     return promise;
   }
 
-  private async fetchTermPickerState(): Promise<TermPickerState | null> {
-    const termSelectorUrl = buildTermSelectorUrl(document);
+  private async fetchTermPickerState(doc: Document): Promise<TermPickerState | null> {
+    const termSelectorUrl = buildTermSelectorUrl(doc);
     if (!termSelectorUrl) return null;
 
     const res = await fetch(termSelectorUrl, {
       method: "GET",
-      credentials: "include"
+      credentials: "include",
     });
 
     if (!res.ok) return null;
 
     const html = await res.text();
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
+    const nextDoc = parser.parseFromString(html, "text/html");
 
-    if (getPageId(doc) !== TERM_PAGE_ID) {
+    if (getPageId(nextDoc) !== TERM_PAGE_ID) {
       const context = extractContextFromHtml(html) ?? parseContext(res.url);
       if (context) persistContext(context);
       return null;
     }
 
-    const radios = Array.from(doc.querySelectorAll<HTMLInputElement>(TERM_RADIO_SELECTOR)).filter(
-      (radio) => !radio.disabled && radio.name
-    );
+    const radios = Array.from(
+      nextDoc.querySelectorAll<HTMLInputElement>(TERM_RADIO_SELECTOR),
+    ).filter((radio) => !radio.disabled && radio.name);
 
     if (radios.length === 0) return null;
 
     const options: TermOption[] = [];
     for (const radio of radios) {
       const rowIndex = radio.id.match(/\$(\d+)\$\$0$/)?.[1] ?? radio.value;
-      const term = textById(doc, `TERM_CAR$${rowIndex}`);
-      const career = textById(doc, `CAREER$${rowIndex}`);
+      const term = textById(nextDoc, `TERM_CAR$${rowIndex}`);
+      const career = textById(nextDoc, `CAREER$${rowIndex}`);
       const label = [term, career].filter(Boolean).join(" | ") || `Term ${radio.value}`;
 
       options.push({
         value: radio.value,
         term,
         career,
-        label
+        label,
       });
     }
 
@@ -292,41 +216,70 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
   }
 
   private autoContinueTermPage(doc: Document): void {
-    if (this.autoSubmitTriggered) return;
+    showTermSpinnerOverlay(doc);
 
-    const radios = Array.from(doc.querySelectorAll<HTMLInputElement>(TERM_RADIO_SELECTOR)).filter(
-      (radio) => !radio.disabled
-    );
-    const continueButton = doc.querySelector<HTMLInputElement>(CONTINUE_BUTTON_SELECTOR);
-    if (radios.length === 0 || !continueButton || continueButton.disabled) {
-      releasePeopleSoftLock(NAV_LOCK_OWNER);
+    if (doc.readyState !== "complete") {
+      if (this.waitingForLoad) return;
+      this.waitingForLoad = true;
+      window.addEventListener(
+        "load",
+        () => {
+          this.waitingForLoad = false;
+          this.run(document);
+        },
+        { once: true },
+      );
       return;
     }
 
-    const targetValue = getTargetTermSelection();
+    const targetValue = getTargetTermSelection() ?? "";
+    const signature = buildPageSignature(doc, targetValue);
+    if (this.lastSubmittedSignature === signature) {
+      return;
+    }
+
+    const radios = Array.from(
+      doc.querySelectorAll<HTMLInputElement>(TERM_RADIO_SELECTOR),
+    ).filter((radio) => !radio.disabled);
+    const continueButton = doc.querySelector<HTMLInputElement>(
+      CONTINUE_BUTTON_SELECTOR,
+    );
+    if (radios.length === 0 || !continueButton || continueButton.disabled) {
+      clearTargetTermSelection();
+      releasePeopleSoftLock(NAV_LOCK_OWNER);
+      hideTermSpinnerOverlay(doc);
+      return;
+    }
+
     const selectedRadio =
       (targetValue ? radios.find((radio) => radio.value === targetValue) : null) ??
+      radios.find((radio) => radio.checked) ??
       radios[radios.length - 1] ??
       null;
 
     if (!selectedRadio) {
+      clearTargetTermSelection();
       releasePeopleSoftLock(NAV_LOCK_OWNER);
+      hideTermSpinnerOverlay(doc);
       return;
     }
 
-    this.autoSubmitTriggered = true;
+    this.lastSubmittedSignature = signature;
     clearTargetTermSelection();
-    showTermSpinnerOverlay(doc);
 
-    selectedRadio.click();
+    if (!selectedRadio.checked) {
+      selectedRadio.checked = true;
+      selectedRadio.setAttribute("checked", "checked");
+    }
+
     window.setTimeout(() => {
       continueButton.click();
-    }, 40);
+    }, 80);
 
-    // Safety release if CAESAR does not navigate away.
     window.setTimeout(() => {
       if (getPageId(document) === TERM_PAGE_ID) {
         releasePeopleSoftLock(NAV_LOCK_OWNER);
+        hideTermSpinnerOverlay(document);
       }
     }, 10_000);
   }
@@ -335,31 +288,14 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
     await acquirePeopleSoftLock(NAV_LOCK_OWNER, {
       waitForIdle: true,
       abortActive: true,
-      ttlMs: 120_000
+      ttlMs: 120_000,
     });
+
     try {
       navigate();
     } catch (error) {
       releasePeopleSoftLock(NAV_LOCK_OWNER);
       throw error;
-    }
-  }
-
-  private readStoredContext(): EnrollmentContext | null {
-    try {
-      const raw = window.localStorage.getItem(CONTEXT_STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as Partial<EnrollmentContext>;
-      if (!parsed.ACAD_CAREER || !parsed.INSTITUTION || !parsed.STRM) return null;
-
-      return {
-        ACAD_CAREER: parsed.ACAD_CAREER,
-        INSTITUTION: parsed.INSTITUTION,
-        STRM: parsed.STRM,
-        EMPLID: parsed.EMPLID
-      };
-    } catch {
-      return null;
     }
   }
 }
@@ -369,6 +305,25 @@ function persistContext(context: EnrollmentContext): void {
     window.localStorage.setItem(CONTEXT_STORAGE_KEY, JSON.stringify(context));
   } catch {
     // Ignore storage errors.
+  }
+}
+
+function readStoredContext(): EnrollmentContext | null {
+  try {
+    const raw = window.localStorage.getItem(CONTEXT_STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<EnrollmentContext>;
+    if (!parsed.ACAD_CAREER || !parsed.INSTITUTION || !parsed.STRM) return null;
+
+    return {
+      ACAD_CAREER: parsed.ACAD_CAREER,
+      INSTITUTION: parsed.INSTITUTION,
+      STRM: parsed.STRM,
+      EMPLID: parsed.EMPLID,
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -390,12 +345,12 @@ function parseContext(pathOrUrl: string): EnrollmentContext | null {
     ACAD_CAREER,
     INSTITUTION,
     STRM,
-    ...(EMPLID ? { EMPLID } : {})
+    ...(EMPLID ? { EMPLID } : {}),
   };
 }
 
 function extractContextFromHtml(html: string): EnrollmentContext | null {
-  const pattern = /(?:strCurrUrl|sHistURL|refererURL)\s*=\s*['\"]([^'\"]+)['\"]/g;
+  const pattern = /(?:strCurrUrl|sHistURL|refererURL)\s*=\s*['"]([^'"]+)['"]/g;
 
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(html)) !== null) {
@@ -420,6 +375,7 @@ function getComponentId(doc: Document): string | null {
 
 function isEnrollmentWorkflowPage(doc: Document, pageId: string | null): boolean {
   if (pageId === TERM_PAGE_ID) return false;
+
   const component = getComponentId(doc);
   const value = (component ?? pageId ?? "").toUpperCase();
   if (!value.startsWith("SSR_SSENRL_")) return false;
@@ -436,7 +392,7 @@ function isEnrollmentWorkflowPage(doc: Document, pageId: string | null): boolean
 function extractUrlsFromInlineScripts(doc: Document): string[] {
   const urls = new Set<string>();
   const scriptEls = doc.querySelectorAll("script:not([src])");
-  const pattern = /(?:strCurrUrl|sHistURL|refererURL)\s*=\s*['\"]([^'\"]+)['\"]/g;
+  const pattern = /(?:strCurrUrl|sHistURL|refererURL)\s*=\s*['"]([^'"]+)['"]/g;
 
   for (const script of Array.from(scriptEls)) {
     const source = script.textContent ?? "";
@@ -452,15 +408,12 @@ function extractUrlsFromInlineScripts(doc: Document): string[] {
 }
 
 function buildTermSelectorUrl(doc: Document): string | null {
-  const pageInfo = doc.querySelector<HTMLElement>("#pt_pageinfo_win0");
-  const currentPage = pageInfo?.getAttribute("Page") ?? "";
+  const currentPage = getPageId(doc) ?? "";
 
   if (currentPage === TERM_PAGE_ID) {
     return window.location.href;
   }
 
-  // Prefer term selection within the current enrollment workflow page so
-  // continue returns to the same flow (Drop/Swap/Edit/Cart), not always Cart.
   if (isEnrollmentWorkflowPage(doc, currentPage)) {
     try {
       const currentUrl = new URL(window.location.href);
@@ -486,49 +439,14 @@ function buildTermSelectorUrl(doc: Document): string | null {
     }
   }
 
-  const breadcrumbHref = doc.querySelector<HTMLAnchorElement>("#pthnavbccrefanc_SSR_SSENRL_CART_GBL")?.href;
-  const cartNavHrefs = Array.from(
-    doc.querySelectorAll<HTMLAnchorElement>("a[href*='SSR_SSENRL_CART.GBL?Page=SSR_SSENRL_CART']")
-  ).map((link) => link.href);
   const formAction = doc.querySelector<HTMLFormElement>("form[name='win0']")?.action;
-  const candidates = Array.from(
-    new Set([breadcrumbHref, ...cartNavHrefs, window.location.href, formAction].filter(Boolean))
-  ) as string[];
-
-  for (const candidate of candidates) {
-    let url: URL;
-    try {
-      url = new URL(candidate, window.location.origin);
-    } catch {
-      continue;
-    }
-
-    if (!/SSR_SSENRL_CART\.GBL/i.test(url.pathname)) continue;
-
-    if (!url.searchParams.get("Page")) {
-      url.searchParams.set("Page", "SSR_SSENRL_CART");
-    }
-    if (!url.searchParams.get("NavColl")) {
-      url.searchParams.set("NavColl", "true");
-    }
-    if (!url.searchParams.get("ICAGTarget")) {
-      url.searchParams.set("ICAGTarget", "start");
-    }
-    if (!url.searchParams.get("ICAJAXTrf")) {
-      url.searchParams.set("ICAJAXTrf", "true");
-    }
-
-    url.searchParams.set("PAGE", TERM_PAGE_ID);
-    return url.toString();
-  }
-
-  const context = readContextFromCandidates([window.location.href, formAction, ...candidates]);
+  const candidates = [window.location.href, formAction];
+  const context = readContextFromCandidates(candidates) ?? readStoredContext();
   if (!context) return null;
 
-  const baseCandidate = candidates[0] ?? window.location.href;
   let fallbackUrl: URL;
   try {
-    fallbackUrl = new URL(baseCandidate, window.location.origin);
+    fallbackUrl = new URL(window.location.href);
   } catch {
     return null;
   }
@@ -536,7 +454,7 @@ function buildTermSelectorUrl(doc: Document): string | null {
   if (/SA_LEARNER_SERVICES(?:_2)?\.[^.]+\.GBL/i.test(fallbackUrl.pathname)) {
     fallbackUrl.pathname = fallbackUrl.pathname.replace(
       /SA_LEARNER_SERVICES(?:_2)?\.[^.]+\.GBL/i,
-      "SA_LEARNER_SERVICES_2.SSR_SSENRL_CART.GBL"
+      "SA_LEARNER_SERVICES_2.SSR_SSENRL_CART.GBL",
     );
   }
 
@@ -553,11 +471,11 @@ function buildTermSelectorUrl(doc: Document): string | null {
   fallbackUrl.searchParams.set("ICAJAXTrf", "true");
   fallbackUrl.searchParams.set("PAGE", TERM_PAGE_ID);
   return fallbackUrl.toString();
-
-  return null;
 }
 
-function readContextFromCandidates(candidates: Array<string | null | undefined>): EnrollmentContext | null {
+function readContextFromCandidates(
+  candidates: Array<string | null | undefined>,
+): EnrollmentContext | null {
   for (const candidate of candidates) {
     if (!candidate) continue;
     const context = parseContext(candidate);
@@ -572,10 +490,7 @@ function textById(doc: Document, id: string): string {
   return normalizeText(element.textContent ?? "");
 }
 
-function readCurrentTermSignature(doc: Document): {
-  term: string;
-  career: string;
-} | null {
+function readCurrentTermSignature(doc: Document): { term: string; career: string } | null {
   const text = textById(doc, "DERIVED_REGFRM1_SSR_STDNTKEY_DESCR$11$");
   if (!text) return null;
 
@@ -587,26 +502,6 @@ function readCurrentTermSignature(doc: Document): {
 
 function normalizeText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
-}
-
-function applyContextToCartUrl(baseUrl: URL, context: EnrollmentContext): URL {
-  const url = new URL(baseUrl.toString());
-  if (!/SSR_SSENRL_CART\.GBL/i.test(url.pathname)) return url;
-
-  url.searchParams.set("Page", "SSR_SSENRL_CART");
-  url.searchParams.set("Action", "A");
-  url.searchParams.set("ACAD_CAREER", context.ACAD_CAREER);
-  url.searchParams.set("INSTITUTION", context.INSTITUTION);
-  url.searchParams.set("STRM", context.STRM);
-  if (context.EMPLID) {
-    url.searchParams.set("EMPLID", context.EMPLID);
-  }
-
-  return url;
-}
-
-function isRelativeHref(href: string): boolean {
-  return href.startsWith("/") || href.startsWith("?") || !/^https?:\/\//i.test(href);
 }
 
 function setTargetTermSelection(value: string): void {
@@ -633,6 +528,12 @@ function clearTargetTermSelection(): void {
   }
 }
 
+function buildPageSignature(doc: Document, targetValue: string): string {
+  const icStateNum =
+    doc.querySelector<HTMLInputElement>("#ICStateNum")?.value ?? "";
+  return `${window.location.href}|${icStateNum}|${targetValue}`;
+}
+
 function showTermSpinnerOverlay(doc: Document): void {
   if (doc.getElementById(SPINNER_OVERLAY_ID)) return;
 
@@ -649,9 +550,14 @@ function showTermSpinnerOverlay(doc: Document): void {
 
   overlay.appendChild(spinner);
   overlay.appendChild(text);
+
   const host = doc.body ?? doc.documentElement;
   if (!host) return;
   host.appendChild(overlay);
+}
+
+function hideTermSpinnerOverlay(doc: Document): void {
+  doc.getElementById(SPINNER_OVERLAY_ID)?.remove();
 }
 
 function resolveTermSwitcherAnchor(doc: Document): Element | null {

@@ -1,4 +1,7 @@
-import { beginPeopleSoftRequest } from "./traffic";
+import {
+  getCurrentPeopleSoftTaskSignal,
+  PeopleSoftTaskCancelledError
+} from "./traffic";
 
 type RequestOptions = {
   owner?: string;
@@ -9,7 +12,7 @@ export async function fetchPeopleSoft(
   params: URLSearchParams,
   options?: RequestOptions
 ): Promise<string> {
-  const { signal, finish } = beginPeopleSoftRequest(options?.owner);
+  const signal = getCurrentPeopleSoftTaskSignal();
 
   try {
     const res = await fetch(actionUrl, {
@@ -26,14 +29,25 @@ export async function fetchPeopleSoft(
       throw new Error(`Search request failed (${res.status}).`);
     }
 
-    return res.text();
-  } finally {
-    finish();
+    return await res.text();
+  } catch (error) {
+    if (signal?.aborted) {
+      const reason = signal.reason;
+      if (reason instanceof PeopleSoftTaskCancelledError) {
+        throw reason;
+      }
+
+      throw new PeopleSoftTaskCancelledError(
+        reason instanceof Error ? reason.message : "PeopleSoft task canceled."
+      );
+    }
+
+    throw error;
   }
 }
 
 export async function fetchPeopleSoftGet(url: string, options?: RequestOptions): Promise<string> {
-  const { signal, finish } = beginPeopleSoftRequest(options?.owner);
+  const signal = getCurrentPeopleSoftTaskSignal();
 
   try {
     const res = await fetch(url, {
@@ -46,8 +60,19 @@ export async function fetchPeopleSoftGet(url: string, options?: RequestOptions):
       throw new Error(`Context request failed (${res.status}).`);
     }
 
-    return res.text();
-  } finally {
-    finish();
+    return await res.text();
+  } catch (error) {
+    if (signal?.aborted) {
+      const reason = signal.reason;
+      if (reason instanceof PeopleSoftTaskCancelledError) {
+        throw reason;
+      }
+
+      throw new PeopleSoftTaskCancelledError(
+        reason instanceof Error ? reason.message : "PeopleSoft task canceled."
+      );
+    }
+
+    throw error;
   }
 }

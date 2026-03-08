@@ -1,3 +1,5 @@
+import { isRetryablePeopleSoftTaskError } from "../peoplesoft";
+
 export interface Augmentation {
   readonly id: string;
   run(doc?: Document): void;
@@ -32,6 +34,7 @@ export abstract class TemplateAugmentation<TTarget, TData> implements Augmentati
           this.markLoaded(target, key);
         })
         .catch((error: unknown) => {
+          if (isRetryablePeopleSoftTaskError(error)) return;
           this.renderError(target, this.toError(error), key);
         });
     }
@@ -60,6 +63,11 @@ export abstract class TemplateAugmentation<TTarget, TData> implements Augmentati
 
     const job = this.enqueue(() => this.fetchData(target, key, doc));
     this.cache.set(key, job);
+    void job.catch((error: unknown) => {
+      if (!isRetryablePeopleSoftTaskError(error)) return;
+      if (this.cache.get(key) !== job) return;
+      this.cache.delete(key);
+    });
     return job;
   }
 

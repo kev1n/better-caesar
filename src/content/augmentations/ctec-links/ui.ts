@@ -77,7 +77,7 @@ export function renderFetchButton(container: HTMLElement, onFetch: () => void): 
   container.innerHTML = "";
   const btn = document.createElement("button");
   btn.className = "bc-ctec-fetch";
-  btn.textContent = "CTEC";
+  btn.textContent = "Load CTEC";
   btn.addEventListener("click", (e) => {
     e.preventDefault();
     onFetch();
@@ -86,7 +86,7 @@ export function renderFetchButton(container: HTMLElement, onFetch: () => void): 
 }
 
 export function renderLoading(container: HTMLElement): void {
-  container.innerHTML = '<div class="bc-ctec-widget bc-ctec-muted">Loading\u2026</div>';
+  container.innerHTML = '<div class="bc-ctec-widget bc-ctec-muted">Loading CTEC\u2026</div>';
 }
 
 export function isCtecCellReady(container: HTMLElement): boolean {

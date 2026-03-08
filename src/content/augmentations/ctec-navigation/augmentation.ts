@@ -1,5 +1,6 @@
 import type { Augmentation } from "../../framework";
 import { fetchPeopleSoft, fetchPeopleSoftGet } from "../../peoplesoft/http";
+import { isRetryablePeopleSoftTaskError, runPeopleSoftTask } from "../../peoplesoft";
 import {
   DEFAULT_CAREER_CODE,
   DEFAULT_SUBJECT_CODE,
@@ -174,53 +175,64 @@ export class CtecNavigationAugmentation implements Augmentation {
     this.refresh();
 
     try {
-      rememberLastSubject(subjectCode);
+      const completedIndex = await runPeopleSoftTask(
+        "user",
+        async () => {
+          rememberLastSubject(subjectCode);
 
-      let subjectContext: CtecSubjectContext = { code: subjectCode, label: subjectCode };
-      let entries: CtecIndexedEntry[] = [];
+          let subjectContext: CtecSubjectContext = { code: subjectCode, label: subjectCode };
+          let entries: CtecIndexedEntry[] = [];
 
-      const canUseVisibleRows =
-        this.currentRows.length > 0 && this.currentContext?.code === subjectCode;
+          const canUseVisibleRows =
+            this.currentRows.length > 0 && this.currentContext?.code === subjectCode;
 
-      if (canUseVisibleRows) {
-        const form = document.forms.namedItem("win0");
-        if (!(form instanceof HTMLFormElement)) {
-          throw new Error("Could not find the CAESAR form for visible-row indexing.");
-        }
+          if (canUseVisibleRows) {
+            const form = document.forms.namedItem("win0");
+            if (!(form instanceof HTMLFormElement)) {
+              throw new Error("Could not find the CAESAR form for visible-row indexing.");
+            }
 
-        subjectContext = this.currentContext ?? { code: subjectCode, label: subjectCode };
-        const actionUrl = resolveActionUrl(form.action);
-        const baseParams = serializeForm(form);
-        entries = await this.indexClassTasks(
-          this.currentRows.map((row) => ({ row, actionUrl, params: baseParams, courseIndex: -1 }))
-        );
-      } else {
-        const remoteData = await this.fetchAndIndexRemoteSubject(subjectCode, careerCode);
-        subjectContext = remoteData.context;
-        entries = remoteData.entries;
-      }
+            subjectContext = this.currentContext ?? { code: subjectCode, label: subjectCode };
+            const actionUrl = resolveActionUrl(form.action);
+            const baseParams = serializeForm(form);
+            entries = await this.indexClassTasks(
+              this.currentRows.map((row) => ({ row, actionUrl, params: baseParams, courseIndex: -1 }))
+            );
+          } else {
+            const remoteData = await this.fetchAndIndexRemoteSubject(subjectCode, careerCode);
+            subjectContext = remoteData.context;
+            entries = remoteData.entries;
+          }
 
-      if (entries.length === 0) {
-        throw new Error(`No CTEC rows found for ${subjectCode}.`);
-      }
+          if (entries.length === 0) {
+            throw new Error(`No CTEC rows found for ${subjectCode}.`);
+          }
 
-      const dedupedEntries = dedupeEntries(entries);
-      this.indexingProgress = `Indexed ${dedupedEntries.length} rows for ${subjectCode}.`;
-      this.queueProgressRender(true);
+          const dedupedEntries = dedupeEntries(entries);
+          this.indexingProgress = `Indexed ${dedupedEntries.length} rows for ${subjectCode}.`;
+          this.queueProgressRender(true);
 
-      const nextIndex: CtecSubjectIndex = {
-        subjectCode,
-        subjectLabel: subjectContext.label,
-        builtAt: Date.now(),
-        sourceUrl: window.location.href,
-        entries: dedupedEntries
-      };
+          const nextIndex: CtecSubjectIndex = {
+            subjectCode,
+            subjectLabel: subjectContext.label,
+            builtAt: Date.now(),
+            sourceUrl: window.location.href,
+            entries: dedupedEntries
+          };
 
-      writeSubjectIndex(subjectCode, nextIndex);
+          writeSubjectIndex(subjectCode, nextIndex);
+          return nextIndex;
+        },
+        { owner: REQUEST_OWNER }
+      );
 
-      this.currentIndex = nextIndex;
+      this.currentIndex = completedIndex;
     } catch (reason) {
-      const message = reason instanceof Error ? reason.message : String(reason);
+      const message = isRetryablePeopleSoftTaskError(reason)
+        ? "Index canceled."
+        : reason instanceof Error
+          ? reason.message
+          : String(reason);
       this.indexingProgress = `Index failed: ${message}`;
       this.queueProgressRender(true);
     } finally {
@@ -327,52 +339,52 @@ export class CtecNavigationAugmentation implements Augmentation {
         this.indexingProgress = `Indexing ${classRows.length} classes for ${course.description}...`;
         this.queueProgressRender(true);
 
-        const courseEntries = await Promise.all(
-          classRows.map(async (row) => {
-            this.updateVisualState((s) => {
-              s.classesStarted += 1;
-              s.inFlightClasses += 1;
-            });
-            this.queueProgressRender();
+        const courseEntries: CtecIndexedEntry[] = [];
 
-            let blueraUrl: string | null = null;
-            let error: string | null = null;
+        for (const row of classRows) {
+          this.updateVisualState((s) => {
+            s.classesStarted += 1;
+            s.inFlightClasses += 1;
+          });
+          this.queueProgressRender();
 
-            try {
-              const params = buildActionParams(classParams, row.actionId);
-              const responseText = await fetchPeopleSoft(classActionUrl, params, { owner: REQUEST_OWNER });
-              blueraUrl = extractBlueraUrl(responseText);
-              if (!blueraUrl) {
-                error = "No Bluera URL returned for this row.";
-              }
-            } catch (reason) {
-              error = reason instanceof Error ? reason.message : String(reason);
+          let blueraUrl: string | null = null;
+          let error: string | null = null;
+
+          try {
+            const params = buildActionParams(classParams, row.actionId);
+            const responseText = await fetchPeopleSoft(classActionUrl, params, { owner: REQUEST_OWNER });
+            blueraUrl = extractBlueraUrl(responseText);
+            if (!blueraUrl) {
+              error = "No Bluera URL returned for this row.";
             }
+          } catch (reason) {
+            error = reason instanceof Error ? reason.message : String(reason);
+          }
 
-            this.updateVisualState((s) => {
-              s.classesCompleted += 1;
-              s.inFlightClasses = Math.max(0, s.inFlightClasses - 1);
-              if (blueraUrl) {
-                s.linksFound += 1;
-              } else {
-                s.linksMissing += 1;
-              }
-              const cp = s.courses[index];
-              cp.classesCompleted += 1;
-            });
-            this.queueProgressRender();
+          this.updateVisualState((s) => {
+            s.classesCompleted += 1;
+            s.inFlightClasses = Math.max(0, s.inFlightClasses - 1);
+            if (blueraUrl) {
+              s.linksFound += 1;
+            } else {
+              s.linksMissing += 1;
+            }
+            const cp = s.courses[index];
+            cp.classesCompleted += 1;
+          });
+          this.queueProgressRender();
 
-            return {
-              actionId: row.actionId,
-              term: row.term,
-              description: row.description,
-              instructor: row.instructor,
-              blueraUrl,
-              error,
-              searchText: normalizeSearch([row.term, row.description, row.instructor].join(" "))
-            };
-          })
-        );
+          courseEntries.push({
+            actionId: row.actionId,
+            term: row.term,
+            description: row.description,
+            instructor: row.instructor,
+            blueraUrl,
+            error,
+            searchText: normalizeSearch([row.term, row.description, row.instructor].join(" "))
+          });
+        }
 
         allEntries.push(...courseEntries);
         this.setCourseStatus(index, "done");

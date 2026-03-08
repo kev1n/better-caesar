@@ -1,2 +1,8 @@
 export { lookupClass } from "./lookup";
-export { acquirePeopleSoftLock, releasePeopleSoftLock, waitForPeopleSoftIdle } from "./traffic";
+export {
+  acquirePeopleSoftLock,
+  isRetryablePeopleSoftTaskError,
+  releasePeopleSoftLock,
+  runPeopleSoftTask,
+  waitForPeopleSoftIdle
+} from "./traffic";

@@ -6,7 +6,7 @@ const FEATURES: { id: string; label: string }[] = [
   { id: "seats-notes", label: "Seats & Notes" },
   { id: "ctec-links", label: "CTEC Links" },
   { id: "ctec-navigation", label: "CTEC Navigator" },
-  { id: "enrollment-navigation", label: "Enrollment Navigation" }
+  { id: "enrollment-navigation", label: "Enrollment Terms" }
 ];
 
 async function loadSettings(): Promise<Record<string, boolean>> {

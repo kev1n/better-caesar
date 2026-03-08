@@ -1,14 +1,70 @@
 const LOCK_KEY = "better-caesar:peoplesoft-lock";
 const DEFAULT_LOCK_TTL_MS = 120_000;
 
+const PRIORITY_ORDER: Record<PeopleSoftTaskPriority, number> = {
+  navigation: 0,
+  user: 1,
+  background: 2
+};
+
 type LockState = {
   owner: string;
   expiresAt: number;
 };
 
-let activeRequestCount = 0;
+type QueueTask<T> = {
+  id: number;
+  owner?: string;
+  priority: PeopleSoftTaskPriority;
+  controller: AbortController;
+  execute: () => Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+};
+
+export type PeopleSoftTaskPriority = "navigation" | "user" | "background";
+
+export class PeopleSoftTaskCancelledError extends Error {
+  readonly retryable = true;
+
+  constructor(message = "PeopleSoft task canceled.") {
+    super(message);
+    this.name = "PeopleSoftTaskCancelledError";
+  }
+}
+
+let taskSequence = 0;
+let activeTask: QueueTask<any> | null = null;
+let activeTaskSignal: AbortSignal | null = null;
+let queue: QueueTask<any>[] = [];
 let idleResolvers: Array<() => void> = [];
-let activeControllers = new Set<AbortController>();
+
+export async function runPeopleSoftTask<T>(
+  priority: PeopleSoftTaskPriority,
+  execute: () => Promise<T>,
+  options?: { owner?: string }
+): Promise<T> {
+  if (isPeopleSoftLockedFor(options?.owner) && priority !== "navigation") {
+    throw new Error("PeopleSoft requests are paused while term navigation is in progress.");
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const task: QueueTask<T> = {
+      id: ++taskSequence,
+      owner: options?.owner,
+      priority,
+      controller: new AbortController(),
+      execute,
+      resolve,
+      reject
+    };
+
+    prepareQueueForTask(task);
+    queue.push(task as QueueTask<any>);
+    queue.sort(compareTasks);
+    void pumpQueue();
+  });
+}
 
 export async function acquirePeopleSoftLock(
   owner: string,
@@ -24,7 +80,18 @@ export async function acquirePeopleSoftLock(
   });
 
   if (abortActive) {
-    abortActivePeopleSoftRequests();
+    cancelQueuedTasks(
+      (task) => task.priority !== "navigation",
+      "PeopleSoft task canceled because navigation took priority."
+    );
+
+    if (activeTask && activeTask.owner !== owner) {
+      activeTask.controller.abort(
+        new PeopleSoftTaskCancelledError(
+          "PeopleSoft task canceled because navigation took priority."
+        )
+      );
+    }
   }
 
   if (waitForIdle) {
@@ -39,47 +106,8 @@ export function releasePeopleSoftLock(owner: string): void {
   clearLock();
 }
 
-export function beginPeopleSoftRequest(owner?: string): {
-  signal: AbortSignal;
-  finish: () => void;
-} {
-  if (isPeopleSoftLockedFor(owner)) {
-    throw new Error("PeopleSoft requests are paused while term navigation is in progress.");
-  }
-
-  const controller = new AbortController();
-  activeControllers.add(controller);
-  activeRequestCount += 1;
-  let done = false;
-
-  return {
-    signal: controller.signal,
-    finish: () => {
-      if (done) return;
-      done = true;
-
-      activeControllers.delete(controller);
-      activeRequestCount = Math.max(0, activeRequestCount - 1);
-      if (activeRequestCount === 0) {
-        const resolvers = idleResolvers;
-        idleResolvers = [];
-        for (const resolve of resolvers) {
-          resolve();
-        }
-      }
-    }
-  };
-}
-
-export function abortActivePeopleSoftRequests(): void {
-  if (activeControllers.size === 0) return;
-  for (const controller of Array.from(activeControllers)) {
-    controller.abort("PeopleSoft request aborted due to navigation lock.");
-  }
-}
-
 export async function waitForPeopleSoftIdle(): Promise<void> {
-  if (activeRequestCount === 0) return;
+  if (!activeTask && queue.length === 0) return;
   await new Promise<void>((resolve) => {
     idleResolvers.push(resolve);
   });
@@ -90,6 +118,117 @@ export function isPeopleSoftLockedFor(owner?: string): boolean {
   if (!lock) return false;
   if (owner && lock.owner === owner) return false;
   return true;
+}
+
+export function getCurrentPeopleSoftTaskSignal(): AbortSignal | null {
+  return activeTaskSignal;
+}
+
+export function isRetryablePeopleSoftTaskError(error: unknown): boolean {
+  return error instanceof PeopleSoftTaskCancelledError;
+}
+
+function prepareQueueForTask(task: QueueTask<any>): void {
+  if (task.priority === "background") return;
+
+  cancelQueuedTasks(
+    (queued) => queued.priority === "background",
+    "Background PeopleSoft task canceled because a higher-priority action started."
+  );
+
+  if (task.priority === "user") {
+    if (activeTask?.priority === "background") {
+      activeTask.controller.abort(
+        new PeopleSoftTaskCancelledError(
+          "Background PeopleSoft task canceled because a user action took priority."
+        )
+      );
+    }
+    return;
+  }
+
+  cancelQueuedTasks(
+    (queued) => queued.priority !== "navigation",
+    "PeopleSoft task canceled because navigation took priority."
+  );
+
+  if (activeTask && activeTask.priority !== "navigation") {
+    activeTask.controller.abort(
+      new PeopleSoftTaskCancelledError(
+        "PeopleSoft task canceled because navigation took priority."
+      )
+    );
+  }
+}
+
+function cancelQueuedTasks(
+  predicate: (task: QueueTask<any>) => boolean,
+  message: string
+): void {
+  const kept: QueueTask<any>[] = [];
+
+  for (const task of queue) {
+    if (!predicate(task)) {
+      kept.push(task);
+      continue;
+    }
+
+    task.reject(new PeopleSoftTaskCancelledError(message));
+  }
+
+  queue = kept;
+  resolveIdleIfNeeded();
+}
+
+async function pumpQueue(): Promise<void> {
+  if (activeTask) return;
+
+  const nextTask = queue.shift();
+  if (!nextTask) {
+    resolveIdleIfNeeded();
+    return;
+  }
+
+  if (isPeopleSoftLockedFor(nextTask.owner) && nextTask.priority !== "navigation") {
+    nextTask.reject(
+      new Error("PeopleSoft requests are paused while term navigation is in progress.")
+    );
+    resolveIdleIfNeeded();
+    void pumpQueue();
+    return;
+  }
+
+  activeTask = nextTask;
+  activeTaskSignal = nextTask.controller.signal;
+
+  try {
+    const result = await nextTask.execute();
+    nextTask.resolve(result);
+  } catch (error) {
+    nextTask.reject(error);
+  } finally {
+    activeTask = null;
+    activeTaskSignal = null;
+    resolveIdleIfNeeded();
+    void pumpQueue();
+  }
+}
+
+function compareTasks(left: QueueTask<any>, right: QueueTask<any>): number {
+  const priorityDelta = PRIORITY_ORDER[left.priority] - PRIORITY_ORDER[right.priority];
+  if (priorityDelta !== 0) return priorityDelta;
+  return left.id - right.id;
+}
+
+function resolveIdleIfNeeded(): void {
+  if (activeTask || queue.length > 0) return;
+  if (idleResolvers.length === 0) return;
+
+  const resolvers = idleResolvers;
+  idleResolvers = [];
+  for (const resolve of resolvers) {
+    resolve();
+  }
 }
 
 function readLock(): LockState | null {

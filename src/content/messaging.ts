@@ -10,7 +10,7 @@ export function registerLookupMessageHandler(): void {
     ) => {
       if (!message || message.type !== "lookup-class") return;
 
-      void lookupClass(message)
+      void lookupClass(message, { priority: "user", owner: "popup-lookup" })
         .then((response) => sendResponse(response))
         .catch((error: unknown) => {
           const text = error instanceof Error ? error.message : "Unknown error.";

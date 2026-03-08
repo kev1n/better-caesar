@@ -4,8 +4,20 @@ import { fetchPeopleSoft } from "./http";
 import { buildLookupSummary, isMatchingClass, mergeDetailData } from "./parsers";
 import { buildDetailParams, buildSearchParams } from "./params";
 import { sanitizeClassNumber } from "./shared";
+import { isRetryablePeopleSoftTaskError, runPeopleSoftTask, type PeopleSoftTaskPriority } from "./traffic";
 
-export async function lookupClass(message: LookupClassMessage): Promise<LookupClassResponse> {
+export async function lookupClass(
+  message: LookupClassMessage,
+  options?: { priority?: PeopleSoftTaskPriority; owner?: string }
+): Promise<LookupClassResponse> {
+  return runPeopleSoftTask(
+    options?.priority ?? "background",
+    () => lookupClassInternal(message),
+    { owner: options?.owner }
+  );
+}
+
+async function lookupClassInternal(message: LookupClassMessage): Promise<LookupClassResponse> {
   const classNumber = sanitizeClassNumber(message.classNumber);
   if (!classNumber) {
     return { ok: false, error: "Enter a numeric class number." };
@@ -36,6 +48,10 @@ export async function lookupClass(message: LookupClassMessage): Promise<LookupCl
 
       if (lastSummary) return lastSummary;
     } catch (error) {
+      if (isRetryablePeopleSoftTaskError(error)) {
+        throw error;
+      }
+
       if (attempts >= 2) {
         const text = error instanceof Error ? error.message : "Unknown error.";
         return { ok: false, error: text };

@@ -14,11 +14,20 @@ import {
 import { readSubjectIndex, writeSubjectIndex } from "../ctec-navigation/storage";
 import type { CtecIndexedEntry } from "../ctec-navigation/types";
 import { fetchPeopleSoft, fetchPeopleSoftGet } from "../../peoplesoft/http";
+import { runPeopleSoftTask } from "../../peoplesoft";
 import { CTEC_AUTH_URL, REQUEST_OWNER } from "./constants";
 import { courseDescMatchesCatalog, entryMatchesCourse, isAuthResponse, normalizeInstructor, termToSortKey } from "./helpers";
 import type { CtecLinkData, CtecLinkEntry, CtecLinkParams } from "./types";
 
 export async function fetchCtecLinks(params: CtecLinkParams): Promise<CtecLinkData> {
+  return runPeopleSoftTask(
+    "user",
+    () => fetchCtecLinksInternal(params),
+    { owner: REQUEST_OWNER }
+  );
+}
+
+async function fetchCtecLinksInternal(params: CtecLinkParams): Promise<CtecLinkData> {
   const { subject, catalogNumber, instructor, career } = params;
 
   // 1. Check cache — use it if it already has matching entries for this course.
