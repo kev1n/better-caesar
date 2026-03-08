@@ -197,7 +197,7 @@ export class CtecLinksAugmentation implements Augmentation {
     this.inFlight.add(key);
     renderLoading(target.container);
 
-    void fetchCtecLinks(target.params)
+    void fetchCtecLinks(target.params, (msg) => { renderLoading(target.container, msg); })
       .then((data: CtecLinkData) => {
         this.inFlight.delete(key);
         renderCtecLinksWidget(target.container, data, () => this.kick(target, key));
