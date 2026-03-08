@@ -12,38 +12,81 @@ import {
   serializeForm
 } from "../ctec-navigation/helpers";
 import { readSubjectIndex, writeSubjectIndex } from "../ctec-navigation/storage";
-import type { CtecIndexedEntry } from "../ctec-navigation/types";
+import type { CtecIndexedEntry, CtecSubjectIndex } from "../ctec-navigation/types";
 import { fetchPeopleSoft, fetchPeopleSoftGet } from "../../peoplesoft/http";
 import { runPeopleSoftTask } from "../../peoplesoft";
 import { CTEC_AUTH_URL, REQUEST_OWNER } from "./constants";
 import { courseDescMatchesCatalog, entryMatchesCourse, isAuthResponse, normalizeInstructor, termToSortKey } from "./helpers";
 import type { CtecLinkData, CtecLinkEntry, CtecLinkParams } from "./types";
 
-export async function fetchCtecLinks(params: CtecLinkParams): Promise<CtecLinkData> {
+const NOT_FOUND_ACTION_ID = "BC_NOT_FOUND";
+
+export async function fetchCtecLinks(
+  params: CtecLinkParams,
+  onProgress?: (msg: string) => void
+): Promise<CtecLinkData> {
   return runPeopleSoftTask(
     "user",
-    () => fetchCtecLinksInternal(params),
+    () => fetchCtecLinksInternal(params, false, onProgress),
     { owner: REQUEST_OWNER }
   );
 }
 
-async function fetchCtecLinksInternal(params: CtecLinkParams): Promise<CtecLinkData> {
+export async function fetchCtecLinksBackground(
+  params: CtecLinkParams,
+  forceRefresh = false,
+  onProgress?: (msg: string) => void
+): Promise<CtecLinkData> {
+  return runPeopleSoftTask(
+    "background",
+    () => fetchCtecLinksInternal(params, forceRefresh, onProgress),
+    { owner: REQUEST_OWNER }
+  );
+}
+
+// Remove all cached entries (including sentinels) matching this course+instructor
+// so the next fetch will hit the network.
+export function clearCtecCacheForCourse(
+  subject: string,
+  catalogNumber: string,
+  instructor: string
+): void {
+  const index = readSubjectIndex(subject);
+  if (!index) return;
+  const remaining = index.entries.filter(
+    (e) => !entryMatchesCourse(e, subject, catalogNumber, instructor)
+  );
+  writeSubjectIndex(subject, { ...index, entries: remaining });
+}
+
+async function fetchCtecLinksInternal(
+  params: CtecLinkParams,
+  forceRefresh: boolean,
+  onProgress?: (msg: string) => void
+): Promise<CtecLinkData> {
   const { subject, catalogNumber, instructor, career } = params;
 
-  // 1. Check cache — use it if it already has matching entries for this course.
+  // 1. Check cache (skip on force refresh).
   const cachedIndex = readSubjectIndex(subject);
-  if (cachedIndex) {
+  if (!forceRefresh && cachedIndex) {
     const cached = cachedIndex.entries.filter((e) =>
       entryMatchesCourse(e, subject, catalogNumber, instructor)
     );
     if (cached.length > 0) {
       return buildFoundResult(cached);
     }
-    // Cache exists but doesn't have this course — fall through to fetch.
   }
 
   // 2. Fetch the course's class entries from PeopleSoft.
-  const fetchResult = await fetchCourseEntries(subject, catalogNumber, career, instructor);
+  onProgress?.("Connecting to CTEC\u2026");
+  let fetchResult = await fetchCourseEntries(subject, catalogNumber, career, instructor, onProgress);
+
+  // Career fallback: 400–499 courses start as UGRD but may also live in TGS.
+  const catalogNum = parseInt(catalogNumber, 10);
+  if (fetchResult.type === "not-found" && career === "UGRD" && catalogNum >= 400 && catalogNum < 500) {
+    onProgress?.("Trying graduate section\u2026");
+    fetchResult = await fetchCourseEntries(subject, catalogNumber, "TGS", instructor, onProgress);
+  }
 
   if (fetchResult.type === "auth") {
     return { state: "auth-required", loginUrl: CTEC_AUTH_URL };
@@ -52,12 +95,17 @@ async function fetchCtecLinksInternal(params: CtecLinkParams): Promise<CtecLinkD
     return { state: "error", message: fetchResult.message };
   }
   if (fetchResult.type === "not-found") {
+    writeSentinel(subject, catalogNumber, instructor, readSubjectIndex(subject));
     return { state: "not-found" };
   }
 
-  // 3. Merge new entries into existing subject index to avoid stomping ctec-navigation's data.
+  // 3. Merge new entries into existing subject index.
   const existingEntries = cachedIndex?.entries ?? [];
-  const merged = dedupeEntries([...existingEntries, ...fetchResult.entries]);
+  // On force refresh, drop old entries for this course before merging.
+  const base = forceRefresh
+    ? existingEntries.filter((e) => !entryMatchesCourse(e, subject, catalogNumber, instructor))
+    : existingEntries;
+  const merged = dedupeEntries([...base, ...fetchResult.entries]);
   writeSubjectIndex(subject, {
     subjectCode: subject,
     subjectLabel: cachedIndex?.subjectLabel ?? subject,
@@ -66,11 +114,14 @@ async function fetchCtecLinksInternal(params: CtecLinkParams): Promise<CtecLinkD
     entries: merged
   });
 
-  // 4. Filter merged entries for this course+instructor.
+  // 4. Filter for this course+instructor.
   const matches = fetchResult.entries.filter((e) =>
     entryMatchesCourse(e, subject, catalogNumber, instructor)
   );
-  if (matches.length === 0) return { state: "not-found" };
+  if (matches.length === 0) {
+    writeSentinel(subject, catalogNumber, instructor, readSubjectIndex(subject));
+    return { state: "not-found" };
+  }
   return buildFoundResult(matches);
 }
 
@@ -88,7 +139,9 @@ export function getCtecLinksFromCache(params: CtecLinkParams): CtecLinkData | nu
 }
 
 function buildFoundResult(entries: CtecIndexedEntry[]): CtecLinkData {
-  const sorted = [...entries].sort((a, b) => termToSortKey(b.term) - termToSortKey(a.term));
+  // Exclude sentinel entries from display and count.
+  const real = entries.filter((e) => e.actionId !== NOT_FOUND_ACTION_ID);
+  const sorted = [...real].sort((a, b) => termToSortKey(b.term) - termToSortKey(a.term));
 
   const withUrls: CtecLinkEntry[] = sorted
     .filter((e): e is CtecIndexedEntry & { blueraUrl: string } => e.blueraUrl !== null)
@@ -96,7 +149,36 @@ function buildFoundResult(entries: CtecIndexedEntry[]): CtecLinkData {
 
   if (withUrls.length === 0) return { state: "not-found" };
 
-  return { state: "found", entries: withUrls, totalCount: entries.length };
+  // Mark incomplete if any entries failed to fetch (cancelled mid-run).
+  const incomplete = real.some((e) => e.error === "Fetch failed");
+
+  return { state: "found", entries: withUrls, totalCount: real.length, incomplete };
+}
+
+function writeSentinel(
+  subject: string,
+  catalogNumber: string,
+  instructor: string,
+  existingIndex: CtecSubjectIndex | null
+): void {
+  const sentinel: CtecIndexedEntry = {
+    actionId: NOT_FOUND_ACTION_ID,
+    term: "",
+    description: `${subject} ${catalogNumber}`,
+    instructor,
+    blueraUrl: null,
+    error: "not-found",
+    searchText: normalizeSearch(`${catalogNumber} ${instructor}`)
+  };
+  const existing = existingIndex?.entries ?? [];
+  const merged = dedupeEntries([...existing, sentinel]);
+  writeSubjectIndex(subject, {
+    subjectCode: subject,
+    subjectLabel: existingIndex?.subjectLabel ?? subject,
+    builtAt: existingIndex?.builtAt ?? Date.now(),
+    sourceUrl: existingIndex?.sourceUrl ?? window.location.href,
+    entries: merged
+  });
 }
 
 type FetchCourseResult =
@@ -109,9 +191,9 @@ async function fetchCourseEntries(
   subject: string,
   catalogNumber: string,
   career: string,
-  instructor: string
+  instructor: string,
+  onProgress?: (msg: string) => void
 ): Promise<FetchCourseResult> {
-  // Load subject results page.
   const resultsUrl = buildSubjectResultsUrl(subject, career);
   let html: string;
   try {
@@ -131,14 +213,13 @@ async function fetchCourseEntries(
   const actionUrl = resolveActionUrl(form.action);
   const baseParams = serializeForm(form);
 
-  // Find the course matching subject + catalog number.
+  onProgress?.("Finding course\u2026");
   const courseRows = collectCourseRows(doc);
   const targetCourse = courseRows.find((c) =>
     courseDescMatchesCatalog(c.description, catalogNumber)
   );
   if (!targetCourse) return { type: "not-found" };
 
-  // Load that course's class list.
   let courseResponse: string;
   try {
     courseResponse = await fetchPeopleSoft(
@@ -155,8 +236,6 @@ async function fetchCourseEntries(
   const allClassRows = collectClassRowsFromText(courseResponse);
   if (allClassRows.length === 0) return { type: "not-found" };
 
-  // Filter to rows matching the instructor before fetching Bluera URLs,
-  // to avoid N×100 requests when an instructor param is available.
   const normInstructor = normalizeInstructor(instructor);
   const instrTokens = normInstructor.split(" ").filter((t) => t.length > 2);
   const classRows =
@@ -170,9 +249,12 @@ async function fetchCourseEntries(
   const classParams = applyResponseState(baseParams, courseResponse);
   const classActionUrl = extractPostUrl(courseResponse) ?? actionUrl;
 
-  // Fetch Bluera URL for each class row sequentially.
+  const total = classRows.length;
   const resultEntries: CtecIndexedEntry[] = [];
-  for (const row of classRows) {
+  for (let i = 0; i < classRows.length; i++) {
+    const row = classRows[i]!;
+    onProgress?.(`Loading evaluation ${i + 1}/${total}\u2026`);
+
     let classResponse: string;
     try {
       classResponse = await fetchPeopleSoft(

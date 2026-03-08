@@ -5,8 +5,8 @@ import { enrollmentNavigationAugmentation } from "./enrollment-navigation";
 import { seatsNotesAugmentation } from "./seats-notes";
 
 export const augmentationRegistry: Augmentation[] = [
+  enrollmentNavigationAugmentation,
   ctecLinksAugmentation,
   ctecNavigationAugmentation,
-  enrollmentNavigationAugmentation,
   seatsNotesAugmentation
 ];

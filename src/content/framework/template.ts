@@ -82,6 +82,10 @@ export abstract class TemplateAugmentation<TTarget, TData> implements Augmentati
     return job;
   }
 
+  protected clearCache(): void {
+    this.cache.clear();
+  }
+
   private toError(error: unknown): Error {
     if (error instanceof Error) return error;
     return new Error(String(error));

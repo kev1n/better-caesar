@@ -35,6 +35,13 @@ export function ensureCustomCells(row: HTMLTableRowElement): RowCells {
   };
 }
 
+export function findExistingCells(row: HTMLTableRowElement): RowCells | null {
+  const seatsCell = row.querySelector<HTMLTableCellElement>(`.${SEATS_CELL_CLASS}`);
+  const notesCell = row.querySelector<HTMLTableCellElement>(`.${NOTES_CELL_CLASS}`);
+  if (!seatsCell || !notesCell) return null;
+  return { seatsCell, notesCell };
+}
+
 export function renderMetadata(response: SeatsNotesResult, classNumber: string, cells: RowCells): void {
   cells.seatsCell.textContent = "";
   cells.notesCell.textContent = "";
@@ -191,10 +198,11 @@ function buildNotesCard(response: SeatsNotesSuccess, classNumber: string): HTMLE
   const card = document.createElement("div");
   card.className = "better-caesar-card";
 
-  appendNote(card, "Enrollment Information", response.enrollmentInfoNotes);
+  appendNote(card, "Class Attributes", response.classAttributes);
+  appendNote(card, "Enrollment Requirements", response.enrollmentRequirements);
   appendNote(card, "Class Notes", response.classNotes);
 
-  if (!response.enrollmentInfoNotes && !response.classNotes) {
+  if (!response.classAttributes && !response.enrollmentRequirements && !response.classNotes) {
     const empty = document.createElement("div");
     empty.className = "better-caesar-muted";
     empty.textContent = "No notes listed.";

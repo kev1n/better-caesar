@@ -1,4 +1,4 @@
-import { CTEC_CELL_CLASS, STYLE_ID } from "./constants";
+import { CTEC_CELL_CLASS, CTEC_HEADER_CLASS, STYLE_ID } from "./constants";
 import type { CtecLinkData } from "./types";
 
 export function injectStyles(): void {
@@ -9,7 +9,14 @@ export function injectStyles(): void {
     .${CTEC_CELL_CLASS} {
       padding: 4px 8px;
       min-width: 120px;
+      max-width: 200px;
       vertical-align: top;
+      border-left: 2px solid #d8b6c8;
+    }
+    .${CTEC_HEADER_CLASS} {
+      min-width: 120px;
+      color: #fff;
+      background: #66023c;
     }
     .bc-ctec-widget {
       font-size: 11px;
@@ -76,17 +83,24 @@ export function injectStyles(): void {
 export function renderFetchButton(container: HTMLElement, onFetch: () => void): void {
   container.innerHTML = "";
   const btn = document.createElement("button");
+  btn.type = "button";
   btn.className = "bc-ctec-fetch";
   btn.textContent = "Load CTEC";
-  btn.addEventListener("click", (e) => {
-    e.preventDefault();
-    onFetch();
-  });
+  btn.addEventListener("click", onFetch);
   container.appendChild(btn);
 }
 
-export function renderLoading(container: HTMLElement): void {
-  container.innerHTML = '<div class="bc-ctec-widget bc-ctec-muted">Loading CTEC\u2026</div>';
+export function renderLoading(container: HTMLElement, message = "Loading CTEC\u2026"): void {
+  const existing = container.querySelector<HTMLElement>(".bc-ctec-loading-msg");
+  if (existing) {
+    existing.textContent = message;
+    return;
+  }
+  container.innerHTML = "";
+  const div = document.createElement("div");
+  div.className = "bc-ctec-widget bc-ctec-muted bc-ctec-loading-msg";
+  div.textContent = message;
+  container.appendChild(div);
 }
 
 export function isCtecCellReady(container: HTMLElement): boolean {
@@ -141,15 +155,31 @@ export function renderCtecLinksWidget(
         root.appendChild(extraContainer);
 
         const expandBtn = document.createElement("button");
+        expandBtn.type = "button";
         expandBtn.className = "bc-ctec-expand";
         expandBtn.textContent = `Show ${remaining} more`;
-        expandBtn.addEventListener("click", (e) => {
-          e.preventDefault();
+        expandBtn.addEventListener("click", () => {
           const isHidden = extraContainer.style.display === "none";
           extraContainer.style.display = isHidden ? "" : "none";
           expandBtn.textContent = isHidden ? "Show less" : `Show ${remaining} more`;
         });
         root.appendChild(expandBtn);
+      }
+
+      if (data.incomplete) {
+        const warn = document.createElement("div");
+        warn.className = "bc-ctec-warn";
+        warn.style.marginTop = "3px";
+        warn.style.fontSize = "10px";
+        warn.textContent = "Results may be incomplete \u2014 ";
+        const reloadLink = document.createElement("button");
+        reloadLink.type = "button";
+        reloadLink.className = "bc-ctec-expand";
+        reloadLink.style.display = "inline";
+        reloadLink.textContent = "reload";
+        reloadLink.addEventListener("click", onRetry);
+        warn.appendChild(reloadLink);
+        root.appendChild(warn);
       }
       break;
     }
@@ -190,20 +220,31 @@ export function renderCtecLinksWidget(
 
 function makeRetryButton(onRetry: () => void): HTMLButtonElement {
   const btn = document.createElement("button");
+  btn.type = "button";
   btn.className = "bc-ctec-btn";
   btn.textContent = "Retry";
-  btn.addEventListener("click", (e) => {
-    e.preventDefault();
-    onRetry();
-  });
+  btn.addEventListener("click", onRetry);
   return btn;
+}
+
+export function ensureCtecHeader(table: HTMLTableElement): void {
+  const headerRow = table.querySelector("tr");
+  if (!headerRow) return;
+  if (headerRow.querySelector(`.${CTEC_HEADER_CLASS}`)) return;
+  const th = document.createElement("th");
+  th.scope = "col";
+  th.className = `PSLEVEL1GRIDCOLUMNHDR ${CTEC_HEADER_CLASS}`;
+  th.textContent = "CTEC";
+  headerRow.appendChild(th);
 }
 
 export function ensureCtecCell(row: HTMLTableRowElement): HTMLElement {
   const existing = row.querySelector<HTMLTableCellElement>(`.${CTEC_CELL_CLASS}`);
   if (existing) return existing;
   const td = document.createElement("td");
-  td.className = CTEC_CELL_CLASS;
+  // Inherit the row's existing cell class so PeopleSoft alternating-row styles apply.
+  const rowCellClass = row.querySelector("td,th")?.className ?? "";
+  td.className = rowCellClass ? `${rowCellClass} ${CTEC_CELL_CLASS}` : CTEC_CELL_CLASS;
   row.appendChild(td);
   return td;
 }

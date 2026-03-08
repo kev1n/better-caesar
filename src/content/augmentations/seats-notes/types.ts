@@ -18,7 +18,8 @@ export type SeatsNotesSuccess = {
   availableSeats: string | null;
   waitListCapacity: string | null;
   waitListTotal: string | null;
-  enrollmentInfoNotes: string | null;
+  classAttributes: string | null;
+  enrollmentRequirements: string | null;
   classNotes: string | null;
 };
 
