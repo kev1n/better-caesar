@@ -36,6 +36,17 @@ export type CtecReportHoursMetric = {
   responseCount: number;
 };
 
+export type CtecReportChart = {
+  question: string;
+  imageUrl: string;
+  alt: string | null;
+};
+
+export type CtecReportCommentGroup = {
+  prompt: string;
+  comments: string[];
+};
+
 export type CtecReportSummary = {
   url: string;
   parsedAt: number;
@@ -47,6 +58,8 @@ export type CtecReportSummary = {
     stimulating?: CtecReportScalarMetric;
     hours?: CtecReportHoursMetric;
   };
+  charts: CtecReportChart[];
+  commentGroups: CtecReportCommentGroup[];
 };
 
 export type CtecSubjectIndex = {

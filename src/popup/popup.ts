@@ -1,4 +1,4 @@
-import { FEATURES_STORAGE_KEY } from "../content/settings";
+import { FEATURES_STORAGE_KEY, getDefaultFeatureEnabled } from "../content/settings";
 
 const CTEC_INDEX_KEY = "better-caesar:ctec-index:v1";
 
@@ -6,6 +6,9 @@ const FEATURES: { id: string; label: string }[] = [
   { id: "seats-notes", label: "Seats & Notes" },
   { id: "ctec-links", label: "CTEC Links" },
   { id: "paper-ctec", label: "paper.nu CTEC" },
+  { id: "paper-ctec-single-summary-card", label: "paper.nu First Timeslot Only" },
+  { id: "paper-ctec-compact-cards", label: "paper.nu Dense Cards" },
+  { id: "paper-ctec-compact-card-stars", label: "paper.nu Dense Card Stars" },
   { id: "ctec-navigation", label: "CTEC Navigator" },
   { id: "enrollment-navigation", label: "Enrollment Terms" }
 ];
@@ -27,7 +30,7 @@ async function init(): Promise<void> {
   if (!list) return;
 
   for (const feature of FEATURES) {
-    const enabled = settings[feature.id] !== false;
+    const enabled = settings[feature.id] ?? getDefaultFeatureEnabled(feature.id);
 
     const li = document.createElement("li");
     li.className = "feature-row";

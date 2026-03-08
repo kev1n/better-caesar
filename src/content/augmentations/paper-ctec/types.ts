@@ -1,4 +1,4 @@
-import type { CtecReportAggregate } from "../ctec-links/reports";
+import type { CtecCourseAnalytics, CtecReportAggregate } from "../ctec-links/reports";
 import type { CtecLinkParams } from "../ctec-links/types";
 
 export type PaperCtecTarget = {
@@ -6,6 +6,7 @@ export type PaperCtecTarget = {
   widget: HTMLElement;
   params: CtecLinkParams;
   titleHint: string;
+  key: string;
 };
 
 export type PaperCtecWidgetData =
@@ -26,4 +27,18 @@ export type PaperCtecStatusBarData = {
   latestMessage?: string;
   loginUrl?: string;
   awaitingAuthRetry?: boolean;
+};
+
+export type PaperCtecAnalyticsState =
+  | { state: "found"; analytics: CtecCourseAnalytics }
+  | { state: "auth-required"; loginUrl: string }
+  | { state: "not-found" }
+  | { state: "error"; message: string };
+
+export type PaperCtecSideCardContext = {
+  panel: HTMLElement;
+  key: string;
+  params: CtecLinkParams;
+  titleHint: string;
+  subjectLabel: string;
 };

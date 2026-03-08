@@ -1,3 +1,8 @@
 export const STYLE_ID = "better-caesar-paper-ctec-style";
 export const WIDGET_CLASS = "bc-paper-ctec";
 export const STATUS_BAR_ID = "bc-paper-ctec-status-bar";
+export const SIDECARD_TABS_CLASS = "bc-paper-ctec-side-tabs";
+export const SIDECARD_ANALYTICS_PANEL_CLASS = "bc-paper-ctec-analytics-panel";
+export const COMPACT_CARD_FEATURE_ID = "paper-ctec-compact-cards";
+export const COMPACT_CARD_STARS_FEATURE_ID = "paper-ctec-compact-card-stars";
+export const SINGLE_SUMMARY_CARD_FEATURE_ID = "paper-ctec-single-summary-card";

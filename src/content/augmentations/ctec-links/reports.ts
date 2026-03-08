@@ -2,6 +2,8 @@ import { normalizeSearch } from "../ctec-navigation/helpers";
 import { readSubjectIndex, writeSubjectIndex } from "../ctec-navigation/storage";
 import type {
   CtecIndexedEntry,
+  CtecReportChart,
+  CtecReportCommentGroup,
   CtecReportHoursMetric,
   CtecReportScalarMetric,
   CtecReportSummary
@@ -22,8 +24,13 @@ export type CtecAggregateMetric = {
 export type CtecReportAggregate = {
   evaluationCount: number;
   parsedCount: number;
+  aggregateEvaluationCount: number;
+  aggregateParsedCount: number;
+  maxEntriesUsed: number | null;
+  windowTerms: string[];
   latestTerm: string | null;
   latestUrl: string | null;
+  allFetched: boolean;
   partial: boolean;
   metrics: {
     instruction?: CtecAggregateMetric;
@@ -35,8 +42,42 @@ export type CtecReportAggregate = {
   };
 };
 
+export type CtecCourseAnalyticsEntry = {
+  term: string;
+  description: string;
+  instructor: string;
+  url: string | null;
+  status: "ready" | "pending" | "unavailable";
+  metrics: CtecReportSummary["metrics"];
+  charts: CtecReportChart[];
+  commentGroups: CtecReportCommentGroup[];
+};
+
+export type CtecCourseAnalytics = {
+  recentAggregate: CtecReportAggregate;
+  entries: CtecCourseAnalyticsEntry[];
+  allFetched: boolean;
+};
+
 export type CtecReportAggregateResult =
   | { state: "found"; aggregate: CtecReportAggregate }
+  | { state: "auth-required"; loginUrl: string }
+  | { state: "not-found" }
+  | { state: "error"; message: string };
+
+export type CtecCourseAnalyticsResult =
+  | { state: "found"; analytics: CtecCourseAnalytics }
+  | { state: "auth-required"; loginUrl: string }
+  | { state: "not-found" }
+  | { state: "error"; message: string };
+
+type FetchCtecReportAggregateOptions = {
+  fetchLimit?: number;
+  aggregateLimit?: number;
+};
+
+type EnsureReportEntriesResult =
+  | { state: "found"; entries: CtecIndexedEntry[] }
   | { state: "auth-required"; loginUrl: string }
   | { state: "not-found" }
   | { state: "error"; message: string };
@@ -44,39 +85,45 @@ export type CtecReportAggregateResult =
 export async function fetchCtecReportAggregate(
   params: CtecLinkParams,
   titleHint?: string,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  options: FetchCtecReportAggregateOptions = {}
 ): Promise<CtecReportAggregateResult> {
-  const links = await fetchCtecLinksBackground(params, false, onProgress);
-  if (links.state !== "found") return links;
+  const result = await ensureReportEntries(params, titleHint, onProgress, {
+    fetchLimit: options.fetchLimit
+  });
+  if (result.state !== "found") return result;
 
-  let entries = getIndexedEntriesForCourse(params, titleHint);
-  if (entries.length === 0) {
-    return { state: "not-found" };
-  }
-
-  const missing = entries.filter((entry) => entry.blueraUrl && entry.reportSummary === undefined);
-
-  for (let index = 0; index < missing.length; index++) {
-    const entry = missing[index]!;
-    const url = entry.blueraUrl;
-    if (!url) continue;
-
-    onProgress?.(`Reading evaluation ${index + 1}/${missing.length}…`);
-
-    const response = await fetchTextResultViaBackground(url, { method: "GET" });
-    if (isAuthResponse(response.text)) {
-      return { state: "auth-required", loginUrl: response.finalUrl || url };
-    }
-
-    const summary = parseCtecReportHtml(response.text, url);
-    cacheReportSummary(params.subject, entry.actionId, summary);
-  }
-
-  entries = getIndexedEntriesForCourse(params, titleHint);
   return {
     state: "found",
-    aggregate: buildReportAggregate(entries)
+    aggregate: buildReportAggregate(result.entries, {
+      aggregateLimit: options.aggregateLimit
+    })
   };
+}
+
+export async function fetchCtecCourseAnalytics(
+  params: CtecLinkParams,
+  titleHint?: string,
+  recentAggregateLimit?: number,
+  onProgress?: (message: string) => void
+): Promise<CtecCourseAnalyticsResult> {
+  const result = await ensureReportEntries(params, titleHint, onProgress);
+  if (result.state !== "found") return result;
+
+  return {
+    state: "found",
+    analytics: buildCourseAnalytics(result.entries, recentAggregateLimit)
+  };
+}
+
+export function getCtecCourseAnalyticsSnapshot(
+  params: CtecLinkParams,
+  titleHint?: string,
+  recentAggregateLimit?: number
+): CtecCourseAnalytics | null {
+  const entries = getIndexedEntriesForCourse(params, titleHint);
+  if (entries.length === 0) return null;
+  return buildCourseAnalytics(entries, recentAggregateLimit);
 }
 
 export function parseCtecReportHtml(
@@ -88,12 +135,19 @@ export function parseCtecReportHtml(
   if (blocks.length === 0) return null;
 
   const metrics: CtecReportSummary["metrics"] = {};
+  const charts: CtecReportChart[] = [];
+  const commentGroups: CtecReportCommentGroup[] = [];
 
   for (const block of blocks) {
     const question = cleanText(
       block.querySelector<HTMLElement>(".ReportBlockTitle")?.textContent
     );
     if (!question) continue;
+
+    charts.push(...parseCharts(block, question, url));
+
+    const commentGroup = parseCommentGroup(block, question);
+    if (commentGroup) commentGroups.push(commentGroup);
 
     const kind = classifyQuestion(question);
     if (!kind) continue;
@@ -114,12 +168,16 @@ export function parseCtecReportHtml(
     if (kind === "stimulating") metrics.stimulating = scalarMetric;
   }
 
-  if (!hasAnyMetrics(metrics)) return null;
+  if (!hasAnyMetrics(metrics) && charts.length === 0 && commentGroups.length === 0) {
+    return null;
+  }
 
   return {
     url,
     parsedAt: Date.now(),
-    metrics
+    metrics,
+    charts,
+    commentGroups
   };
 }
 
@@ -137,6 +195,51 @@ function getIndexedEntriesForCourse(
   );
 
   return selectEntriesForTitle(baseEntries, titleHint);
+}
+
+async function ensureReportEntries(
+  params: CtecLinkParams,
+  titleHint?: string,
+  onProgress?: (message: string) => void,
+  options: { fetchLimit?: number } = {}
+): Promise<EnsureReportEntriesResult> {
+  const links = await fetchCtecLinksBackground(params, false, onProgress);
+  if (links.state !== "found") return links;
+
+  let entries = sortEntries(getIndexedEntriesForCourse(params, titleHint));
+  if (entries.length === 0) {
+    return { state: "not-found" };
+  }
+
+  const relevantEntries =
+    options.fetchLimit && options.fetchLimit > 0
+      ? entries.slice(0, options.fetchLimit)
+      : entries;
+  const missing = relevantEntries.filter(
+    (entry) => entry.blueraUrl && entry.reportSummary === undefined
+  );
+
+  for (let index = 0; index < missing.length; index++) {
+    const entry = missing[index]!;
+    const url = entry.blueraUrl;
+    if (!url) continue;
+
+    onProgress?.(`Reading evaluation ${index + 1}/${missing.length}…`);
+
+    const response = await fetchTextResultViaBackground(url, { method: "GET" });
+    if (isAuthResponse(response.text)) {
+      return { state: "auth-required", loginUrl: response.finalUrl || url };
+    }
+
+    const summary = parseCtecReportHtml(response.text, url);
+    cacheReportSummary(params.subject, entry.actionId, summary);
+  }
+
+  entries = sortEntries(getIndexedEntriesForCourse(params, titleHint));
+  return {
+    state: "found",
+    entries
+  };
 }
 
 function selectEntriesForTitle(
@@ -183,18 +286,33 @@ function cacheReportSummary(
   });
 }
 
-function buildReportAggregate(entries: CtecIndexedEntry[]): CtecReportAggregate {
-  const sorted = [...entries].sort((left, right) => termToSortKey(right.term) - termToSortKey(left.term));
-  const summaries = sorted
+function buildReportAggregate(
+  entries: CtecIndexedEntry[],
+  options: { aggregateLimit?: number } = {}
+): CtecReportAggregate {
+  const sorted = sortEntries(entries);
+  const aggregateEntries =
+    options.aggregateLimit && options.aggregateLimit > 0
+      ? sorted.slice(0, options.aggregateLimit)
+      : sorted;
+  const summaries = aggregateEntries
     .map((entry) => entry.reportSummary)
     .filter((summary): summary is CtecReportSummary => !!summary && hasAnyMetrics(summary.metrics));
+  const parsedCount = sorted.filter(
+    (entry) => !!entry.reportSummary && hasAnyMetrics(entry.reportSummary.metrics)
+  ).length;
 
   return {
     evaluationCount: sorted.length,
-    parsedCount: summaries.length,
+    parsedCount,
+    aggregateEvaluationCount: aggregateEntries.length,
+    aggregateParsedCount: summaries.length,
+    maxEntriesUsed: options.aggregateLimit ?? null,
+    windowTerms: aggregateEntries.map((entry) => entry.term),
     latestTerm: sorted[0]?.term ?? null,
     latestUrl: sorted[0]?.blueraUrl ?? null,
-    partial: summaries.length < sorted.length,
+    allFetched: sorted.every((entry) => entry.reportSummary !== undefined),
+    partial: summaries.length < aggregateEntries.length,
     metrics: {
       instruction: aggregateMetric(summaries, (summary) => summary.metrics.instruction),
       course: aggregateMetric(summaries, (summary) => summary.metrics.course),
@@ -203,6 +321,37 @@ function buildReportAggregate(entries: CtecIndexedEntry[]): CtecReportAggregate 
       stimulating: aggregateMetric(summaries, (summary) => summary.metrics.stimulating),
       hours: aggregateMetric(summaries, (summary) => summary.metrics.hours)
     }
+  };
+}
+
+function buildCourseAnalytics(
+  entries: CtecIndexedEntry[],
+  recentAggregateLimit?: number
+): CtecCourseAnalytics {
+  const sorted = sortEntries(entries);
+  const aggregateLimit =
+    recentAggregateLimit && recentAggregateLimit > 0 ? recentAggregateLimit : undefined;
+
+  return {
+    recentAggregate: buildReportAggregate(sorted, {
+      aggregateLimit
+    }),
+    entries: sorted.map((entry) => ({
+      term: entry.term,
+      description: entry.description,
+      instructor: entry.instructor,
+      url: entry.blueraUrl,
+      status:
+        entry.reportSummary === undefined
+          ? "pending"
+          : entry.reportSummary
+            ? "ready"
+            : "unavailable",
+      metrics: entry.reportSummary?.metrics ?? {},
+      charts: entry.reportSummary?.charts ?? [],
+      commentGroups: entry.reportSummary?.commentGroups ?? []
+    })),
+    allFetched: sorted.every((entry) => entry.reportSummary !== undefined)
   };
 }
 
@@ -280,6 +429,41 @@ function parseHoursMetric(block: HTMLElement): CtecReportHoursMetric | undefined
   };
 }
 
+function parseCharts(
+  block: HTMLElement,
+  question: string,
+  url: string
+): CtecReportChart[] {
+  return Array.from(block.querySelectorAll<HTMLImageElement>(".FrequencyBlock_chart img"))
+    .map((image) => {
+      const src = image.getAttribute("src")?.trim();
+      if (!src) return null;
+
+      try {
+        return {
+          question,
+          imageUrl: new URL(src, url).toString(),
+          alt: cleanText(image.getAttribute("alt")) || null
+        };
+      } catch {
+        return null;
+      }
+    })
+    .filter((chart): chart is CtecReportChart => !!chart);
+}
+
+function parseCommentGroup(
+  block: HTMLElement,
+  prompt: string
+): CtecReportCommentGroup | null {
+  const comments = Array.from(block.querySelectorAll<HTMLElement>(".CommentBlockRow td"))
+    .map((cell) => extractRichText(cell))
+    .filter(Boolean);
+
+  if (comments.length === 0) return null;
+  return { prompt, comments };
+}
+
 function classifyQuestion(
   question: string
 ): "instruction" | "course" | "learned" | "challenging" | "stimulating" | "hours" | null {
@@ -331,10 +515,31 @@ function cleanText(value: string | null | undefined): string {
   return value?.replace(/\s+/g, " ").trim() ?? "";
 }
 
+function extractRichText(element: HTMLElement): string {
+  const clone = element.cloneNode(true) as HTMLElement;
+  for (const br of Array.from(clone.querySelectorAll("br"))) {
+    br.replaceWith("\n");
+  }
+
+  return (clone.textContent ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function extractShortTitle(description: string): string {
   const stripped = description.replace(/^\S+\s+[\d][\d-]*\s*/, "").trim();
   const colonIndex = stripped.lastIndexOf(":");
   return colonIndex >= 0 ? stripped.slice(colonIndex + 1).trim() : stripped;
+}
+
+function sortEntries(entries: CtecIndexedEntry[]): CtecIndexedEntry[] {
+  return [...entries].sort(
+    (left, right) => termToSortKey(right.term) - termToSortKey(left.term)
+  );
 }
 
 function hasAnyMetrics(metrics: CtecReportSummary["metrics"]): boolean {

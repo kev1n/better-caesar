@@ -1,4 +1,4 @@
-import { isFeatureEnabled } from "../settings";
+import { FEATURES_STORAGE_KEY, isFeatureEnabled } from "../settings";
 import type { Augmentation } from "./template";
 
 export class AugmentationRunner {
@@ -11,6 +11,7 @@ export class AugmentationRunner {
   start(): void {
     this.runAll();
     this.observeMutations();
+    this.observeSettings();
   }
 
   private runAll(): void {
@@ -38,6 +39,14 @@ export class AugmentationRunner {
     observer.observe(root, {
       childList: true,
       subtree: true
+    });
+  }
+
+  private observeSettings(): void {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "local") return;
+      if (!changes[FEATURES_STORAGE_KEY]) return;
+      this.runAll();
     });
   }
 }
