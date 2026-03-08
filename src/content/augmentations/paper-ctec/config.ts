@@ -21,6 +21,22 @@ export const PAPER_CTEC_CONFIG = {
     summaryChipStrokeWidth: 1.8,
     summaryChipStarSizePx: 8,
     summaryChipStarGapPx: 1,
+    ratingChipTones: [
+      { minScore: 0.9, hue: 116 },
+      { minScore: 0.78, hue: 92 },
+      { minScore: 0.62, hue: 58 },
+      { minScore: 0.48, hue: 34 },
+      { minScore: 0.32, hue: 18 },
+      { minScore: 0, hue: 4 }
+    ],
+    hoursChipTones: [
+      { minScore: 0.84, hue: 116 },
+      { minScore: 0.72, hue: 92 },
+      { minScore: 0.58, hue: 58 },
+      { minScore: 0.42, hue: 34 },
+      { minScore: 0.26, hue: 18 },
+      { minScore: 0, hue: 4 }
+    ],
     statusIconSizePx: 14,
     statusIconStrokeWidth: 1.9,
     statusBarMinHeightPx: 28,

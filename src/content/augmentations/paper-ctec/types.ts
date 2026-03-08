@@ -40,5 +40,4 @@ export type PaperCtecSideCardContext = {
   key: string;
   params: CtecLinkParams;
   titleHint: string;
-  subjectLabel: string;
 };
