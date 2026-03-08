@@ -9,17 +9,11 @@
   <body>
     <main class="app">
       <h1>Better CAESAR</h1>
-      <p class="subhead">Lookup a class by class number from the active CAESAR tab.</p>
-
-      <form id="lookup-form">
-        <label for="class-number">Class number</label>
-        <input id="class-number" name="classNumber" type="text" inputmode="numeric" required />
-        <button type="submit">Fetch</button>
-      </form>
-
-      <pre id="result" aria-live="polite">Ready.</pre>
+      <ul class="feature-list" id="feature-list"></ul>
+      <div class="actions">
+        <button id="clear-ctec-cache" class="action-btn">Clear CTEC cache</button>
+      </div>
     </main>
-
     <script src="./popup.js"></script>
   </body>
 </html>

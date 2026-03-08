@@ -1,3 +1,4 @@
+import { isFeatureEnabled } from "../settings";
 import type { Augmentation } from "./template";
 
 export class AugmentationRunner {
@@ -14,6 +15,7 @@ export class AugmentationRunner {
 
   private runAll(): void {
     for (const augmentation of this.augmentations) {
+      if (!isFeatureEnabled(augmentation.id)) continue;
       augmentation.run(document);
     }
   }

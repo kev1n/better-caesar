@@ -25,7 +25,7 @@
       "all_frames": true
     }
   ],
-  "permissions": ["scripting", "tabs"],
+  "permissions": ["scripting", "tabs", "storage"],
   "host_permissions": [
     "https://caesar.ent.northwestern.edu/*",
     "https://northwestern.bluera.com/*",

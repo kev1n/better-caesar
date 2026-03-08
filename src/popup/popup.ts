@@ -1,93 +1,73 @@
-import type { LookupClassMessage, LookupClassResponse } from "../shared/messages";
+import { FEATURES_STORAGE_KEY } from "../content/settings";
 
-const ui = getUi();
+const CTEC_INDEX_KEY = "better-caesar:ctec-index:v1";
 
-ui.form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const classNumber = ui.classNumberInput.value.trim();
+const FEATURES: { id: string; label: string }[] = [
+  { id: "seats-notes", label: "Seats & Notes" },
+  { id: "ctec-links", label: "CTEC Links" },
+  { id: "ctec-navigation", label: "CTEC Navigator" },
+  { id: "enrollment-navigation", label: "Enrollment Navigation" }
+];
 
-  if (!classNumber) {
-    ui.resultEl.textContent = "Enter a class number.";
-    return;
+async function loadSettings(): Promise<Record<string, boolean>> {
+  const result = await chrome.storage.local.get(FEATURES_STORAGE_KEY) as Record<string, unknown>;
+  const raw = result[FEATURES_STORAGE_KEY];
+  if (raw && typeof raw === "object") return raw as Record<string, boolean>;
+  return {};
+}
+
+async function saveSettings(settings: Record<string, boolean>): Promise<void> {
+  await chrome.storage.local.set({ [FEATURES_STORAGE_KEY]: settings });
+}
+
+async function init(): Promise<void> {
+  const settings = await loadSettings();
+  const list = document.getElementById("feature-list");
+  if (!list) return;
+
+  for (const feature of FEATURES) {
+    const enabled = settings[feature.id] !== false;
+
+    const li = document.createElement("li");
+    li.className = "feature-row";
+
+    const label = document.createElement("span");
+    label.className = "feature-label";
+    label.textContent = feature.label;
+
+    const toggle = document.createElement("button");
+    toggle.className = `toggle ${enabled ? "on" : "off"}`;
+    toggle.setAttribute("aria-pressed", String(enabled));
+    toggle.setAttribute("aria-label", `Toggle ${feature.label}`);
+
+    toggle.addEventListener("click", async () => {
+      const next = toggle.getAttribute("aria-pressed") !== "true";
+      toggle.setAttribute("aria-pressed", String(next));
+      toggle.className = `toggle ${next ? "on" : "off"}`;
+      const current = await loadSettings();
+      current[feature.id] = next;
+      await saveSettings(current);
+    });
+
+    li.appendChild(label);
+    li.appendChild(toggle);
+    list.appendChild(li);
   }
-
-  setBusy(true);
-  ui.resultEl.textContent = "Loading...";
-
-  try {
-    const tab = await getActiveTab();
-    if (!tab?.id) throw new Error("No active tab found.");
-    if (!tab.url?.includes("caesar.ent.northwestern.edu")) {
-      throw new Error("Open CAESAR in the active tab first.");
-    }
-
-    const message: LookupClassMessage = { type: "lookup-class", classNumber };
-    const response = (await chrome.tabs.sendMessage(tab.id, message)) as LookupClassResponse;
-
-    if (!response) {
-      throw new Error("No response from content script. Reload the CAESAR tab and retry.");
-    }
-
-    ui.resultEl.textContent = formatResponse(response);
-  } catch (error) {
-    const text = error instanceof Error ? error.message : "Unknown error.";
-    ui.resultEl.textContent = `Error: ${text}`;
-  } finally {
-    setBusy(false);
-  }
-});
-
-async function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tabs[0];
 }
 
-function setBusy(isBusy: boolean): void {
-  ui.submitButton.disabled = isBusy;
-  ui.classNumberInput.disabled = isBusy;
+function initClearCacheButton(): void {
+  const btn = document.getElementById("clear-ctec-cache");
+  if (!(btn instanceof HTMLButtonElement)) return;
+  btn.addEventListener("click", async () => {
+    await chrome.storage.local.remove(CTEC_INDEX_KEY);
+    btn.textContent = "Cleared!";
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = "Clear CTEC cache";
+      btn.disabled = false;
+    }, 1500);
+  });
 }
 
-function formatResponse(response: LookupClassResponse): string {
-  if (!response.ok) return `Error: ${response.error}`;
-
-  return JSON.stringify(
-    {
-      requestedClassNumber: response.requestedClassNumber,
-      criteriaClassNumber: response.criteriaClassNumber,
-      firstResultClassNumber: response.firstResultClassNumber,
-      firstResultCourseTitle: response.firstResultCourseTitle,
-      firstResultSection: response.firstResultSection,
-      firstResultInstructor: response.firstResultInstructor,
-      firstResultDaysTimes: response.firstResultDaysTimes,
-      firstResultRoom: response.firstResultRoom,
-      firstResultMeetingDates: response.firstResultMeetingDates,
-      firstResultGrading: response.firstResultGrading,
-      firstResultStatus: response.firstResultStatus,
-      nextActionForDetails: response.nextActionForDetails,
-      searchPageId: response.searchPageId,
-      detailPageId: response.detailPageId,
-      hasDetailPayload: Boolean(response.detailResponseText),
-      detailPayloadSize: response.detailResponseText?.length ?? 0
-    },
-    null,
-    2
-  );
-}
-
-function getUi(): {
-  form: HTMLFormElement;
-  classNumberInput: HTMLInputElement;
-  resultEl: HTMLElement;
-  submitButton: HTMLButtonElement;
-} {
-  const form = document.querySelector<HTMLFormElement>("#lookup-form");
-  const classNumberInput = document.querySelector<HTMLInputElement>("#class-number");
-  const resultEl = document.querySelector<HTMLElement>("#result");
-  const submitButton = form?.querySelector<HTMLButtonElement>("button[type='submit']");
-
-  if (!form || !classNumberInput || !resultEl || !submitButton) {
-    throw new Error("Popup UI failed to initialize.");
-  }
-
-  return { form, classNumberInput, resultEl, submitButton };
-}
+void init();
+initClearCacheButton();

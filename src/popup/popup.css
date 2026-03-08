@@ -10,63 +10,108 @@ body {
 }
 
 .app {
-  width: 320px;
+  width: 260px;
   padding: 14px;
 }
 
 h1 {
-  margin: 0 0 8px;
-  font-size: 16px;
-}
-
-.subhead {
   margin: 0 0 12px;
-  font-size: 12px;
-  color: #4b5563;
+  font-size: 15px;
+  font-weight: 700;
+  color: #66023c;
 }
 
-form {
-  display: grid;
-  gap: 8px;
+.feature-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-label {
-  font-size: 12px;
-}
-
-input,
-button {
-  font: inherit;
-  padding: 8px;
-  border-radius: 8px;
-}
-
-input {
-  border: 1px solid #d1d5db;
+.feature-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
   background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
 }
 
-button {
-  border: 0;
-  background: #0b6efd;
-  color: #ffffff;
+.feature-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Toggle switch */
+.toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  border: none;
   cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s;
 }
 
-button:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-}
-
-pre {
-  margin: 12px 0 0;
-  padding: 8px;
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
   background: #ffffff;
+  transition: left 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.toggle.on {
+  background: #66023c;
+}
+
+.toggle.on::after {
+  left: 19px;
+}
+
+.toggle.off {
+  background: #d1d5db;
+}
+
+.toggle.off::after {
+  left: 3px;
+}
+
+.actions {
+  margin-top: 10px;
+}
+
+.action-btn {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
   border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #6b7280;
   border-radius: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  white-space: pre-wrap;
-  max-height: 180px;
-  overflow: auto;
+  text-align: left;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.action-btn:hover {
+  border-color: #66023c;
+  color: #66023c;
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  border-color: #d1d5db;
+  color: #6b7280;
 }

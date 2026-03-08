@@ -2,66 +2,60 @@ import { LAST_SUBJECT_STORAGE_KEY, STORAGE_KEY } from "./constants";
 import { normalizeSubjectCode } from "./helpers";
 import type { CtecIndexStore, CtecSubjectIndex } from "./types";
 
+// In-memory cache loaded once from chrome.storage.local on script startup.
+// All reads are synchronous against this cache; writes update it immediately
+// and persist to extension storage asynchronously.
+let memoryStore: CtecIndexStore = { version: 1, subjects: {} };
+let memoryLastSubject: string | null = null;
+
+void chrome.storage.local
+  .get([STORAGE_KEY, LAST_SUBJECT_STORAGE_KEY])
+  .then((result: Record<string, unknown>) => {
+    const raw = result[STORAGE_KEY];
+    if (raw && typeof raw === "object") {
+      const candidate = raw as Partial<CtecIndexStore>;
+      if (
+        candidate.version === 1 &&
+        candidate.subjects &&
+        typeof candidate.subjects === "object"
+      ) {
+        memoryStore = candidate as CtecIndexStore;
+      }
+    }
+    const rawSubject = result[LAST_SUBJECT_STORAGE_KEY];
+    if (typeof rawSubject === "string") {
+      memoryLastSubject = normalizeSubjectCode(rawSubject);
+    }
+  });
+
 export function readStore(): CtecIndexStore {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return { version: 1, subjects: {} };
-    }
-
-    const parsed = JSON.parse(raw) as Partial<CtecIndexStore>;
-    if (parsed.version !== 1 || !parsed.subjects || typeof parsed.subjects !== "object") {
-      return { version: 1, subjects: {} };
-    }
-
-    return {
-      version: 1,
-      subjects: parsed.subjects as Record<string, CtecSubjectIndex>
-    };
-  } catch {
-    return { version: 1, subjects: {} };
-  }
+  return memoryStore;
 }
 
 export function writeStore(store: CtecIndexStore): void {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  } catch {
-    // Ignore storage errors.
-  }
+  memoryStore = store;
+  void chrome.storage.local.set({ [STORAGE_KEY]: store });
 }
 
 export function readSubjectIndex(subjectCode: string): CtecSubjectIndex | null {
-  const store = readStore();
-  const index = store.subjects[subjectCode];
-  return index ?? null;
+  return memoryStore.subjects[subjectCode] ?? null;
 }
 
 export function writeSubjectIndex(subjectCode: string, index: CtecSubjectIndex): void {
-  const store = readStore();
-  store.subjects[subjectCode] = index;
-  writeStore(store);
+  memoryStore.subjects[subjectCode] = index;
+  void chrome.storage.local.set({ [STORAGE_KEY]: memoryStore });
 }
 
 export function clearSubjectIndex(subjectCode: string): void {
-  const store = readStore();
-  delete store.subjects[subjectCode];
-  writeStore(store);
+  delete memoryStore.subjects[subjectCode];
+  void chrome.storage.local.set({ [STORAGE_KEY]: memoryStore });
 }
 
 export function readLastSubject(): string | null {
-  try {
-    const value = window.localStorage.getItem(LAST_SUBJECT_STORAGE_KEY);
-    return normalizeSubjectCode(value);
-  } catch {
-    return null;
-  }
+  return memoryLastSubject;
 }
 
 export function rememberLastSubject(subjectCode: string): void {
-  try {
-    window.localStorage.setItem(LAST_SUBJECT_STORAGE_KEY, subjectCode);
-  } catch {
-    // Ignore storage errors.
-  }
+  memoryLastSubject = subjectCode;
+  void chrome.storage.local.set({ [LAST_SUBJECT_STORAGE_KEY]: subjectCode });
 }

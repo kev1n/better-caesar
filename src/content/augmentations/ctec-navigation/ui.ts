@@ -1,4 +1,4 @@
-import { MAX_RESULTS, PANEL_ID, STYLE_ID } from "./constants";
+import { MAX_RESULTS, PANEL_ID, PAPER_IFRAME_PANEL_ID, PAPER_IFRAME_URL, STYLE_ID } from "./constants";
 import { normalizeSearch } from "./helpers";
 import type { CourseProgress, CtecIndexedEntry, CtecSubjectIndex, IndexVisualState, PanelRefs } from "./types";
 
@@ -10,16 +10,17 @@ export function hasCtecDisclaimer(doc: Document): boolean {
 }
 
 export function ensurePanel(doc: Document): HTMLElement | null {
-  const existing = doc.getElementById(PANEL_ID);
-  if (existing instanceof HTMLElement) return existing;
-
-  const disclaimer =
-    doc.querySelector<HTMLElement>("#win0divNW_CTEC_WRK_HTMLAREA1") ??
-    doc.querySelector<HTMLElement>("#NW_CTEC_WRK_HTMLAREA1") ??
-    doc.querySelector<HTMLElement>(".ctec-disclaimer") ??
-    doc.querySelector<HTMLElement>("[class*='ctec-disclaimer']");
-  const anchor = disclaimer;
+  const anchor = getCtecDisclaimerAnchor(doc);
   if (!anchor) return null;
+
+  const existing = doc.getElementById(PANEL_ID);
+  if (existing instanceof HTMLElement) {
+    const iframePanel = ensurePaperIframePanel(doc, anchor, existing);
+    positionIframePanelAbovePanel(iframePanel, existing);
+    return existing;
+  }
+
+  const iframePanel = ensurePaperIframePanel(doc, anchor);
 
   const root = doc.createElement("section");
   root.id = PANEL_ID;
@@ -146,8 +147,61 @@ export function ensurePanel(doc: Document): HTMLElement | null {
   root.appendChild(searchInput);
   root.appendChild(results);
 
-  anchor.insertAdjacentElement("afterend", root);
+  iframePanel.insertAdjacentElement("afterend", root);
   return root;
+}
+
+function getCtecDisclaimerAnchor(doc: Document): HTMLElement | null {
+  return (
+    doc.querySelector<HTMLElement>("#win0divNW_CTEC_WRK_HTMLAREA1") ??
+    doc.querySelector<HTMLElement>("#NW_CTEC_WRK_HTMLAREA1") ??
+    doc.querySelector<HTMLElement>(".ctec-disclaimer") ??
+    doc.querySelector<HTMLElement>("[class*='ctec-disclaimer']")
+  );
+}
+
+function ensurePaperIframePanel(
+  doc: Document,
+  anchor: HTMLElement,
+  panel?: HTMLElement
+): HTMLElement {
+  const existing = doc.getElementById(PAPER_IFRAME_PANEL_ID);
+  if (existing instanceof HTMLElement) {
+    if (panel) {
+      positionIframePanelAbovePanel(existing, panel);
+    }
+    return existing;
+  }
+
+  const wrap = doc.createElement("section");
+  wrap.id = PAPER_IFRAME_PANEL_ID;
+  wrap.className = "better-caesar-ctec-paper-panel";
+
+  const title = doc.createElement("div");
+  title.className = "better-caesar-ctec-paper-title";
+  title.textContent = "paper.nu (experiment)";
+
+  const frame = doc.createElement("iframe");
+  frame.className = "better-caesar-ctec-paper-frame";
+  frame.src = PAPER_IFRAME_URL;
+  frame.loading = "lazy";
+  frame.referrerPolicy = "no-referrer";
+  frame.setAttribute("allow", "clipboard-read; clipboard-write");
+
+  wrap.appendChild(title);
+  wrap.appendChild(frame);
+
+  if (panel) {
+    panel.insertAdjacentElement("beforebegin", wrap);
+  } else {
+    anchor.insertAdjacentElement("afterend", wrap);
+  }
+  return wrap;
+}
+
+function positionIframePanelAbovePanel(iframePanel: HTMLElement, panel: HTMLElement): void {
+  if (iframePanel.nextElementSibling === panel) return;
+  panel.insertAdjacentElement("beforebegin", iframePanel);
 }
 
 export function getPanelRefs(root: HTMLElement): PanelRefs | null {
@@ -375,6 +429,27 @@ export function injectStyles(doc: Document): void {
       background: var(--bc-tyrian-soft);
       display: grid;
       gap: 8px;
+    }
+    .better-caesar-ctec-paper-panel {
+      margin: 10px 0 10px;
+      padding: 10px;
+      border: 1px solid var(--bc-tyrian-mid);
+      border-radius: 8px;
+      background: #fff;
+      display: grid;
+      gap: 8px;
+    }
+    .better-caesar-ctec-paper-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--bc-tyrian);
+    }
+    .better-caesar-ctec-paper-frame {
+      width: 100%;
+      height: 480px;
+      border: 1px solid var(--bc-tyrian-mid);
+      border-radius: 6px;
+      background: #fff;
     }
     .better-caesar-ctec-title {
       margin: 0;

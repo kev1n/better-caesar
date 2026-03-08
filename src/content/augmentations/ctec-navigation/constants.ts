@@ -1,6 +1,8 @@
 export const PAGE_ID = "NW_CTEC_RSLT2_FL";
 export const STYLE_ID = "better-caesar-ctec-index-style";
 export const PANEL_ID = "better-caesar-ctec-index-panel";
+export const PAPER_IFRAME_PANEL_ID = "better-caesar-ctec-paper-panel";
+export const PAPER_IFRAME_URL = "https://paper.nu/";
 
 export const STORAGE_KEY = "better-caesar:ctec-index:v1";
 export const LAST_SUBJECT_STORAGE_KEY = "better-caesar:ctec-index:last-subject";
