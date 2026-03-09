@@ -2,23 +2,30 @@ import {
   getCurrentPeopleSoftTaskSignal,
   PeopleSoftTaskCancelledError
 } from "./traffic";
-import { fetchTextViaBackground } from "../remote-fetch";
+import { fetchTextResultViaBackground, fetchTextViaBackground } from "../remote-fetch";
 
 type RequestOptions = {
   owner?: string;
 };
 
-export async function fetchPeopleSoft(
+export type PeopleSoftTextResponse = {
+  status: number;
+  text: string;
+  finalUrl: string;
+};
+
+export async function fetchPeopleSoftResult(
   actionUrl: string,
   params: URLSearchParams,
   options?: RequestOptions
-): Promise<string> {
+): Promise<PeopleSoftTextResponse> {
   const signal = getCurrentPeopleSoftTaskSignal();
 
   try {
+    void options;
     if (shouldUseBackgroundFetch()) {
       throwIfAborted(signal);
-      const text = await fetchTextViaBackground(actionUrl, {
+      const response = await fetchTextResultViaBackground(actionUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
@@ -26,7 +33,11 @@ export async function fetchPeopleSoft(
         body: params.toString()
       });
       throwIfAborted(signal);
-      return text;
+      return {
+        status: response.status,
+        text: response.text,
+        finalUrl: response.finalUrl
+      };
     }
 
     const res = await fetch(actionUrl, {
@@ -39,11 +50,11 @@ export async function fetchPeopleSoft(
       signal
     });
 
-    if (!res.ok) {
-      throw new Error(`Search request failed (${res.status}).`);
-    }
-
-    return await res.text();
+    return {
+      status: res.status,
+      text: await res.text(),
+      finalUrl: res.url
+    };
   } catch (error) {
     if (signal?.aborted) {
       const reason = signal.reason;
@@ -60,15 +71,23 @@ export async function fetchPeopleSoft(
   }
 }
 
-export async function fetchPeopleSoftGet(url: string, options?: RequestOptions): Promise<string> {
+export async function fetchPeopleSoftGetResult(
+  url: string,
+  options?: RequestOptions
+): Promise<PeopleSoftTextResponse> {
   const signal = getCurrentPeopleSoftTaskSignal();
 
   try {
+    void options;
     if (shouldUseBackgroundFetch()) {
       throwIfAborted(signal);
-      const text = await fetchTextViaBackground(url, { method: "GET" });
+      const response = await fetchTextResultViaBackground(url, { method: "GET" });
       throwIfAborted(signal);
-      return text;
+      return {
+        status: response.status,
+        text: response.text,
+        finalUrl: response.finalUrl
+      };
     }
 
     const res = await fetch(url, {
@@ -77,11 +96,11 @@ export async function fetchPeopleSoftGet(url: string, options?: RequestOptions):
       signal
     });
 
-    if (!res.ok) {
-      throw new Error(`Context request failed (${res.status}).`);
-    }
-
-    return await res.text();
+    return {
+      status: res.status,
+      text: await res.text(),
+      finalUrl: res.url
+    };
   } catch (error) {
     if (signal?.aborted) {
       const reason = signal.reason;
@@ -96,6 +115,41 @@ export async function fetchPeopleSoftGet(url: string, options?: RequestOptions):
 
     throw error;
   }
+}
+
+export async function fetchPeopleSoft(
+  actionUrl: string,
+  params: URLSearchParams,
+  options?: RequestOptions
+): Promise<string> {
+  if (shouldUseBackgroundFetch()) {
+    return fetchTextViaBackground(actionUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+      },
+      body: params.toString(),
+      allowNonOkStatus: true
+    });
+  }
+
+  const response = await fetchPeopleSoftResult(actionUrl, params, options);
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`Search request failed (${response.status}).`);
+  }
+  return response.text;
+}
+
+export async function fetchPeopleSoftGet(url: string, options?: RequestOptions): Promise<string> {
+  if (shouldUseBackgroundFetch()) {
+    return fetchTextViaBackground(url, { method: "GET", allowNonOkStatus: true });
+  }
+
+  const response = await fetchPeopleSoftGetResult(url, options);
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`Context request failed (${response.status}).`);
+  }
+  return response.text;
 }
 
 function shouldUseBackgroundFetch(): boolean {

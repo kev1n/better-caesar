@@ -10,15 +10,66 @@ body {
 }
 
 .app {
-  width: 260px;
+  width: 700px;
   padding: 14px;
+  box-sizing: border-box;
+}
+
+.app-header {
+  margin-bottom: 12px;
 }
 
 h1 {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 15px;
   font-weight: 700;
   color: #66023c;
+}
+
+.app-subtitle {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #6b7280;
+}
+
+.feature-sections {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.feature-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.feature-section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.feature-section-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #66023c;
+}
+
+.feature-section-blurb {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #6b7280;
 }
 
 .feature-list {
@@ -27,22 +78,37 @@ h1 {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
 }
 
 .feature-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 10px;
   padding: 8px 10px;
-  background: #ffffff;
+  background: #faf7f9;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #f0e4eb;
+}
+
+.feature-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .feature-label {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  color: #111827;
+}
+
+.feature-description {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #6b7280;
 }
 
 /* Toggle switch */
@@ -87,7 +153,7 @@ h1 {
 }
 
 .actions {
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .action-btn {
@@ -99,8 +165,8 @@ h1 {
   border: 1px solid #d1d5db;
   background: #ffffff;
   color: #6b7280;
-  border-radius: 8px;
-  text-align: left;
+  border-radius: 10px;
+  text-align: center;
   transition: border-color 0.15s, color 0.15s;
 }
 

@@ -6,38 +6,52 @@ export function injectStyles(): void {
   const style = document.createElement("style");
   style.id = STYLE_ID;
   style.textContent = `
-    .${CTEC_CELL_CLASS} {
-      padding: 4px 8px;
-      min-width: 180px;
-      max-width: 260px;
-      width: 180px;
-      vertical-align: top;
-      border-left: 2px solid #d8b6c8;
-    }
+	    .${CTEC_CELL_CLASS} {
+	      padding: 4px 8px;
+	      min-width: 180px;
+	      max-width: 240px;
+	      width: 180px;
+	      vertical-align: top;
+	      border-left: 2px solid #d8b6c8;
+	      overflow: hidden;
+	      box-sizing: border-box;
+	    }
     .${CTEC_HEADER_CLASS} {
       min-width: 120px;
       color: #fff;
       background: #66023c;
     }
-    .bc-ctec-widget {
-      font-size: 11px;
-      line-height: 1.6;
-      font-family: Helvetica, Arial, sans-serif;
-    }
-    .bc-ctec-count {
-      font-weight: 700;
-      color: #66023c;
-      margin-bottom: 1px;
-    }
-    .bc-ctec-link {
-      display: block;
-      color: #66023c;
-      text-decoration: none;
-      white-space: nowrap;
-    }
-    .bc-ctec-link:hover { text-decoration: underline; }
-    .bc-ctec-muted { color: #888; }
-    .bc-ctec-warn { color: #a00; }
+	    .bc-ctec-widget {
+	      font-size: 11px;
+	      line-height: 1.6;
+	      font-family: Helvetica, Arial, sans-serif;
+	      min-width: 0;
+	      overflow: hidden;
+	    }
+	    .bc-ctec-count {
+	      font-weight: 700;
+	      color: #66023c;
+	      margin-bottom: 1px;
+	      overflow: hidden;
+	      text-overflow: ellipsis;
+	      white-space: nowrap;
+	    }
+	    .bc-ctec-link {
+	      display: block;
+	      color: #66023c;
+	      text-decoration: none;
+	      white-space: nowrap;
+	      overflow: hidden;
+	      text-overflow: ellipsis;
+	    }
+	    .bc-ctec-link:hover { text-decoration: underline; }
+	    .bc-ctec-muted,
+	    .bc-ctec-warn {
+	      overflow: hidden;
+	      text-overflow: ellipsis;
+	    }
+	    .bc-ctec-muted { color: #888; }
+	    .bc-ctec-warn { color: #a00; }
     .bc-ctec-auth-link {
       color: #66023c;
       font-weight: 600;
@@ -135,19 +149,20 @@ export function renderCtecLinksWidget(
 
       const renderLinks = (entries: typeof data.entries) => {
         for (const entry of entries) {
-          const a = document.createElement("a");
-          a.className = "bc-ctec-link";
-          a.href = entry.url;
-          a.target = "_blank";
-          a.rel = "noopener noreferrer";
+	        const a = document.createElement("a");
+	          a.className = "bc-ctec-link";
+	          a.href = entry.url;
+	          a.target = "_blank";
+	          a.rel = "noopener noreferrer";
           let label = `\u2197 ${entry.term}`;
           if (multiInstructor) label += ` \u2014 ${lastName(entry.instructor)}`;
-          const title = courseShortTitle(entry.description);
-          if (title) label += ` (${title})`;
-          a.textContent = label;
-          root.appendChild(a);
-        }
-      };
+	          const title = courseShortTitle(entry.description);
+	          if (title) label += ` (${title})`;
+	          a.textContent = label;
+	          a.title = label;
+	          root.appendChild(a);
+	        }
+	      };
 
       renderLinks(data.entries.slice(0, INITIAL_SHOWN));
 

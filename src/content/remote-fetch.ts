@@ -4,6 +4,7 @@ type FetchTextOptions = {
   method?: "GET" | "POST";
   headers?: Record<string, string>;
   body?: string;
+  allowNonOkStatus?: boolean;
 };
 
 export async function fetchTextResultViaBackground(
@@ -22,10 +23,6 @@ export async function fetchTextResultViaBackground(
     throw new Error(response?.error || "Background fetch failed.");
   }
 
-  if (response.status < 200 || response.status >= 300) {
-    throw new Error(`Request failed (${response.status}).`);
-  }
-
   return response;
 }
 
@@ -34,5 +31,8 @@ export async function fetchTextViaBackground(
   options?: FetchTextOptions
 ): Promise<string> {
   const response = await fetchTextResultViaBackground(url, options);
+  if (!options?.allowNonOkStatus && (response.status < 200 || response.status >= 300)) {
+    throw new Error(`Request failed (${response.status}).`);
+  }
   return response.text;
 }

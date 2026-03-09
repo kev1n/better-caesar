@@ -13,7 +13,10 @@ import {
 } from "../ctec-navigation/helpers";
 import { readSubjectIndex, writeSubjectIndex } from "../ctec-navigation/storage";
 import type { CtecIndexedEntry, CtecSubjectIndex } from "../ctec-navigation/types";
-import { fetchPeopleSoft, fetchPeopleSoftGet } from "../../peoplesoft/http";
+import {
+  fetchPeopleSoftGetResult,
+  fetchPeopleSoftResult
+} from "../../peoplesoft/http";
 import { runPeopleSoftTask } from "../../peoplesoft";
 import { CTEC_AUTH_URL, REQUEST_OWNER } from "./constants";
 import { courseDescMatchesCatalog, entryMatchesCourse, extractLastNameTokens, isAuthResponse, termToSortKey } from "./helpers";
@@ -89,7 +92,7 @@ async function fetchCtecLinksInternal(
   }
 
   if (fetchResult.type === "auth") {
-    return { state: "auth-required", loginUrl: CTEC_AUTH_URL };
+    return { state: "auth-required", loginUrl: fetchResult.loginUrl };
   }
   if (fetchResult.type === "error") {
     return { state: "error", message: fetchResult.message };
@@ -183,7 +186,7 @@ function writeSentinel(
 
 type FetchCourseResult =
   | { type: "entries"; entries: CtecIndexedEntry[] }
-  | { type: "auth" }
+  | { type: "auth"; loginUrl: string }
   | { type: "not-found" }
   | { type: "error"; message: string };
 
@@ -196,13 +199,19 @@ async function fetchCourseEntries(
 ): Promise<FetchCourseResult> {
   const resultsUrl = buildSubjectResultsUrl(subject, career);
   let html: string;
+  let resultsLoginUrl = CTEC_AUTH_URL;
   try {
-    html = await fetchPeopleSoftGet(resultsUrl, { owner: REQUEST_OWNER });
+    const response = await fetchPeopleSoftGetResult(resultsUrl, { owner: REQUEST_OWNER });
+    resultsLoginUrl = response.finalUrl || CTEC_AUTH_URL;
+    if (isUnauthorizedStatus(response.status)) {
+      return { type: "auth", loginUrl: CTEC_AUTH_URL };
+    }
+    html = response.text;
   } catch (e) {
     return { type: "error", message: e instanceof Error ? e.message : "Failed to load CTEC page." };
   }
 
-  if (isAuthResponse(html)) return { type: "auth" };
+  if (isAuthResponse(html)) return { type: "auth", loginUrl: resultsLoginUrl };
 
   const doc = new DOMParser().parseFromString(html, "text/html");
   const form = doc.forms.namedItem("win0");
@@ -221,17 +230,23 @@ async function fetchCourseEntries(
   if (!targetCourse) return { type: "not-found" };
 
   let courseResponse: string;
+  let courseLoginUrl = CTEC_AUTH_URL;
   try {
-    courseResponse = await fetchPeopleSoft(
+    const response = await fetchPeopleSoftResult(
       actionUrl,
       buildActionParams(baseParams, targetCourse.actionId),
       { owner: REQUEST_OWNER }
     );
+    courseLoginUrl = response.finalUrl || CTEC_AUTH_URL;
+    if (isUnauthorizedStatus(response.status)) {
+      return { type: "auth", loginUrl: CTEC_AUTH_URL };
+    }
+    courseResponse = response.text;
   } catch (e) {
     return { type: "error", message: e instanceof Error ? e.message : "Failed to load course." };
   }
 
-  if (isAuthResponse(courseResponse)) return { type: "auth" };
+  if (isAuthResponse(courseResponse)) return { type: "auth", loginUrl: courseLoginUrl };
 
   const allClassRows = collectClassRowsFromText(courseResponse);
   if (allClassRows.length === 0) return { type: "not-found" };
@@ -256,12 +271,18 @@ async function fetchCourseEntries(
     onProgress?.(`Loading evaluation ${i + 1}/${total}\u2026`);
 
     let classResponse: string;
+    let classLoginUrl = CTEC_AUTH_URL;
     try {
-      classResponse = await fetchPeopleSoft(
+      const response = await fetchPeopleSoftResult(
         classActionUrl,
         buildActionParams(classParams, row.actionId),
         { owner: REQUEST_OWNER }
       );
+      classLoginUrl = response.finalUrl || CTEC_AUTH_URL;
+      if (isUnauthorizedStatus(response.status)) {
+        return { type: "auth", loginUrl: CTEC_AUTH_URL };
+      }
+      classResponse = response.text;
     } catch {
       resultEntries.push({
         actionId: row.actionId,
@@ -275,7 +296,7 @@ async function fetchCourseEntries(
       continue;
     }
 
-    if (isAuthResponse(classResponse)) return { type: "auth" };
+    if (isAuthResponse(classResponse)) return { type: "auth", loginUrl: classLoginUrl };
 
     const blueraUrl = extractBlueraUrl(classResponse);
     resultEntries.push({
@@ -290,4 +311,8 @@ async function fetchCourseEntries(
   }
 
   return { type: "entries", entries: resultEntries };
+}
+
+function isUnauthorizedStatus(status: number): boolean {
+  return status === 401 || status === 403;
 }

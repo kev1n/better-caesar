@@ -99,60 +99,80 @@ export function injectStyles(): void {
       background: var(--bc-tyrian);
       border-color: var(--bc-tyrian-ink);
     }
-    .${SEATS_CELL_CLASS},
-    .${NOTES_CELL_CLASS} {
-      min-width: 220px;
-      max-width: 420px;
-      padding: 4px 6px;
-      border-left: 2px solid var(--bc-tyrian-mid);
-      vertical-align: top;
-    }
-    .better-caesar-card {
-      display: grid;
-      gap: 6px;
-      padding: 8px;
+	    .${SEATS_CELL_CLASS},
+	    .${NOTES_CELL_CLASS} {
+	      min-width: 220px;
+	      width: 220px;
+	      max-width: 320px;
+	      padding: 4px 6px;
+	      border-left: 2px solid var(--bc-tyrian-mid);
+	      vertical-align: top;
+	      overflow: hidden;
+	      box-sizing: border-box;
+	    }
+	    .better-caesar-card {
+	      display: grid;
+	      gap: 6px;
+	      padding: 8px;
       border-radius: 8px;
       border: 1px solid var(--bc-tyrian-mid);
-      background: var(--bc-tyrian-soft);
-      color: var(--bc-tyrian-ink);
-      font-size: 11px;
-      line-height: 1.35;
-    }
-    .better-caesar-pill {
-      display: inline-block;
-      justify-self: start;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: var(--bc-good-bg);
-      color: var(--bc-good-ink);
-      font-weight: 700;
-    }
-    .better-caesar-lines {
-      display: grid;
-      gap: 2px;
-    }
-    .better-caesar-line {
-      font-size: 11px;
-      color: var(--bc-tyrian-ink);
-    }
-    .better-caesar-note {
-      display: grid;
-      gap: 2px;
-    }
-    .better-caesar-note-label {
-      font-size: 10px;
+	      background: var(--bc-tyrian-soft);
+	      color: var(--bc-tyrian-ink);
+	      font-size: 11px;
+	      line-height: 1.35;
+	      width: 100%;
+	      min-width: 0;
+	      overflow: hidden;
+	      box-sizing: border-box;
+	    }
+	    .better-caesar-pill {
+	      display: inline-block;
+	      justify-self: start;
+	      padding: 2px 8px;
+	      border-radius: 999px;
+	      border: 1px solid transparent;
+	      font-weight: 700;
+	      max-width: 100%;
+	      overflow: hidden;
+	      text-overflow: ellipsis;
+	      white-space: nowrap;
+	    }
+	    .better-caesar-lines {
+	      display: grid;
+	      gap: 2px;
+	      min-width: 0;
+	    }
+	    .better-caesar-line {
+	      font-size: 11px;
+	      color: var(--bc-tyrian-ink);
+	      min-width: 0;
+	      overflow: hidden;
+	      text-overflow: ellipsis;
+	      white-space: nowrap;
+	    }
+	    .better-caesar-note {
+	      display: grid;
+	      gap: 2px;
+	      min-width: 0;
+	    }
+	    .better-caesar-note-label {
+	      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.25px;
       color: var(--bc-tyrian);
     }
-    .better-caesar-note-text {
-      color: var(--bc-tyrian-ink);
-      overflow-wrap: anywhere;
-    }
-    .better-caesar-warning {
-      color: #8a2e00;
-      border-top: 1px dashed #d99a66;
+	    .better-caesar-note-text {
+	      color: var(--bc-tyrian-ink);
+	      overflow-wrap: anywhere;
+	      overflow: hidden;
+	      display: -webkit-box;
+	      -webkit-box-orient: vertical;
+	      -webkit-line-clamp: 4;
+	    }
+	    .better-caesar-warning {
+	      color: #8a2e00;
+	      border-top: 1px dashed #d99a66;
       padding-top: 4px;
       font-weight: 600;
     }
@@ -176,7 +196,10 @@ function buildSeatsCard(response: SeatsNotesSuccess): HTMLElement {
 
   const primary = document.createElement("div");
   primary.className = "better-caesar-pill";
-  primary.textContent = buildPrimarySeatsLine(response) ?? "Seat counts unavailable";
+  const primaryLine = buildPrimarySeatsLine(response) ?? "Seat counts unavailable";
+  primary.textContent = primaryLine;
+  primary.title = primaryLine;
+  applySeatsTone(primary, response);
   card.appendChild(primary);
 
   const details = document.createElement("div");
@@ -233,7 +256,9 @@ function appendLine(container: HTMLElement, label: string, value: string | null)
   if (!value) return;
   const line = document.createElement("div");
   line.className = "better-caesar-line";
-  line.textContent = `${label}: ${value}`;
+  const text = `${label}: ${value}`;
+  line.textContent = text;
+  line.title = text;
   container.appendChild(line);
 }
 
@@ -249,10 +274,109 @@ function appendNote(container: HTMLElement, label: string, value: string | null)
   const textEl = document.createElement("div");
   textEl.className = "better-caesar-note-text";
   textEl.textContent = value;
+  textEl.title = value;
 
   block.appendChild(labelEl);
   block.appendChild(textEl);
   container.appendChild(block);
+}
+
+function applySeatsTone(element: HTMLElement, response: SeatsNotesSuccess): void {
+  const tone = getSeatsTone(response);
+  element.style.background = tone.background;
+  element.style.borderColor = tone.border;
+  element.style.color = tone.ink;
+}
+
+function getSeatsTone(response: SeatsNotesSuccess): {
+  background: string;
+  border: string;
+  ink: string;
+} {
+  const classCapacity = toNumber(response.classCapacity);
+  const enrollmentTotal = toNumber(response.enrollmentTotal);
+  const availableSeats = toNumber(response.availableSeats);
+  const waitListTotal = toNumber(response.waitListTotal);
+
+  if (classCapacity !== null) {
+    if ((availableSeats !== null && availableSeats <= 0) || (enrollmentTotal !== null && enrollmentTotal >= classCapacity)) {
+      return {
+        background: "#fde8e8",
+        border: "#f4a9a9",
+        ink: "#8c1d18"
+      };
+    }
+
+    if (enrollmentTotal !== null) {
+      const occupancy = Math.min(Math.max(enrollmentTotal / classCapacity, 0), 1.2);
+      return occupancyToTone(occupancy);
+    }
+
+    if (availableSeats !== null) {
+      const occupancy = Math.min(Math.max((classCapacity - availableSeats) / classCapacity, 0), 1.2);
+      return occupancyToTone(occupancy);
+    }
+  }
+
+  if (waitListTotal !== null && waitListTotal > 0) {
+    return {
+      background: "#fff0d9",
+      border: "#f1c27a",
+      ink: "#8a4b00"
+    };
+  }
+
+  return {
+    background: "#eef2ff",
+    border: "#c7d2fe",
+    ink: "#3730a3"
+  };
+}
+
+function occupancyToTone(occupancy: number): {
+  background: string;
+  border: string;
+  ink: string;
+} {
+  if (occupancy >= 0.95) {
+    return {
+      background: "#fde8e8",
+      border: "#f4a9a9",
+      ink: "#8c1d18"
+    };
+  }
+  if (occupancy >= 0.8) {
+    return {
+      background: "#fff1df",
+      border: "#f7c58a",
+      ink: "#94410d"
+    };
+  }
+  if (occupancy >= 0.6) {
+    return {
+      background: "#fff8d9",
+      border: "#eed46b",
+      ink: "#7a5d00"
+    };
+  }
+  if (occupancy >= 0.35) {
+    return {
+      background: "#eef8d7",
+      border: "#bfdc7d",
+      ink: "#4d6b00"
+    };
+  }
+  return {
+    background: "#e8f5e9",
+    border: "#b9ddbc",
+    ink: "#1b5e20"
+  };
+}
+
+function toNumber(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number.parseFloat(value.replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function buildError(text: string): HTMLElement {

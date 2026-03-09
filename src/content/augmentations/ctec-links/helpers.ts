@@ -92,10 +92,16 @@ export function extractInstructorFromRow(row: HTMLTableRowElement): string {
 }
 
 export function isAuthResponse(html: string): boolean {
+  const normalized = html.toLowerCase();
   return (
-    html.includes("Northwestern SSO") ||
-    html.includes("fed.it.northwestern.edu") ||
-    html.includes("shibboleth") ||
-    (html.includes("Sign In") && html.includes("password"))
+    normalized.includes("northwestern sso") ||
+    normalized.includes("northwestern online passport") ||
+    normalized.includes("ads-fed.northwestern.edu") ||
+    normalized.includes("/adfs/ls") ||
+    normalized.includes("fed.it.northwestern.edu") ||
+    normalized.includes("shibboleth") ||
+    normalized.includes("netid or email address") ||
+    normalized.includes("trouble logging in?") ||
+    (normalized.includes("sign in") && normalized.includes("password"))
   );
 }

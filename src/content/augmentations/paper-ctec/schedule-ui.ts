@@ -82,13 +82,29 @@ export function renderWidget(widget: HTMLElement, data: PaperCtecWidgetData): vo
 
   const chips = [
     metricChip("Inst", "Instruction", aggregate.metrics.instruction, aggregate, "rating"),
-    metricChip("Course", "Course", aggregate.metrics.course, aggregate, "rating"),
-    metricChip("Learn", "Learned", aggregate.metrics.learned, aggregate, "rating"),
+    metricChip("CRSE", "Course", aggregate.metrics.course, aggregate, "rating"),
+    metricChip("LRN", "Learned", aggregate.metrics.learned, aggregate, "rating"),
     metricChip("Hrs", "Hours", aggregate.metrics.hours, aggregate, "hours")
   ].filter((chip): chip is HTMLElement => !!chip);
 
   if (chips.length === 0) {
-    summary.appendChild(makeChip("spark", "CTEC loaded", "is-muted"));
+    const fallbackChips = [
+      metricChip("CHLG", "Challenge", aggregate.metrics.challenging, aggregate, "rating"),
+      metricChip("INT", "Interest", aggregate.metrics.stimulating, aggregate, "rating")
+    ].filter((chip): chip is HTMLElement => !!chip);
+
+    if (fallbackChips.length > 0) {
+      fallbackChips.forEach((chip) => summary.appendChild(chip));
+    } else {
+      summary.appendChild(
+        makeChip(
+          "spark",
+          "CTEC detail",
+          "is-muted",
+          "Matching CTEC reports were found, but the compact card does not have Inst, CRSE, LRN, Hrs, Challenge, or Interest summary metrics for this course."
+        )
+      );
+    }
   } else {
     chips.forEach((chip) => summary.appendChild(chip));
   }
@@ -219,15 +235,15 @@ function renderStatusLegend(doc: Document, stack: HTMLElement): void {
     stack.append(legend);
   }
 
-  const signature = "inst|course|learn|hrs";
+  const signature = "inst|crse|lrn|hrs";
   if (legend.dataset.bcPaperCtecSignature === signature) {
     return;
   }
 
   legend.replaceChildren(
     makeLegendItem(doc, "Inst", "instruction rating"),
-    makeLegendItem(doc, "Course", "course rating"),
-    makeLegendItem(doc, "Learn", "amount learned"),
+    makeLegendItem(doc, "CRSE", "course rating"),
+    makeLegendItem(doc, "LRN", "amount learned"),
     makeLegendItem(doc, "Hrs", "avg hours / week")
   );
   legend.dataset.bcPaperCtecSignature = signature;
@@ -360,7 +376,10 @@ function buildWidgetSignature(data: PaperCtecWidgetData): string {
     aggregate.metrics.instruction?.mean ?? "",
     aggregate.metrics.course?.mean ?? "",
     aggregate.metrics.learned?.mean ?? "",
-    aggregate.metrics.hours?.mean ?? ""
+    aggregate.metrics.hours?.mean ?? "",
+    aggregate.metrics.challenging?.mean ?? "",
+    aggregate.metrics.stimulating?.mean ?? "",
+    aggregate.parsedCount
   ].join(",");
 
   return [

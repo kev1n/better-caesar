@@ -10,6 +10,7 @@ import type {
 } from "../ctec-navigation/types";
 import { fetchTextResultViaBackground } from "../../remote-fetch";
 import { fetchCtecLinksBackground } from "./fetcher";
+import { CTEC_AUTH_URL } from "./constants";
 import { entryMatchesCourse, isAuthResponse, termToSortKey } from "./helpers";
 import type { CtecLinkParams } from "./types";
 
@@ -229,6 +230,12 @@ async function ensureReportEntries(
     const response = await fetchTextResultViaBackground(url, { method: "GET" });
     if (isAuthResponse(response.text)) {
       return { state: "auth-required", loginUrl: response.finalUrl || url };
+    }
+    if (response.status === 401 || response.status === 403) {
+      return { state: "auth-required", loginUrl: CTEC_AUTH_URL };
+    }
+    if (response.status < 200 || response.status >= 300) {
+      return { state: "error", message: `Request failed (${response.status}).` };
     }
 
     const summary = parseCtecReportHtml(response.text, url);
