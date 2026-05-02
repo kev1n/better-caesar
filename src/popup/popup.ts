@@ -64,6 +64,11 @@ const FEATURE_SECTIONS: FeatureSection[] = [
         id: "paper-ctec-compact-card-stars",
         label: "Dense Card Stars",
         description: "Uses stars instead of numeric values in dense schedule cards."
+      },
+      {
+        id: "paper-ctec-rating-percent",
+        label: "Percent Ratings",
+        description: "Shows CTEC ratings as a /100 percentage instead of the native /6 score."
       }
     ]
   }

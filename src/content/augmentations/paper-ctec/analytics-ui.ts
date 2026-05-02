@@ -9,6 +9,11 @@ import {
   SIDECARD_ANALYTICS_PANEL_CLASS,
   SIDECARD_TABS_CLASS
 } from "./constants";
+import {
+  formatRatingDetail,
+  isRatingPercentMode,
+  ratingPercentSignature
+} from "./rating-format";
 import { buildAnalyticsEntryKey } from "./identity";
 import type { PaperCtecSideCardContext } from "./types";
 import {
@@ -224,6 +229,7 @@ function buildSideCardAnalyticsSignature(data: SideCardAnalyticsRenderData): str
     snapshot?.recentAggregate.evaluationCount ?? 0,
     snapshot?.recentAggregate.aggregateEvaluationCount ?? 0,
     snapshot?.recentAggregate.windowTerms.join(",") ?? "",
+    ratingPercentSignature(),
     entrySignature
   ].join("||");
 }
@@ -393,7 +399,7 @@ function analyticsAggregateScalarCard(
     doc,
     label,
     metric.mean,
-    `${label} ${metric.mean.toFixed(2)} across ${metric.evaluationCount} recent term${
+    `${label} ${formatRatingDetail(metric.mean)} across ${metric.evaluationCount} recent term${
       metric.evaluationCount === 1 ? "" : "s"
     }.`
   );
@@ -619,7 +625,7 @@ function analyticsTermScalarCard(
     doc,
     label,
     metric.mean,
-    `${label} ${metric.mean.toFixed(2)} in this term.`,
+    `${label} ${formatRatingDetail(metric.mean)} in this term.`,
     action
   );
 
@@ -716,13 +722,17 @@ function createScalarMetricCard(
     card.append(title);
   }
 
+  const percentMode = isRatingPercentMode();
+
   const rating = doc.createElement("div");
   rating.className = "bc-paper-ctec-analytics-card-rating";
-  rating.append(createRatingStars(doc, mean));
+  if (!percentMode) {
+    rating.append(createRatingStars(doc, mean));
+  }
 
   const value = doc.createElement("div");
   value.className = "bc-paper-ctec-analytics-card-value";
-  value.textContent = mean.toFixed(2);
+  value.textContent = formatRatingDetail(mean);
   rating.append(value);
 
   card.append(rating);
