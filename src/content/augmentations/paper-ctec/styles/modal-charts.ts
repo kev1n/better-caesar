@@ -5,7 +5,7 @@ export function modalChartStyles(): string {
   return `
     .bc-paper-ctec-modal-kpi-strip {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
+      grid-template-columns: repeat(7, 1fr);
       gap: 14px;
       margin-bottom: 20px;
     }

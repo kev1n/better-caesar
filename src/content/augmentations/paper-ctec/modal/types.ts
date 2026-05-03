@@ -4,6 +4,11 @@ export type ModalCommentSentimentFilter = "all" | ModalCommentTone;
 export type ModalCommentSort = "recent" | "longest" | "shortest";
 export type ModalTab = "overview" | "comments" | "terms";
 
+// Active selection in the overview KPI strip. A specific metric kind shows
+// that metric's trend + distribution; "global" swaps in the heatmap +
+// stacked + trend-lines view that summarizes all metrics together.
+export type ModalActiveView = ModalMetricKind | "global";
+
 // Result banner shown after a "Check for new CTECs" pass. Lives in modal
 // header; the augmentation owns lifecycle (set on completion, auto-dismiss
 // for success, sticky for errors).
@@ -14,7 +19,7 @@ export type ModalRefreshFlash =
 
 export type AnalyticsModalState = {
   tab: ModalTab;
-  activeMetric: ModalMetricKind;
+  activeMetric: ModalActiveView;
   selectedTermId: string | null;
   commentsQuery: string;
   commentsSentimentFilter: ModalCommentSentimentFilter;
@@ -26,7 +31,7 @@ export type AnalyticsModalState = {
 export type AnalyticsModalCallbacks = {
   onClose: () => void;
   onTabChange: (tab: ModalTab) => void;
-  onMetricChange: (kind: ModalMetricKind) => void;
+  onMetricChange: (kind: ModalActiveView) => void;
   onTermChange: (id: string) => void;
   onCommentsSentimentChange: (filter: ModalCommentSentimentFilter) => void;
   onCommentsTopicChange: (topic: string | null) => void;

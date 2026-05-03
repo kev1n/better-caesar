@@ -13,16 +13,23 @@ import {
 import { preventAndStop } from "../ui-shared";
 import {
   renderDistChart,
-  renderGroupedRatingsChart,
   renderStackedRatingsChart,
   renderTrendChart
 } from "./charts";
 import { pickSelectedTerm, renderCard } from "./common";
-import type { AnalyticsModalCallbacks, AnalyticsModalState } from "./types";
+import { renderHeatmap } from "./heatmap";
+import type {
+  AnalyticsModalCallbacks,
+  AnalyticsModalState,
+  ModalActiveView
+} from "./types";
 
-// Overview tab: KPI strip (one card per metric), trend + selected-term
-// distribution, workload (hours) density, and three experimental ratings
-// charts (stacked, grouped, multi-line).
+// Overview tab. KPI strip selects a view: a specific metric (instruction,
+// course, learned, challenge, interest, hours) or "Global" — the global
+// view replaces the per-metric trend + distribution with the heatmap and
+// the cross-metric experimental charts (stacked + trend-lines). The
+// workload-distribution card stays visible in both views as a stable
+// reference for the hours data.
 export function renderOverview(
   doc: Document,
   data: ModalDisplayData,
@@ -39,21 +46,41 @@ export function renderOverview(
   for (const kind of [...MODAL_RATING_METRICS, "hours"] as ModalMetricKind[]) {
     kpiStrip.append(renderKpiCard(doc, kind, data, state, callbacks, showDelta));
   }
+  kpiStrip.append(renderGlobalKpiCard(doc, data, state, callbacks));
   root.append(kpiStrip);
 
-  const selectedTerm = pickSelectedTerm(data, state.selectedTermId);
+  if (state.activeMetric === "global") {
+    root.append(renderGlobalSection(doc, data, state, callbacks));
+  } else {
+    root.append(renderMetricSection(doc, data, state, state.activeMetric));
+  }
 
+  root.append(renderWorkloadCard(doc, data));
+
+  return root;
+}
+
+// Per-metric body: trend + selected-term distribution. Always shown when a
+// metric category (not Global) is active.
+function renderMetricSection(
+  doc: Document,
+  data: ModalDisplayData,
+  state: AnalyticsModalState,
+  metric: ModalMetricKind
+): HTMLElement {
   const charts = doc.createElement("div");
   charts.className = "bc-paper-ctec-modal-charts";
+
+  const selectedTerm = pickSelectedTerm(data, state.selectedTermId);
 
   const trendCard = renderCard(
     doc,
     `Trend · ${data.terms.length} ${data.terms.length === 1 ? "term" : "terms"}`,
-    `${MODAL_METRIC_LABELS[state.activeMetric]}${
-      state.activeMetric === "hours" ? " · hrs/wk" : " · mean rating"
+    `${MODAL_METRIC_LABELS[metric]}${
+      metric === "hours" ? " · hrs/wk" : " · mean rating"
     }`
   );
-  trendCard.body.append(renderTrendChart(doc, data, state.activeMetric));
+  trendCard.body.append(renderTrendChart(doc, data, metric));
   charts.append(trendCard.root);
 
   const distCard = renderCard(
@@ -63,11 +90,51 @@ export function renderOverview(
       ? `${selectedTerm.term} · ${selectedTerm.responses} responses`
       : ""
   );
-  distCard.body.append(renderDistChart(doc, selectedTerm, state.activeMetric));
+  distCard.body.append(renderDistChart(doc, selectedTerm, metric));
   charts.append(distCard.root);
 
-  root.append(charts);
+  return charts;
+}
 
+// Global body: heatmap (also a term picker for the Terms tab drill-in),
+// stacked-ratings chart, and per-metric trend lines. These all summarize
+// the full corpus rather than a single metric.
+function renderGlobalSection(
+  doc: Document,
+  data: ModalDisplayData,
+  state: AnalyticsModalState,
+  callbacks: AnalyticsModalCallbacks
+): HTMLElement {
+  const wrapper = doc.createElement("div");
+
+  const heatCard = renderCard(
+    doc,
+    "Term × Metric heatmap",
+    "Click a term to drill in (Terms tab) · shading scaled within these terms only"
+  );
+  heatCard.body.append(renderHeatmap(doc, data, state, callbacks));
+  wrapper.append(heatCard.root);
+
+  const stackedCard = renderCard(
+    doc,
+    "Ratings stacked · per term",
+    "Sum of mean ratings (instruction + course + learned + challenge + interest)"
+  );
+  stackedCard.body.append(renderStackedRatingsChart(doc, data));
+  wrapper.append(stackedCard.root);
+
+  const lineCard = renderCard(
+    doc,
+    "Ratings trend lines · per metric",
+    "One line per metric across terms · 0–6 scale"
+  );
+  lineCard.body.append(renderMultilineRatingsChart(doc, data));
+  wrapper.append(lineCard.root);
+
+  return wrapper;
+}
+
+function renderWorkloadCard(doc: Document, data: ModalDisplayData): HTMLElement {
   const aggregateTotal = data.aggregateHoursBuckets.reduce(
     (sum, b) => sum + b.count,
     0
@@ -124,33 +191,7 @@ export function renderOverview(
         }${aggregateTotal > 0 ? ` · ${aggregateTotal.toLocaleString()} responses` : ""}`
   );
   hoursCard.body.append(renderHoursDensity(doc, hoursSeries));
-  root.append(hoursCard.root);
-
-  const stackedCard = renderCard(
-    doc,
-    "Ratings stacked · per term (experimental)",
-    "Sum of mean ratings (instruction + course + learned + challenge + interest)"
-  );
-  stackedCard.body.append(renderStackedRatingsChart(doc, data));
-  root.append(stackedCard.root);
-
-  const groupedCard = renderCard(
-    doc,
-    "Ratings grouped · per term (experimental)",
-    "Mean rating per metric · 0–6 scale"
-  );
-  groupedCard.body.append(renderGroupedRatingsChart(doc, data));
-  root.append(groupedCard.root);
-
-  const lineCard = renderCard(
-    doc,
-    "Ratings trend lines · per metric (experimental)",
-    "One line per metric across terms · 0–6 scale"
-  );
-  lineCard.body.append(renderMultilineRatingsChart(doc, data));
-  root.append(lineCard.root);
-
-  return root;
+  return hoursCard.root;
 }
 
 function renderKpiCard(
@@ -220,6 +261,62 @@ function renderKpiCard(
     );
   }
   button.append(deltaRow);
+
+  return button;
+}
+
+// Renders the "Global" KPI card alongside the per-metric ones. Its value
+// is the average mean across the 5 rating metrics so it still feels like a
+// KPI; clicking switches the body to the global section.
+function renderGlobalKpiCard(
+  doc: Document,
+  data: ModalDisplayData,
+  state: AnalyticsModalState,
+  callbacks: AnalyticsModalCallbacks
+): HTMLElement {
+  const isActive: boolean = state.activeMetric === "global";
+
+  const ratingMeans = MODAL_RATING_METRICS
+    .map((kind) => data.metrics[kind].mean)
+    .filter((value) => value > 0);
+  const overallMean =
+    ratingMeans.length > 0
+      ? ratingMeans.reduce((sum, v) => sum + v, 0) / ratingMeans.length
+      : 0;
+
+  const button = doc.createElement("button");
+  button.type = "button";
+  button.className = `bc-paper-ctec-modal-kpi${isActive ? " is-active" : ""}`;
+  button.title = "Cross-metric overview: heatmap + stacked + trend lines.";
+  button.addEventListener("click", (event) => {
+    preventAndStop(event);
+    callbacks.onMetricChange("global" satisfies ModalActiveView);
+  });
+
+  const top = doc.createElement("div");
+  top.className = "bc-paper-ctec-modal-kpi-top";
+
+  const label = doc.createElement("span");
+  label.className = "bc-paper-ctec-modal-kpi-label";
+  label.textContent = "Global";
+  top.append(label);
+  button.append(top);
+
+  const value = doc.createElement("div");
+  value.className = "bc-paper-ctec-modal-kpi-value";
+  const big = doc.createElement("span");
+  big.className = "bc-paper-ctec-modal-kpi-mean";
+  big.textContent = overallMean > 0 ? overallMean.toFixed(1) : "—";
+  const unit = doc.createElement("span");
+  unit.className = "bc-paper-ctec-modal-kpi-scale";
+  unit.textContent = "/ 6 avg";
+  value.append(big, unit);
+  button.append(value);
+
+  const sub = doc.createElement("div");
+  sub.className = "bc-paper-ctec-modal-kpi-delta is-muted";
+  sub.textContent = "all metrics view";
+  button.append(sub);
 
   return button;
 }

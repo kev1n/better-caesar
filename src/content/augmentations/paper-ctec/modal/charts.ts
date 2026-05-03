@@ -7,7 +7,6 @@ import { renderMetricDistribution } from "../dist-render";
 import { renderHoursDensity } from "../hours-density";
 import {
   MODAL_METRIC_LABELS,
-  MODAL_METRIC_SCALES,
   MODAL_RATING_METRICS,
   type ModalDisplayData,
   type ModalMetricKind,
@@ -324,99 +323,3 @@ export function renderStackedRatingsChart(
   return wrapper;
 }
 
-// Grouped bar chart of the 5 rating-metric means per term. Each term gets a
-// cluster of 5 thin bars (one per metric), all on a fixed 0–6 y-axis so
-// terms are directly comparable.
-export function renderGroupedRatingsChart(
-  doc: Document,
-  data: ModalDisplayData
-): HTMLElement {
-  const wrapper = doc.createElement("div");
-  wrapper.className = "bc-paper-ctec-modal-multibar";
-
-  const terms = data.trendTerms;
-  if (terms.length === 0) {
-    const empty = doc.createElement("div");
-    empty.className = "bc-paper-ctec-modal-trend-empty";
-    empty.textContent = "No terms to plot.";
-    wrapper.append(empty);
-    return wrapper;
-  }
-
-  const W = 700;
-  const H = 260;
-  const PL = 40;
-  const PR = 16;
-  const PT = 16;
-  const PB = 40;
-  const innerW = W - PL - PR;
-  const innerH = H - PT - PB;
-
-  const yMax = MODAL_METRIC_SCALES.instruction;
-  const yAt = (v: number) => PT + innerH - (v / yMax) * innerH;
-
-  const SVG_NS = "http://www.w3.org/2000/svg";
-  const svg = doc.createElementNS(SVG_NS, "svg");
-  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  svg.setAttribute("class", "bc-paper-ctec-modal-multibar-svg");
-
-  for (let i = 0; i <= yMax; i++) {
-    const line = doc.createElementNS(SVG_NS, "line");
-    line.setAttribute("x1", String(PL));
-    line.setAttribute("x2", String(W - PR));
-    line.setAttribute("y1", String(yAt(i)));
-    line.setAttribute("y2", String(yAt(i)));
-    line.setAttribute("stroke", "#f1ebef");
-    svg.append(line);
-
-    const tick = doc.createElementNS(SVG_NS, "text");
-    tick.setAttribute("x", String(PL - 6));
-    tick.setAttribute("y", String(yAt(i) + 3));
-    tick.setAttribute("fill", "#9b8290");
-    tick.setAttribute("font-size", "10");
-    tick.setAttribute("text-anchor", "end");
-    tick.textContent = String(i);
-    svg.append(tick);
-  }
-
-  const bandW = innerW / terms.length;
-  const groupGap = Math.min(14, bandW * 0.2);
-  const groupInner = bandW - groupGap;
-  const barW = Math.max(2, groupInner / MODAL_RATING_METRICS.length);
-
-  terms.forEach((term, i) => {
-    const groupLeft = PL + bandW * i + groupGap / 2;
-
-    MODAL_RATING_METRICS.forEach((kind, j) => {
-      const v = term.metrics[kind] ?? 0;
-      if (v <= 0) return;
-      const x = groupLeft + j * barW;
-      const y = yAt(v);
-      const rect = doc.createElementNS(SVG_NS, "rect");
-      rect.setAttribute("x", String(x + 0.5));
-      rect.setAttribute("y", String(y));
-      rect.setAttribute("width", String(Math.max(1, barW - 1)));
-      rect.setAttribute("height", String(PT + innerH - y));
-      rect.setAttribute("fill", RATING_METRIC_COLORS[kind]);
-
-      const title = doc.createElementNS(SVG_NS, "title");
-      title.textContent = `${term.term} · ${MODAL_METRIC_LABELS[kind]}: ${v.toFixed(2)}`;
-      rect.append(title);
-      svg.append(rect);
-    });
-
-    const cx = PL + bandW * (i + 0.5);
-    const termLabel = doc.createElementNS(SVG_NS, "text");
-    termLabel.setAttribute("x", String(cx));
-    termLabel.setAttribute("y", String(H - 14));
-    termLabel.setAttribute("fill", "#7a596a");
-    termLabel.setAttribute("font-size", "10");
-    termLabel.setAttribute("text-anchor", "middle");
-    termLabel.textContent = abbrTerm(term.term);
-    svg.append(termLabel);
-  });
-
-  wrapper.append(svg);
-  wrapper.append(renderRatingMetricLegend(doc));
-  return wrapper;
-}

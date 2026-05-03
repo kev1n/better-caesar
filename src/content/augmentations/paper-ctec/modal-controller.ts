@@ -13,7 +13,7 @@ import type {
   ModalTab
 } from "./modal-ui";
 import { hideAnalyticsModal, readModalCommentsQuery, renderAnalyticsModal } from "./modal-ui";
-import type { ModalMetricKind } from "./modal-data";
+import type { ModalActiveView } from "./modal/types";
 import type {
   AnalyticsModalSource,
   PaperCtecAnalyticsState,
@@ -248,7 +248,7 @@ export class ModalController {
           modalState.tab = tab;
           this.sync(document);
         },
-        onMetricChange: (kind: ModalMetricKind) => {
+        onMetricChange: (kind: ModalActiveView) => {
           modalState.activeMetric = kind;
           this.sync(document);
         },

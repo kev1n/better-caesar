@@ -7,13 +7,14 @@ import {
   type ModalMetricKind,
   type ModalTerm
 } from "../modal-data";
-import { preventAndStop } from "../ui-shared";
-import { pickSelectedTerm, renderCard, spacerCell } from "./common";
+import { preventAndStop, stopPropagation } from "../ui-shared";
+import { pickSelectedTerm, renderCard } from "./common";
 import type { AnalyticsModalCallbacks, AnalyticsModalState } from "./types";
 
-// Terms tab: term × metric heatmap, then a two-column drill-in for the
+// Terms tab: term selector dropdown over a two-column drill-in for the
 // selected term (per-metric stats with vs-other-terms delta on the left,
-// per-metric distribution charts on the right).
+// per-metric distribution charts on the right). The cross-term heatmap
+// that used to live here moved to the Overview "Global" view.
 export function renderTerms(
   doc: Document,
   data: ModalDisplayData,
@@ -23,15 +24,8 @@ export function renderTerms(
   const root = doc.createElement("div");
   root.className = "bc-paper-ctec-modal-terms";
 
-  const heatCard = renderCard(
-    doc,
-    "Term × Metric heatmap",
-    "Shading scaled within these terms only"
-  );
-  heatCard.body.append(renderHeatmap(doc, data, state, callbacks));
-  root.append(heatCard.root);
-
   const selectedTerm = pickSelectedTerm(data, state.selectedTermId);
+  root.append(renderTermPicker(doc, data, selectedTerm, callbacks));
   if (!selectedTerm) return root;
 
   const drillRow = doc.createElement("div");
@@ -56,100 +50,42 @@ export function renderTerms(
   return root;
 }
 
-function renderHeatmap(
+// <select> picker over the loaded terms, since the heatmap (which used to
+// double as the picker) moved to the Overview Global view. Pickers fire
+// onTermChange so other tabs see the updated selection.
+function renderTermPicker(
   doc: Document,
   data: ModalDisplayData,
-  state: AnalyticsModalState,
+  selectedTerm: ModalTerm | null,
   callbacks: AnalyticsModalCallbacks
 ): HTMLElement {
-  const grid = doc.createElement("div");
-  grid.className = "bc-paper-ctec-modal-heatmap";
+  const wrapper = doc.createElement("div");
+  wrapper.className = "bc-paper-ctec-analytics-term-toolbar";
 
-  // Header row.
-  grid.append(spacerCell(doc));
-  for (const kind of [...MODAL_RATING_METRICS, "hours"] as ModalMetricKind[]) {
-    const header = doc.createElement("div");
-    header.className = "bc-paper-ctec-modal-heatmap-header";
-    header.textContent = MODAL_METRIC_LABELS[kind];
-    grid.append(header);
-  }
+  const selectorWrap = doc.createElement("div");
+  selectorWrap.className = "bc-paper-ctec-analytics-term-selector";
 
-  // Rating cells share one shading scale (deep maroon → light) and hours
-  // cells share another (purple) — different units, different scales.
-  const ratings: number[] = [];
-  data.terms.forEach((term) =>
-    MODAL_RATING_METRICS.forEach((kind) => {
-      const value = term.metrics[kind];
-      if (typeof value === "number") ratings.push(value);
-    })
-  );
-  const minR = ratings.length ? Math.min(...ratings) : 0;
-  const maxR = ratings.length ? Math.max(...ratings) : 0;
-  const spanR = maxR - minR;
-  const cellR = (value: number) => {
-    if (spanR < 0.05) return "rgba(102,2,60,0.45)";
-    return `rgba(102,2,60,${0.18 + ((value - minR) / spanR) * 0.72})`;
-  };
+  const label = doc.createElement("label");
+  label.textContent = "Term";
+  selectorWrap.append(label);
 
-  const hourValues: number[] = [];
-  data.terms.forEach((term) => {
-    const value = term.metrics.hours;
-    if (typeof value === "number") hourValues.push(value);
-  });
-  const minH = hourValues.length ? Math.min(...hourValues) : 0;
-  const maxH = hourValues.length ? Math.max(...hourValues) : 0;
-  const spanH = maxH - minH;
-  const cellH = (value: number) => {
-    if (spanH < 0.05) return "rgba(162,28,175,0.45)";
-    return `rgba(162,28,175,${0.18 + ((value - minH) / spanH) * 0.72})`;
-  };
-
+  const select = doc.createElement("select");
+  select.className = "bc-paper-ctec-analytics-term-select";
   for (const term of data.terms) {
-    const isActive = state.selectedTermId === term.id;
-    const termCell = doc.createElement("button");
-    termCell.type = "button";
-    termCell.className = `bc-paper-ctec-modal-heatmap-term${isActive ? " is-active" : ""}`;
-    const termTitle = doc.createElement("div");
-    termTitle.className = "bc-paper-ctec-modal-heatmap-term-title";
-    termTitle.textContent = term.term;
-    const termSub = doc.createElement("div");
-    termSub.className = "bc-paper-ctec-modal-heatmap-term-sub";
-    termSub.textContent = `${term.responses} responded`;
-    termCell.append(termTitle, termSub);
-    termCell.addEventListener("click", (event) => {
-      preventAndStop(event);
-      callbacks.onTermChange(term.id);
-    });
-    grid.append(termCell);
-
-    for (const kind of MODAL_RATING_METRICS) {
-      const value = term.metrics[kind];
-      const cell = doc.createElement("div");
-      cell.className = "bc-paper-ctec-modal-heatmap-cell";
-      if (typeof value === "number") {
-        cell.style.background = cellR(value);
-        cell.textContent = value.toFixed(1);
-      } else {
-        cell.classList.add("is-empty");
-        cell.textContent = "—";
-      }
-      grid.append(cell);
-    }
-
-    const hoursValue = term.metrics.hours;
-    const hoursCell = doc.createElement("div");
-    hoursCell.className = "bc-paper-ctec-modal-heatmap-cell";
-    if (typeof hoursValue === "number") {
-      hoursCell.style.background = cellH(hoursValue);
-      hoursCell.textContent = `${hoursValue.toFixed(1)}h`;
-    } else {
-      hoursCell.classList.add("is-empty");
-      hoursCell.textContent = "—";
-    }
-    grid.append(hoursCell);
+    const option = doc.createElement("option");
+    option.value = term.id;
+    option.textContent = `${term.term} · ${term.instructor} · ${term.responses} responded`;
+    if (selectedTerm?.id === term.id) option.selected = true;
+    select.append(option);
   }
+  select.addEventListener("click", stopPropagation);
+  select.addEventListener("change", () => {
+    callbacks.onTermChange(select.value);
+  });
+  selectorWrap.append(select);
+  wrapper.append(selectorWrap);
 
-  return grid;
+  return wrapper;
 }
 
 function renderTermMetricGrid(
