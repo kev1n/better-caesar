@@ -290,7 +290,7 @@ async function fetchCourseEntries(
   let html: string;
   let resultsLoginUrl = CTEC_AUTH_URL;
   try {
-    const response = await fetchPeopleSoftGetResult(resultsUrl, { owner: REQUEST_OWNER });
+    const response = await fetchPeopleSoftGetResult(resultsUrl);
     resultsLoginUrl = response.finalUrl || CTEC_AUTH_URL;
     if (isUnauthorizedStatus(response.status)) {
       return { type: "auth", loginUrl: CTEC_AUTH_URL };
@@ -323,8 +323,7 @@ async function fetchCourseEntries(
   try {
     const response = await fetchPeopleSoftResult(
       actionUrl,
-      buildActionParams(baseParams, targetCourse.actionId),
-      { owner: REQUEST_OWNER }
+      buildActionParams(baseParams, targetCourse.actionId)
     );
     courseLoginUrl = response.finalUrl || CTEC_AUTH_URL;
     if (isUnauthorizedStatus(response.status)) {
@@ -377,8 +376,7 @@ async function fetchCourseEntries(
     try {
       const response = await fetchPeopleSoftResult(
         classActionUrl,
-        buildActionParams(classParams, row.actionId),
-        { owner: REQUEST_OWNER }
+        buildActionParams(classParams, row.actionId)
       );
       classLoginUrl = response.finalUrl || CTEC_AUTH_URL;
       if (isUnauthorizedStatus(response.status)) {

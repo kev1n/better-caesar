@@ -1,5 +1,3 @@
-import type { CtecCourseAnalytics, CtecCourseAnalyticsEntry } from "../ctec-links/reports";
-import { buildAnalyticsEntryKey } from "./identity";
 import type {
   PaperCtecAnalyticsState,
   PaperCtecStatusBarData,
@@ -122,61 +120,6 @@ export function clearAuthRequiredStates(
       analyticsResolved.delete(key);
     }
   }
-}
-
-export function toggleExpandedChart(
-  expandedCharts: Map<string, Set<string>>,
-  key: string,
-  chartKey: string
-): void {
-  const next = new Set(expandedCharts.get(key) ?? []);
-  if (next.has(chartKey)) {
-    next.delete(chartKey);
-  } else {
-    next.add(chartKey);
-  }
-
-  if (next.size === 0) {
-    expandedCharts.delete(key);
-    return;
-  }
-
-  expandedCharts.set(key, next);
-}
-
-export function resolveSelectedEntryId(
-  selectedAnalyticsEntries: Map<string, string>,
-  key: string,
-  snapshot: CtecCourseAnalytics | null
-): string | null {
-  const availableEntryIds = snapshot?.entries.map(buildAnalyticsEntryKey) ?? [];
-  if (availableEntryIds.length === 0) {
-    selectedAnalyticsEntries.delete(key);
-    return null;
-  }
-
-  const current = selectedAnalyticsEntries.get(key);
-  if (current && availableEntryIds.includes(current)) return current;
-
-  const fallback = availableEntryIds[0] ?? null;
-  if (fallback) {
-    selectedAnalyticsEntries.set(key, fallback);
-  }
-  return fallback;
-}
-
-export function captureCommentQuery(
-  commentQueries: Map<string, string>,
-  key: string,
-  value: string | null
-): void {
-  const nextValue = value?.trim() ?? "";
-  if (!nextValue) {
-    commentQueries.delete(key);
-    return;
-  }
-
-  commentQueries.set(key, nextValue);
 }
 
 function getLatestProgressMessage(

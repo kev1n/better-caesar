@@ -23,14 +23,6 @@ export function buildLookupSummary(
   const firstResultClassNumber =
     responseText.match(/id='MTG_CLASS_NBR\$0'[\s\S]*?>\s*(\d+)\s*<\/a>/i)?.[1] ?? null;
 
-  const firstResultCourseTitle =
-    responseText.match(
-      /SSR_CLSRSLT_WRK_GROUPBOX2GP\$0'[^>]*>[\s\S]*?&nbsp;([^<]+?)&nbsp;<\/DIV>/i
-    )?.[1] ?? null;
-
-  const firstResultSection =
-    responseText.match(/id='MTG_CLASSNAME\$0'[\s\S]*?>\s*([^<]+?)\s*<br/i)?.[1] ?? null;
-
   const nextActionForDetails =
     responseText.match(/submitAction_win0\(document\.win0,'(MTG_CLASSNAME\$0)'\)/i)?.[1] ?? null;
 
@@ -39,16 +31,7 @@ export function buildLookupSummary(
     requestedClassNumber,
     criteriaClassNumber,
     firstResultClassNumber,
-    firstResultCourseTitle,
-    firstResultSection,
-    firstResultInstructor: extractTextById(responseText, "MTG_INSTR$0"),
-    firstResultDaysTimes: extractTextById(responseText, "MTG_DAYTIME$0"),
-    firstResultRoom: extractTextById(responseText, "MTG_ROOM$0"),
-    firstResultMeetingDates: extractTextById(responseText, "MTG_TOPIC$0"),
-    firstResultGrading: extractTextById(responseText, "NW_DERIVED_SS3_DESCR$0"),
-    firstResultStatus: extractStatusText(responseText),
     nextActionForDetails,
-    searchPageId: extractPageId(responseText),
     detailPageId: null,
     detailResponseText: null
   };
@@ -86,19 +69,3 @@ export function extractErrorMessage(responseText: string): string | null {
   return decodeEntities(text);
 }
 
-function extractTextById(responseText: string, id: string): string | null {
-  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`id=['"]${escapedId}['"][\\s\\S]*?>\\s*([^<]+?)\\s*<`, "i");
-  const value = pattern.exec(responseText)?.[1];
-  if (!value) return null;
-  return decodeEntities(value);
-}
-
-function extractStatusText(responseText: string): string | null {
-  const match = responseText.match(
-    /id=['"]DERIVED_CLSRCH_SSR_STATUS_LONG\$0['"][\s\S]*?alt=["']([^"']+)["']/i
-  )?.[1];
-
-  if (!match) return null;
-  return decodeEntities(match);
-}

@@ -29,11 +29,11 @@ export type RenderMetricDistributionOptions = {
   metric: ModalMetricKind;
   altLabel: string;
   className: string;
-  // Optional callback to render the hours-bucket density curve when real
-  // bucket counts are available. modal-ui owns this renderer (it's tied
-  // to the modal's series-aware drawing primitives), so we accept it as
-  // an injection rather than re-implement here.
-  renderHoursBuckets?: (term: ModalTerm) => HTMLElement | null;
+  // Callback to render the hours-bucket density curve when real bucket
+  // counts are available. modal owns this renderer (it's tied to the
+  // modal's series-aware drawing primitives), so we accept it as an
+  // injection rather than re-implement here.
+  renderHoursBuckets: (term: ModalTerm) => HTMLElement | null;
 };
 
 export function renderMetricDistribution(
@@ -41,7 +41,7 @@ export function renderMetricDistribution(
 ): HTMLElement {
   const { doc, term, metric, altLabel, className, renderHoursBuckets } = options;
 
-  if (metric === "hours" && term.hoursBuckets.length > 0 && renderHoursBuckets) {
+  if (metric === "hours" && term.hoursBuckets.length > 0) {
     const buckets = renderHoursBuckets(term);
     if (buckets) return buckets;
   }

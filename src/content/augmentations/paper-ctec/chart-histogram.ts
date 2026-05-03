@@ -60,8 +60,6 @@ export function renderChartHistogram(
         {
           counts: options.preExtractedCounts,
           percentages: options.preExtractedCounts.map((c) => (c / total) * 100),
-          widths: [],
-          span: 0,
           total
         },
         options

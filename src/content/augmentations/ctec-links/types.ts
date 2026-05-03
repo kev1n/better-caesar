@@ -1,5 +1,4 @@
 export type CtecLinkParams = {
-  classNumber: string;
   subject: string;
   catalogNumber: string;
   instructor: string;

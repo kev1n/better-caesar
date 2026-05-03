@@ -20,9 +20,7 @@ const VBAND = 8;
 
 export type ChartExtraction = {
   counts: number[]; // length 6, top → bottom (1-VeryLow … 6-VeryHigh)
-  percentages: number[]; // length 6, derived from widths
-  widths: number[]; // raw bar pixel widths (for diagnostics)
-  span: number; // pixel span representing 100%
+  percentages: number[]; // length 6, derived from bar widths
   total: number;
 };
 
@@ -145,7 +143,7 @@ async function doExtract(
       };
     }
 
-    return { ok: true, data: { counts, percentages, widths, span, total } };
+    return { ok: true, data: { counts, percentages, total } };
   } finally {
     bitmap.close?.();
   }
@@ -275,8 +273,4 @@ function findBarRight(
   // Bar exists but didn't satisfy band-match anywhere right of sample —
   // it's exactly 1 pixel wide.
   return sampleX;
-}
-
-export function clearChartExtractCache(): void {
-  cache.clear();
 }

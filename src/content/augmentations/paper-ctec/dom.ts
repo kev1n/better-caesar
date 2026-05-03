@@ -83,13 +83,6 @@ export function extractSideCardContext(doc: Document): PaperCtecSideCardContext 
   };
 }
 
-export function readSideCardCommentQuery(context: PaperCtecSideCardContext): string | null {
-  const input = context.panel.querySelector<HTMLInputElement>(
-    'input[data-bc-paper-ctec-comment-search="1"]'
-  );
-  return input?.value ?? null;
-}
-
 function parseTarget(card: HTMLElement): PaperCtecCandidate | null {
   if (isPreviewCard(card)) return null;
 

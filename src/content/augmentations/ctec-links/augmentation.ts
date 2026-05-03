@@ -1,6 +1,5 @@
 import type { Augmentation } from "../../framework";
 import { isRetryablePeopleSoftTaskError } from "../../peoplesoft";
-import { extractClassNumber } from "../seats-notes/helpers";
 import { showToast } from "../seats-notes/toast";
 import { CLASS_LINK_SELECTOR, CLASS_ROW_SELECTOR, PAGE_ID } from "./constants";
 import { fetchCtecLinks, getCtecLinksFromCache } from "./fetcher";
@@ -80,7 +79,6 @@ export class CtecLinksAugmentation implements Augmentation {
       targets.push({
         row,
         params: {
-          classNumber: extractClassNumber(linkText) ?? "",
           subject: parsed.subject,
           catalogNumber: parsed.catalogNumber,
           instructor: extractInstructorFromRow(row)

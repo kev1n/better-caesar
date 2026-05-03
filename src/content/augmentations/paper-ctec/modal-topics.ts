@@ -17,7 +17,7 @@
 // contains — no semantic matching, just substring.
 
 import type { CtecLinkParams } from "../ctec-links/types";
-import type { ModalComment, ModalCommentTone, ModalTopicEntry } from "./modal-data";
+import type { ModalComment, ModalTopicEntry } from "./modal-data";
 
 const MIN_TOPIC_DF = 2;
 const MAX_TOPIC_DF_FRACTION = 0.7;
@@ -155,17 +155,4 @@ export function aggregateTopics(comments: ModalComment[]): ModalTopicEntry[] {
     }
   }
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
-}
-
-export function countSentiment(
-  comments: ModalComment[]
-): Record<ModalCommentTone, number> {
-  const out: Record<ModalCommentTone, number> = {
-    pos: 0,
-    neu: 0,
-    mix: 0,
-    neg: 0
-  };
-  for (const comment of comments) out[comment.tone]++;
-  return out;
 }

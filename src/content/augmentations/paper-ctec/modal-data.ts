@@ -6,7 +6,7 @@ import {
 import type { CtecReportChart } from "../ctec-navigation/types";
 import type { CtecLinkParams } from "../ctec-links/types";
 import { collectComments } from "./modal-comments";
-import { aggregateTopics, countSentiment } from "./modal-topics";
+import { aggregateTopics } from "./modal-topics";
 
 export type ModalMetricKind =
   | "instruction"
@@ -135,7 +135,6 @@ export type ModalDisplayData = {
   aggregateHoursBuckets: ModalHoursBucket[];
   comments: ModalComment[];
   topics: ModalTopicEntry[];
-  sentimentCounts: Record<ModalCommentTone, number>;
 };
 
 // Per-topic aggregate: how many comments contain this phrase, and the
@@ -171,7 +170,6 @@ export function buildModalDisplayData(
   const aggregateHoursBuckets = aggregateHoursBucketsFor(terms);
   const comments = collectComments(entries, params, titleHint);
   const topics = aggregateTopics(comments);
-  const sentimentCounts = countSentiment(comments);
   const responses = terms.reduce((sum, term) => sum + term.responses, 0);
 
   const titleParts = titleHint
@@ -195,8 +193,7 @@ export function buildModalDisplayData(
     metrics,
     aggregateHoursBuckets,
     comments,
-    topics,
-    sentimentCounts
+    topics
   };
 }
 
