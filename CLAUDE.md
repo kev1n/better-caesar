@@ -47,11 +47,14 @@ Each feature lives in `src/content/augmentations/<name>/` and exports a plugin i
 
 The runner invokes plugins on initial load and after every DOM mutation (debounced via `requestAnimationFrame`) — needed because PeopleSoft and Paper.nu both navigate via in-place DOM swaps. Each plugin is gated by `isFeatureEnabled(id)`.
 
+When the user toggles a feature off, the runner calls the plugin's optional `cleanup(doc)` method (and skips its `run()` thereafter). `cleanup()` must remove every DOM node, class, dataset marker, and injected style the plugin ever added — host pages must look indistinguishable from the never-installed state. Sub-flag flips (e.g. dense-cards on/off) just trigger another `run()` on the still-enabled plugin; in-place toggles via `classList.toggle(class, enabled)` and signature-based re-render handle these without needing cleanup.
+
 To add a new augmentation:
 
 1. Create `src/content/augmentations/<name>/` with `index.ts` exporting a plugin.
 2. Register it in `src/content/augmentations/registry.ts`.
 3. Add it (and any sub-toggles) to `FEATURE_SECTIONS` in `src/popup/popup.ts`.
+4. Implement `cleanup(doc)` to fully undo every DOM mutation `run()` makes.
 
 ## Current augmentations
 

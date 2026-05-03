@@ -19,6 +19,10 @@ import type { Augmentation } from "./template";
 // of these guards will fan out badly under mutation pressure.
 export class AugmentationRunner {
   private readonly augmentations: Augmentation[];
+  // Per-augmentation last-known enabled state. Lets us detect enabled→disabled
+  // transitions on storage changes so cleanup() runs and the augmentation's
+  // DOM footprint is removed live (no page reload).
+  private readonly lastEnabled = new Map<string, boolean>();
 
   constructor(augmentations: Augmentation[]) {
     this.augmentations = augmentations;
@@ -34,7 +38,27 @@ export class AugmentationRunner {
   private runAll(): void {
     if (!isAccessAllowed()) return;
     for (const augmentation of this.augmentations) {
-      if (!isFeatureEnabled(augmentation.id)) continue;
+      const enabled = isFeatureEnabled(augmentation.id);
+      this.lastEnabled.set(augmentation.id, enabled);
+      if (!enabled) continue;
+      augmentation.run(document);
+    }
+  }
+
+  private applySettingsChange(): void {
+    for (const augmentation of this.augmentations) {
+      const wasEnabled = this.lastEnabled.get(augmentation.id) ?? false;
+      const nowEnabled = isFeatureEnabled(augmentation.id);
+      this.lastEnabled.set(augmentation.id, nowEnabled);
+
+      if (wasEnabled && !nowEnabled) {
+        augmentation.cleanup?.(document);
+        continue;
+      }
+      if (!nowEnabled) continue;
+      // Either freshly enabled or still enabled — re-run so a sub-flag flip
+      // (e.g. dense-cards / rating-display) gets reflected immediately.
+      if (!isAccessAllowed()) continue;
       augmentation.run(document);
     }
   }
@@ -68,7 +92,7 @@ export class AugmentationRunner {
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local") return;
       if (!changes[FEATURES_STORAGE_KEY]) return;
-      this.runAll();
+      this.applySettingsChange();
     });
   }
 }

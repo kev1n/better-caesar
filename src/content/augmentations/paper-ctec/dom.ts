@@ -200,12 +200,67 @@ function ensureWidget(content: HTMLElement): HTMLElement {
   return widget;
 }
 
-function cleanupCardWidget(card: HTMLElement): void {
-  // Analytics anchor button lives as a direct child of the outer card
-  // (outside the .${WIDGET_CLASS} content) so it can hang below the card
-  // edge — clean it up too whenever the widget itself is removed.
+// Full per-card teardown for cleanup(). Removes the widget, analytics
+// anchor, cart anchor, hover preview popup, and undoes the dense-card
+// layout — leaving the card visually identical to a never-augmented one.
+export function teardownCardForCleanup(card: HTMLElement): void {
   card.querySelector<HTMLElement>(
     `:scope > .${WIDGET_CLASS}-analytics-anchor`
+  )?.remove();
+  card.querySelector<HTMLElement>(
+    `:scope > .${WIDGET_CLASS}-cart-anchor`
+  )?.remove();
+  card.querySelector<HTMLElement>(
+    `:scope > .${WIDGET_CLASS}-preview`
+  )?.remove();
+
+  const content = findCardContent(card);
+  if (!content) return;
+
+  content.querySelector<HTMLElement>(`.${WIDGET_CLASS}`)?.remove();
+
+  const courseLine = content.querySelector<HTMLParagraphElement>(
+    '[data-bc-paper-role="course"]'
+  );
+  const titleLine = content.querySelector<HTMLParagraphElement>(
+    '[data-bc-paper-role="title"]'
+  );
+  const instructorLine = content.querySelector<HTMLParagraphElement>(
+    '[data-bc-paper-role="instructor"]'
+  );
+  const head = content.querySelector<HTMLElement>(
+    '[data-bc-paper-role="header"]'
+  );
+
+  if (head) {
+    if (courseLine) content.insertBefore(courseLine, head);
+    if (titleLine && titleLine.parentElement !== content) {
+      content.insertBefore(titleLine, head);
+    }
+    if (instructorLine) content.insertBefore(instructorLine, head);
+    head.remove();
+  }
+
+  content.classList.remove("bc-paper-ctec-dense-card");
+  courseLine?.classList.remove("bc-paper-ctec-course-line");
+  titleLine?.classList.remove("bc-paper-ctec-title-line");
+  instructorLine?.classList.remove("bc-paper-ctec-instructor-line");
+
+  for (const line of [courseLine, titleLine, instructorLine]) {
+    if (line) delete line.dataset.bcPaperRole;
+  }
+}
+
+function cleanupCardWidget(card: HTMLElement): void {
+  // Analytics anchor button + hover-preview popup live as direct children
+  // of the outer card (outside the .${WIDGET_CLASS} content) so they can
+  // escape the dense card's overflow:hidden — clean them up too whenever
+  // the widget itself is removed.
+  card.querySelector<HTMLElement>(
+    `:scope > .${WIDGET_CLASS}-analytics-anchor`
+  )?.remove();
+  card.querySelector<HTMLElement>(
+    `:scope > .${WIDGET_CLASS}-preview`
   )?.remove();
 
   const content = findCardContent(card);

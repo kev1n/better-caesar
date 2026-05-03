@@ -110,6 +110,21 @@ export function getCellState(cells: RowCells): string | undefined {
   return cells.seatsCell.dataset.bcState;
 }
 
+export function removeAllInjectedDom(doc: Document = document): void {
+  const selectors = [
+    `.${SEATS_HEADER_CLASS}`,
+    `.${NOTES_HEADER_CLASS}`,
+    `.${SEATS_CELL_CLASS}`,
+    `.${NOTES_CELL_CLASS}`,
+    `#${STYLE_ID}`
+  ];
+  for (const selector of selectors) {
+    for (const el of Array.from(doc.querySelectorAll(selector))) {
+      el.remove();
+    }
+  }
+}
+
 export function injectStyles(): void {
   if (document.getElementById(STYLE_ID)) return;
 

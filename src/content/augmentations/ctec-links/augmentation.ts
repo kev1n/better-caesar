@@ -18,6 +18,7 @@ import {
   isCtecCellReady,
   markCtecCellDone,
   markCtecCellReady,
+  removeAllInjectedDom,
   renderCtecLinksWidget,
   renderFetchButton,
   renderLoading
@@ -27,6 +28,11 @@ export class CtecLinksAugmentation implements Augmentation {
   readonly id = "ctec-links";
 
   private readonly inFlight = new Set<string>();
+
+  cleanup(doc: Document = document): void {
+    this.inFlight.clear();
+    removeAllInjectedDom(doc);
+  }
 
   run(doc: Document = document): void {
     if (!this.appliesToPage(doc)) return;

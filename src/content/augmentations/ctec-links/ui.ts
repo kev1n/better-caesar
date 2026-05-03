@@ -122,6 +122,19 @@ export function isCtecCellReady(container: HTMLElement): boolean {
   return container.dataset.ctecReady === "1";
 }
 
+export function removeAllInjectedDom(doc: Document = document): void {
+  const selectors = [
+    `.${CTEC_CELL_CLASS}`,
+    `.${CTEC_HEADER_CLASS}`,
+    `#${STYLE_ID}`
+  ];
+  for (const selector of selectors) {
+    for (const el of Array.from(doc.querySelectorAll(selector))) {
+      el.remove();
+    }
+  }
+}
+
 export function markCtecCellReady(container: HTMLElement): void {
   container.dataset.ctecReady = "1";
 }

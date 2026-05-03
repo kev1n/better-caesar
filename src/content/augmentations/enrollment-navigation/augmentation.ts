@@ -45,6 +45,16 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
     promise: Promise<TermPickerState | null>;
   } | null = null;
 
+  cleanup(doc: Document = document): void {
+    this.waitingForLoad = false;
+    this.lastSubmittedSignature = null;
+    releasePeopleSoftLock(NAV_LOCK_OWNER);
+    doc.getElementById(TERM_SWITCHER_ID)?.remove();
+    doc.getElementById(SPINNER_OVERLAY_ID)?.remove();
+    doc.getElementById(EARLY_MASK_ID)?.remove();
+    doc.getElementById(STYLE_ID)?.remove();
+  }
+
   run(doc: Document = document): void {
     injectStyles(doc);
     this.persistContextFromKnownSources(doc);

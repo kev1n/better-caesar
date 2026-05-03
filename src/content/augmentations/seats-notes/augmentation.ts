@@ -18,6 +18,7 @@ import {
   ensureCustomHeaders,
   getCellState,
   injectStyles,
+  removeAllInjectedDom,
   renderIdle,
   renderLoaded,
   renderLoading
@@ -34,6 +35,11 @@ export class SeatsNotesAugmentation implements Augmentation {
       this.storageReady = true;
       this.run();
     });
+  }
+
+  cleanup(doc: Document = document): void {
+    this.inFlight.clear();
+    removeAllInjectedDom(doc);
   }
 
   run(_doc: Document = document): void {
