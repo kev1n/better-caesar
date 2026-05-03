@@ -8,6 +8,13 @@ import {
   writeStoredCode
 } from "../content/access-gate/storage";
 import {
+  BC_THEMES,
+  type BcTheme,
+  bootstrapTheme,
+  getStoredTheme,
+  setStoredTheme
+} from "../content/design";
+import {
   DEFAULT_RECENT_AGGREGATION_TERMS,
   FEATURES_STORAGE_KEY,
   MAX_RECENT_AGGREGATION_TERMS,
@@ -153,6 +160,19 @@ async function saveSettings(settings: Record<string, boolean>): Promise<void> {
   await chrome.storage.local.set({ [FEATURES_STORAGE_KEY]: settings });
 }
 
+let writeQueue: Promise<void> = Promise.resolve();
+
+function updateSettings(
+  mutate: (settings: Record<string, boolean>) => void
+): Promise<void> {
+  writeQueue = writeQueue.then(async () => {
+    const settings = await loadSettings();
+    mutate(settings);
+    await saveSettings(settings);
+  });
+  return writeQueue;
+}
+
 async function init(): Promise<void> {
   const settings = await loadSettings();
   const sectionsRoot = document.getElementById("feature-sections");
@@ -217,13 +237,13 @@ function renderToggleList(
     toggle.setAttribute("aria-pressed", String(enabled));
     toggle.setAttribute("aria-label", `Toggle ${feature.label}`);
 
-    toggle.addEventListener("click", async () => {
+    toggle.addEventListener("click", () => {
       const next = toggle.getAttribute("aria-pressed") !== "true";
       toggle.setAttribute("aria-pressed", String(next));
       toggle.className = `toggle ${next ? "on" : "off"}`;
-      const current = await loadSettings();
-      current[feature.id] = next;
-      await saveSettings(current);
+      void updateSettings((current) => {
+        current[feature.id] = next;
+      });
     });
 
     li.append(copy, toggle);
@@ -293,15 +313,15 @@ function renderRadioGroup(
     radio.setAttribute("aria-checked", "false");
     radio.setAttribute("aria-label", option.label);
 
-    radio.addEventListener("click", async () => {
+    radio.addEventListener("click", () => {
       setSelection(option.id);
-      const current = await loadSettings();
-      // Clear every flag this section owns, then enable just the ones the
-      // chosen option declares. Keeps storage consistent with the radio
-      // contract even if multiple flags were on previously.
-      for (const id of RATING_DISPLAY_FEATURE_IDS) current[id] = false;
-      for (const id of option.enables) current[id] = true;
-      await saveSettings(current);
+      void updateSettings((current) => {
+        // Clear every flag this section owns, then enable just the ones the
+        // chosen option declares. Keeps storage consistent with the radio
+        // contract even if multiple flags were on previously.
+        for (const id of RATING_DISPLAY_FEATURE_IDS) current[id] = false;
+        for (const id of option.enables) current[id] = true;
+      });
     });
 
     li.append(copy, radio);
@@ -369,6 +389,43 @@ function clampRecent(value: number): number {
   );
 }
 
+async function initThemePicker(): Promise<void> {
+  const root = document.getElementById("theme-row");
+  if (!(root instanceof HTMLElement)) return;
+  root.innerHTML = "";
+
+  const label = document.createElement("label");
+  label.className = "ctec-school-label";
+  label.htmlFor = "theme-select";
+
+  const labelTitle = document.createElement("span");
+  labelTitle.className = "ctec-school-label-title";
+  labelTitle.textContent = "Theme";
+
+  const labelHelp = document.createElement("span");
+  labelHelp.className = "ctec-school-label-help";
+  labelHelp.textContent =
+    "Pick the design system theme. Reload pages to apply.";
+
+  label.append(labelTitle, labelHelp);
+
+  const select = document.createElement("select");
+  select.id = "theme-select";
+  select.className = "ctec-school-select";
+  for (const theme of BC_THEMES) {
+    const option = document.createElement("option");
+    option.value = theme;
+    option.textContent = theme;
+    select.appendChild(option);
+  }
+  select.value = await getStoredTheme();
+  select.addEventListener("change", () => {
+    void setStoredTheme(select.value as BcTheme);
+  });
+
+  root.append(label, select);
+}
+
 function initClearCacheButton(): void {
   const btn = document.getElementById("clear-ctec-cache");
   if (!(btn instanceof HTMLButtonElement)) return;
@@ -399,10 +456,12 @@ function initClearCatalogCacheButton(): void {
   });
 }
 
+void bootstrapTheme();
 void init();
 initClearCacheButton();
 initClearCatalogCacheButton();
 void initRecentTermsInput();
+void initThemePicker();
 void renderGate();
 
 chrome.storage.onChanged.addListener((changes, areaName) => {

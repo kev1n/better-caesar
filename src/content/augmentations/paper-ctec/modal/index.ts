@@ -34,15 +34,16 @@ export function renderAnalyticsModal(
     callbacks.onClose();
   };
 
-  if (!modal.dataset.bcPaperCtecEscBound) {
-    doc.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape") return;
-      const open = doc.getElementById(ANALYTICS_MODAL_ID);
-      if (!open) return;
-      callbacks.onClose();
-    });
-    modal.dataset.bcPaperCtecEscBound = "1";
+  if (escKeydownHandler) {
+    document.removeEventListener("keydown", escKeydownHandler);
   }
+  escKeydownHandler = (event) => {
+    if (event.key !== "Escape") return;
+    const open = doc.getElementById(ANALYTICS_MODAL_ID);
+    if (!open) return;
+    callbacks.onClose();
+  };
+  doc.addEventListener("keydown", escKeydownHandler);
 
   const signature = buildSignature(input, state);
   if (modal.dataset.bcPaperCtecSignature === signature) return;
@@ -67,9 +68,15 @@ export function renderAnalyticsModal(
 
 export function hideAnalyticsModal(doc: Document): void {
   doc.getElementById(ANALYTICS_MODAL_ID)?.remove();
+  if (escKeydownHandler) {
+    doc.removeEventListener("keydown", escKeydownHandler);
+    escKeydownHandler = null;
+  }
   disposeTrendChartObserver();
   disposeDarkObserver();
 }
+
+let escKeydownHandler: ((event: KeyboardEvent) => void) | null = null;
 
 // paper.nu applies its `.dark` class to a div inside the React tree, but
 // our modal is appended to document.body — outside that ancestor — so

@@ -55,14 +55,34 @@ function extractEnrollmentRequirements(responseText: string): string | null {
 function extractHtmlAreaNearId(responseText: string, partialId: string): string | null {
   // Find the first element whose id begins with this partial id (handles $246$ style suffixes).
   const escapedId = partialId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const idPattern = new RegExp(`id=['"](?:win0div)?${escapedId}[^'"]*['"]`, "i");
+  const idPattern = new RegExp(`<(\\w+)\\b[^>]*id=['"](?:win0div)?${escapedId}[^'"]*['"][^>]*>`, "i");
   const idMatch = idPattern.exec(responseText);
   if (!idMatch) return null;
 
-  // Look for the HTML area comment block that follows.
-  const afterId = responseText.slice(idMatch.index);
+  // Bound the scan to the matching closing tag — PS field boundary, not next block.
+  const tagName = idMatch[1].toLowerCase();
+  const containerStart = idMatch.index + idMatch[0].length;
+  const tagPattern = new RegExp(`<(/?)${tagName}\\b[^>]*>`, "gi");
+  tagPattern.lastIndex = containerStart;
+  let depth = 1;
+  let containerEnd = -1;
+  let tag: RegExpExecArray | null;
+  while ((tag = tagPattern.exec(responseText)) !== null) {
+    if (tag[1] === "/") {
+      depth--;
+      if (depth === 0) {
+        containerEnd = tag.index;
+        break;
+      }
+    } else {
+      depth++;
+    }
+  }
+  if (containerEnd < 0) return null;
+
+  const container = responseText.slice(containerStart, containerEnd);
   const areaPattern = /<!--\s*Begin HTML Area[^>-]*-->([\s\S]*?)<!--\s*End HTML Area\s*-->/i;
-  const areaMatch = areaPattern.exec(afterId);
+  const areaMatch = areaPattern.exec(container);
   if (!areaMatch) return null;
 
   const raw = areaMatch[1] ?? "";

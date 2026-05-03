@@ -9,7 +9,6 @@ export function applyFilters(
 ): ResultRow[] {
   const tokens = tokenizeQuery(filters.query);
   const tokenRegexes = tokens.map(tokenRegex);
-  const wantedDistros = filters.distros;
   const wantedDisciplines = filters.disciplines;
 
   type Scored = { row: ResultRow; rank: number };
@@ -18,7 +17,6 @@ export function applyFilters(
   for (const course of termCourses) {
     const planEntry = catalogIndex.get(`${course.subject} ${course.catalog}`);
 
-    if (wantedDistros.size > 0 && !anyCharIn(planEntry?.distros, wantedDistros)) continue;
     if (wantedDisciplines.size > 0 && !anyCharIn(planEntry?.disciplines, wantedDisciplines)) continue;
 
     const sections = course.sections;
@@ -117,14 +115,21 @@ function normalize(value: string): string {
   return value.toLowerCase().replace(/_/g, " ");
 }
 
+function isNumericToken(token: string): boolean {
+  return /^[\dx]+$/.test(token) && /\d/.test(token);
+}
+
 function tokenRegex(token: string): RegExp {
   // paper.nu-style: `x` is a digit wildcard ("31x" matches "311"), and
   // `_` is treated as whitespace so "comp_sci" matches "comp sci" (the
   // haystack normalizes underscores to spaces). `\s+` not `\s*` so
   // "compsci" doesn't accidentally match "comp sci".
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const wildcarded = escaped.replace(/x/g, "[\\dx]");
-  const underscoresRelaxed = wildcarded.replace(/_/g, "\\s+");
+  if (isNumericToken(token)) {
+    const wildcarded = escaped.replace(/x/g, "[\\dx]");
+    return new RegExp(`(?<!\\d)${wildcarded}(?!\\d)`, "i");
+  }
+  const underscoresRelaxed = escaped.replace(/_/g, "\\s+");
   return new RegExp(underscoresRelaxed, "i");
 }
 

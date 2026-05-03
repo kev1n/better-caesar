@@ -215,14 +215,15 @@ export function resolveCareerCandidates(
   subject: string,
   catalogNumber: string
 ): string[] {
-  const owners = inverted().get(subject);
-  if (!owners || owners.size === 0) return [...DEFAULT_FALLBACK];
-
   const num = parseInt(catalogNumber, 10);
-  const priority =
-    Number.isFinite(num) && num >= 400
-      ? PRIORITY_GRAD_FIRST
-      : PRIORITY_UNDERGRAD_FIRST;
+  const gradFirst = Number.isFinite(num) && num >= 400;
+
+  const owners = inverted().get(subject);
+  if (!owners || owners.size === 0) {
+    return gradFirst ? ["TGS", "UGRD"] : [...DEFAULT_FALLBACK];
+  }
+
+  const priority = gradFirst ? PRIORITY_GRAD_FIRST : PRIORITY_UNDERGRAD_FIRST;
 
   const ordered: string[] = [];
   for (const c of priority) {
