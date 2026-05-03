@@ -1,9 +1,21 @@
 const TOAST_HOST_ID = "bc-seats-toast-host";
 const TOAST_STYLE_ID = "bc-seats-toast-style";
 
-type ToastTone = "info" | "warn";
+export type ToastTone = "info" | "warn" | "success" | "error";
 
-export function showToast(message: string, options?: { tone?: ToastTone; durationMs?: number }): void {
+export type ToastAction = {
+  label: string;
+  run: () => void;
+};
+
+export function showToast(
+  message: string,
+  options?: {
+    tone?: ToastTone;
+    durationMs?: number;
+    action?: ToastAction;
+  }
+): void {
   const host = ensureHost();
   if (!host) return;
 
@@ -12,8 +24,11 @@ export function showToast(message: string, options?: { tone?: ToastTone; duratio
 
   const toast = document.createElement("div");
   toast.className = `bc-toast bc-toast-${tone}`;
-  toast.textContent = message;
-  host.appendChild(toast);
+
+  const text = document.createElement("span");
+  text.className = "bc-toast-text";
+  text.textContent = message;
+  toast.appendChild(text);
 
   const remove = (): void => {
     if (!toast.isConnected) return;
@@ -22,6 +37,24 @@ export function showToast(message: string, options?: { tone?: ToastTone; duratio
       toast.remove();
     }, 200);
   };
+
+  if (options?.action) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "bc-toast-action";
+    btn.textContent = options.action.label;
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      try {
+        options.action?.run();
+      } finally {
+        remove();
+      }
+    });
+    toast.appendChild(btn);
+  }
+
+  host.appendChild(toast);
 
   window.setTimeout(remove, duration);
   toast.addEventListener("click", remove);
@@ -64,10 +97,27 @@ function injectToastStyles(): void {
       border-radius: 6px;
       font: 500 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-      max-width: 320px;
+      max-width: 360px;
       animation: bc-toast-in 180ms ease-out;
       border: 1px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
+    .bc-toast-text { flex: 1; }
+    .bc-toast-action {
+      flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.7);
+      color: inherit;
+      border: 1px solid currentColor;
+      border-radius: 5px;
+      padding: 3px 8px;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .bc-toast-action:hover { background: rgba(255, 255, 255, 1); }
     .bc-toast-info {
       background: #f6ecf2;
       border-color: #d8b6c8;
@@ -77,6 +127,16 @@ function injectToastStyles(): void {
       background: #fff4e5;
       border-color: #f1c27a;
       color: #6b3a00;
+    }
+    .bc-toast-success {
+      background: #ecfdf3;
+      border-color: #abefc6;
+      color: #054f31;
+    }
+    .bc-toast-error {
+      background: #fef3f2;
+      border-color: #fecdca;
+      color: #912018;
     }
     .bc-toast-leaving {
       animation: bc-toast-out 180ms ease-in forwards;

@@ -72,6 +72,11 @@ const FEATURE_SECTIONS: FeatureSection[] = [
         description: "Improves navigation across enrollment terms and related registration screens."
       },
       {
+        id: "class-search",
+        label: "Class Search",
+        description: "Replaces CAESAR's class search with a paper.nu-powered UI that adds sections to your cart in place."
+      },
+      {
         id: "caesar-domain-redirect",
         label: "Short Domain Redirect",
         description: "Sends caesar.northwestern.edu to caesar.ent.northwestern.edu so the short URL works."
@@ -378,8 +383,25 @@ function initClearCacheButton(): void {
   });
 }
 
+function initClearCatalogCacheButton(): void {
+  const btn = document.getElementById("clear-catalog-cache");
+  if (!(btn instanceof HTMLButtonElement)) return;
+  btn.addEventListener("click", async () => {
+    const all = (await chrome.storage.local.get(null)) as Record<string, unknown>;
+    const keys = Object.keys(all).filter((k) => k.startsWith("better-caesar:paper:"));
+    if (keys.length > 0) await chrome.storage.local.remove(keys);
+    btn.textContent = "Cleared!";
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = "Clear catalog cache";
+      btn.disabled = false;
+    }, 1500);
+  });
+}
+
 void init();
 initClearCacheButton();
+initClearCatalogCacheButton();
 void initRecentTermsInput();
 void renderGate();
 

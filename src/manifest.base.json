@@ -26,7 +26,7 @@
       "all_frames": true
     }
   ],
-  "permissions": ["storage", "declarativeNetRequestWithHostAccess"],
+  "permissions": ["storage", "unlimitedStorage", "declarativeNetRequestWithHostAccess"],
   "host_permissions": [
     "https://caesar.ent.northwestern.edu/*",
     "https://caesar.northwestern.edu/*",
@@ -34,6 +34,8 @@
     "https://paper.nu/*",
     "https://northwestern.bluera.com/*",
     "https://prd-nusso.it.northwestern.edu/*",
-    "https://fed.it.northwestern.edu/*"
+    "https://fed.it.northwestern.edu/*",
+    "https://api-legacy.dilanxd.com/*",
+    "https://cdn.dil.sh/*"
   ]
 }

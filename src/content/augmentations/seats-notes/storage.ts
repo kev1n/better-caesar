@@ -63,6 +63,36 @@ export function writeCachedEntry(classNumber: string, entry: SeatsNotesCacheEntr
   void chrome.storage.local.set({ [CACHE_STORAGE_KEY]: memoryCache });
 }
 
+// Garbage-collect "success but all-null" cache entries — the shape an
+// earlier class-search build wrote when it mistakenly piped CAESAR's
+// "Confirm Your Selection" wizard HTML through the SSR_CLSRCH_DTL parser.
+// Those rows would otherwise show "Seat counts unavailable" forever.
+export function pruneEmptySeatsCache(): void {
+  let removed = 0;
+  for (const key of Object.keys(memoryCache.entries)) {
+    const entry = memoryCache.entries[key];
+    if (!entry) continue;
+    const r = entry.result;
+    if (
+      r.ok &&
+      r.classCapacity === null &&
+      r.enrollmentTotal === null &&
+      r.availableSeats === null &&
+      r.waitListCapacity === null &&
+      r.waitListTotal === null &&
+      r.classAttributes === null &&
+      r.enrollmentRequirements === null &&
+      r.classNotes === null
+    ) {
+      delete memoryCache.entries[key];
+      removed += 1;
+    }
+  }
+  if (removed > 0) {
+    void chrome.storage.local.set({ [CACHE_STORAGE_KEY]: memoryCache });
+  }
+}
+
 export function getRateLimitState(now: number): {
   recentCount: number;
   oldestRecentAt: number | null;
