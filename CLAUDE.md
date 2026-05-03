@@ -57,7 +57,7 @@ To add a new augmentation:
 - `seats-notes` — CAESAR shopping cart: loads class notes, attributes, requirements, seat counts.
 - `ctec-links` — CAESAR shopping cart: per-class CTEC evaluation history widget. Fetches via Bluera and writes a shared CTEC index.
 - `enrollment-navigation` — CAESAR: smoother navigation across enrollment terms / registration screens.
-- `paper-ctec` — Paper.nu: overlays CTEC summaries on schedule cards and analytics in the section side panel. Has its own sub-toggles (single summary card, dense cards, dense card stars).
+- `paper-ctec` — Paper.nu: overlays CTEC summaries on schedule cards and analytics in the section side panel. Has its own sub-toggles (single summary card, dense cards, dense card stars). The analytics modal extracts integer counts from Bluera distribution PNGs (`chart-extract.ts` — background-mediated binary fetch + canvas pixel scan; uses each metric's `responseCount` as the known total) and renders them as inline SVG histograms (`chart-histogram.ts`); falls back to the raw image when extraction fails.
 
 ## Shared CTEC index
 
