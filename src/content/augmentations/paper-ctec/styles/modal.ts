@@ -386,73 +386,73 @@ export function modalStyles(): string {
       padding: 24px 32px 36px;
     }
     .dark .bc-paper-ctec-modal-card {
-      background: #1a1216;
-      color: #f5e7ee;
+      background: #262626;
+      color: #fafafa;
       box-shadow:
         0 1px 2px rgba(0, 0, 0, 0.4),
         0 30px 60px -10px rgba(0, 0, 0, 0.65),
-        0 0 0 1px rgba(252, 165, 207, 0.08);
+        0 0 0 1px rgba(255, 255, 255, 0.04);
     }
     .dark .bc-paper-ctec-modal-close {
-      border-color: rgba(252, 165, 207, 0.14);
-      background: rgba(17, 24, 39, 0.4);
-      color: #d8c7d0;
+      border-color: #404040;
+      background: #404040;
+      color: #d4d4d4;
     }
     .dark .bc-paper-ctec-modal-close:hover {
-      background: rgba(252, 165, 207, 0.1);
-      color: #fff6fb;
+      background: #525252;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-header {
-      border-bottom-color: rgba(252, 165, 207, 0.14);
+      border-bottom-color: #404040;
     }
     .dark .bc-paper-ctec-modal-code {
-      color: #d4b9c5;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-meta {
-      color: #cbd5e1;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-meta > * + *::before {
-      background: rgba(252, 165, 207, 0.18);
+      background: #525252;
     }
     .dark .bc-paper-ctec-modal-meta strong {
-      color: #fff6fb;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-report-link {
-      color: #f5e7ee;
-      border-color: rgba(252, 165, 207, 0.18);
-      background: rgba(17, 24, 39, 0.4);
+      color: #fafafa;
+      border-color: #404040;
+      background: #404040;
     }
     .dark .bc-paper-ctec-modal-report-link:hover {
-      background: rgba(252, 165, 207, 0.1);
+      background: #525252;
     }
     .dark .bc-paper-ctec-modal-action-btn {
-      border-color: rgba(252, 165, 207, 0.18);
-      background: rgba(17, 24, 39, 0.4);
-      color: #f5e7ee;
+      border-color: #404040;
+      background: #404040;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-action-btn:hover:not(:disabled) {
-      background: rgba(252, 165, 207, 0.1);
+      background: #525252;
     }
     .dark .bc-paper-ctec-modal-action-btn.is-primary {
-      border-color: #fbcfe8;
-      background: #fbcfe8;
-      color: #500030;
+      border-color: #d8b4fe;
+      background: #d8b4fe;
+      color: #1f1147;
     }
     .dark .bc-paper-ctec-modal-action-btn.is-primary:hover:not(:disabled) {
-      background: #f9a8d4;
+      background: #c084fc;
     }
     .dark .bc-paper-ctec-modal-action-loadmore {
-      color: #d4b9c5;
+      color: #a3a3a3;
       background: transparent;
       border-color: transparent;
     }
     .dark .bc-paper-ctec-modal-action-loadmore:hover:not(:disabled) {
-      background: rgba(252, 165, 207, 0.1);
-      color: #fff6fb;
+      background: #404040;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-action-refresh:disabled {
-      color: #d4b9c5;
-      background: rgba(252, 165, 207, 0.08);
+      color: #a3a3a3;
+      background: #404040;
     }
     .dark .bc-paper-ctec-modal-flash-success {
       background: rgba(16, 78, 53, 0.32);
@@ -482,55 +482,55 @@ export function modalStyles(): string {
       background: rgba(255, 255, 255, 0.1);
     }
     .dark .bc-paper-ctec-modal-status-body {
-      background: #14090f;
+      background: #171717;
     }
     .dark .bc-paper-ctec-modal-status-card {
-      background: rgba(17, 24, 39, 0.3);
-      border-color: rgba(252, 165, 207, 0.14);
+      background: #262626;
+      border-color: #404040;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
     }
     .dark .bc-paper-ctec-modal-status-card.is-warn {
-      border-color: rgba(252, 165, 207, 0.28);
-      background: rgba(190, 24, 93, 0.18);
+      border-color: rgba(216, 180, 254, 0.32);
+      background: rgba(168, 85, 247, 0.14);
     }
     .dark .bc-paper-ctec-modal-status-title {
-      color: #fff6fb;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-status-card.is-warn .bc-paper-ctec-modal-status-title {
-      color: #fbcfe8;
+      color: #d8b4fe;
     }
     .dark .bc-paper-ctec-modal-status-text {
-      color: #cbd5e1;
+      color: #d4d4d4;
     }
     .dark .bc-paper-ctec-modal-status-primary {
-      border-color: #fbcfe8;
-      background: #fbcfe8;
-      color: #500030;
+      border-color: #d8b4fe;
+      background: #d8b4fe;
+      color: #1f1147;
     }
     .dark .bc-paper-ctec-modal-status-primary:hover {
-      background: #f9a8d4;
+      background: #c084fc;
     }
     .dark .bc-paper-ctec-modal-status-spinner {
-      border-color: rgba(252, 165, 207, 0.18);
-      border-top-color: #fbcfe8;
+      border-color: rgba(216, 180, 254, 0.24);
+      border-top-color: #d8b4fe;
     }
     .dark .bc-paper-ctec-modal-tab {
-      color: #d4b9c5;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-tab.is-active {
-      border-bottom-color: #fbcfe8;
-      color: #fbcfe8;
+      border-bottom-color: #d8b4fe;
+      color: #d8b4fe;
     }
     .dark .bc-paper-ctec-modal-tab-count {
-      color: #d4b9c5;
-      background: rgba(252, 165, 207, 0.08);
+      color: #a3a3a3;
+      background: #404040;
     }
     .dark .bc-paper-ctec-modal-tab.is-active .bc-paper-ctec-modal-tab-count {
-      color: #fbcfe8;
-      background: rgba(252, 165, 207, 0.18);
+      color: #d8b4fe;
+      background: rgba(216, 180, 254, 0.18);
     }
     .dark .bc-paper-ctec-modal-body {
-      background: #14090f;
+      background: #171717;
     }
   `;
 }

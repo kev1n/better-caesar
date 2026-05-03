@@ -26,6 +26,7 @@ export function renderAnalyticsModal(
     modal.setAttribute("aria-modal", "true");
     (doc.body ?? doc.documentElement).appendChild(modal);
   }
+  syncPaperNuDarkMode(doc, modal);
 
   modal.onclick = (event) => {
     if (event.target !== modal) return;
@@ -67,6 +68,34 @@ export function renderAnalyticsModal(
 export function hideAnalyticsModal(doc: Document): void {
   doc.getElementById(ANALYTICS_MODAL_ID)?.remove();
   disposeTrendChartObserver();
+  disposeDarkObserver();
+}
+
+// paper.nu applies its `.dark` class to a div inside the React tree, but
+// our modal is appended to document.body — outside that ancestor — so
+// `.dark .bc-paper-ctec-modal-*` rules never match. Mirror paper.nu's dark
+// state onto the modal element itself, and observe DOM mutations so the
+// modal updates live when the user toggles the setting.
+let darkObserver: MutationObserver | null = null;
+
+function syncPaperNuDarkMode(doc: Document, modal: HTMLElement): void {
+  const apply = () => {
+    modal.classList.toggle("dark", !!doc.querySelector(".dark"));
+  };
+  apply();
+  if (!darkObserver && typeof MutationObserver !== "undefined") {
+    darkObserver = new MutationObserver(apply);
+    darkObserver.observe(doc.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+      subtree: true
+    });
+  }
+}
+
+function disposeDarkObserver(): void {
+  darkObserver?.disconnect();
+  darkObserver = null;
 }
 
 export function readModalCommentsQuery(doc: Document): string | null {

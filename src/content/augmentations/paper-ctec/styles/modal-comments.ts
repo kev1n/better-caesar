@@ -311,105 +311,105 @@ export function modalCommentStyles(): string {
       border-radius: 2px;
     }
     .dark .bc-paper-ctec-modal-rail {
-      border-right-color: rgba(252, 165, 207, 0.14);
-      background: rgba(17, 24, 39, 0.3);
+      border-right-color: #404040;
+      background: #262626;
     }
     .dark .bc-paper-ctec-modal-rail-header {
-      color: #d4b9c5;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-rail-btn {
-      color: #f5e7ee;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-rail-btn.is-active {
-      background: rgba(252, 165, 207, 0.16);
-      color: #fbcfe8;
+      background: rgba(216, 180, 254, 0.16);
+      color: #d8b4fe;
     }
     .dark .bc-paper-ctec-modal-rail-btn:hover:not(.is-active) {
-      background: rgba(252, 165, 207, 0.08);
+      background: #404040;
     }
     .dark .bc-paper-ctec-modal-rail-count {
-      color: #d4b9c5;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-rail-empty {
-      color: #d4b9c5;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-rail-tone {
-      background: rgba(252, 165, 207, 0.12);
+      background: #404040;
     }
     .dark .bc-paper-ctec-modal-comment-theme.is-active {
       background: rgba(254, 240, 138, 0.85);
-      color: #500030;
+      color: #1f1147;
     }
     .dark .bc-paper-ctec-modal-comments-search {
-      border-color: rgba(252, 165, 207, 0.18);
-      background: rgba(17, 24, 39, 0.4);
+      border-color: #404040;
+      background: #404040;
     }
     .dark .bc-paper-ctec-modal-comments-search-icon {
-      color: #d4b9c5;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-comments-input {
-      color: #fff6fb;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-comments-input::placeholder {
-      color: #d4b9c5;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-comments-sort {
-      color: #cbd5e1;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-comments-sort-select {
-      border-color: rgba(252, 165, 207, 0.18);
-      background: rgba(17, 24, 39, 0.4);
-      color: #f5e7ee;
+      border-color: #404040;
+      background: #404040;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-filter-label {
-      color: #cbd5e1;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-filter-chip {
-      background: rgba(252, 165, 207, 0.18);
-      color: #fbcfe8;
+      background: rgba(216, 180, 254, 0.18);
+      color: #d8b4fe;
     }
     .dark .bc-paper-ctec-modal-filter-chip-x {
-      color: #fbcfe8;
+      color: #d8b4fe;
     }
     .dark .bc-paper-ctec-modal-filter-clear {
-      color: #d4b9c5;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-comments-count {
-      color: #cbd5e1;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-comments-count strong {
-      color: #fff6fb;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-comments-empty {
-      background: rgba(17, 24, 39, 0.3);
-      border-color: rgba(252, 165, 207, 0.18);
-      color: #cbd5e1;
+      background: #262626;
+      border-color: #404040;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-comment-card {
-      background: rgba(17, 24, 39, 0.4);
-      border-color: rgba(252, 165, 207, 0.14);
+      background: #404040;
+      border-color: #525252;
     }
     .dark .bc-paper-ctec-modal-comment-term {
-      color: #cbd5e1;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-comment-term strong {
-      color: #fff6fb;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-comment-length {
-      color: #d4b9c5;
+      color: #737373;
     }
     .dark .bc-paper-ctec-modal-comment-prompt {
-      color: #cbd5e1;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-comment-text {
-      color: #f5e7ee;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-comment-toggle {
-      color: #fbcfe8;
+      color: #d8b4fe;
     }
     .dark .bc-paper-ctec-modal-comment-theme {
-      background: rgba(252, 165, 207, 0.1);
-      color: #d4b9c5;
+      background: #525252;
+      color: #d4d4d4;
     }
     .dark .bc-paper-ctec-modal-highlight {
       background: rgba(254, 240, 138, 0.35);

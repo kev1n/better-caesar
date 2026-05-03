@@ -26,16 +26,18 @@ export function modalChartStyles(): string {
       border-color: #66023c;
       box-shadow: 0 0 0 3px rgba(102, 2, 60, 0.08);
     }
-    /* Gestalt grouping: a thin vertical line in the middle of the grid
-       gap before cards that start a new conceptual section. */
+    /* Gestalt grouping: a vertical line in the middle of the grid gap
+       before cards that start a new conceptual section. Spans nearly the
+       full card height so the boundary reads at a glance. */
     .bc-paper-ctec-modal-kpi.is-section-start::before {
       content: "";
       position: absolute;
       left: -8px;
-      top: 14%;
-      bottom: 14%;
-      width: 1px;
-      background: #d1d5db;
+      top: 2%;
+      bottom: 2%;
+      width: 2px;
+      background: #9ca3af;
+      border-radius: 2px;
       pointer-events: none;
     }
     /* Global card stands out: tinted background, bigger maroon number,
@@ -329,77 +331,141 @@ export function modalChartStyles(): string {
       color: #1f2937;
     }
     .dark .bc-paper-ctec-modal-kpi {
-      border-color: rgba(252, 165, 207, 0.14);
-      background: rgba(17, 24, 39, 0.4);
-      color: #f5e7ee;
+      border-color: #404040;
+      background: #404040;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-kpi.is-active {
-      border-color: #fbcfe8;
-      box-shadow: 0 0 0 3px rgba(252, 165, 207, 0.18);
+      border-color: #d8b4fe;
+      box-shadow: 0 0 0 3px rgba(216, 180, 254, 0.18);
     }
     .dark .bc-paper-ctec-modal-kpi.is-section-start::before {
-      background: rgba(252, 165, 207, 0.24);
+      background: rgba(248, 250, 252, 0.6);
     }
     .dark .bc-paper-ctec-modal-kpi.is-global {
-      background: linear-gradient(135deg, rgba(102, 2, 60, 0.4) 0%, rgba(190, 24, 93, 0.32) 100%);
-      border-color: rgba(252, 165, 207, 0.32);
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(168, 85, 247, 0.08) 100%);
+      border-color: rgba(216, 180, 254, 0.32);
     }
     .dark .bc-paper-ctec-modal-kpi.is-global.is-active {
-      border-color: #fbcfe8;
+      border-color: #d8b4fe;
     }
     .dark .bc-paper-ctec-modal-kpi.is-global .bc-paper-ctec-modal-kpi-label {
-      color: #fbcfe8;
+      color: #d8b4fe;
     }
     .dark .bc-paper-ctec-modal-kpi.is-global .bc-paper-ctec-modal-kpi-mean {
-      color: #fbcfe8;
+      color: #d8b4fe;
     }
     .dark .bc-paper-ctec-modal-kpi.is-global .bc-paper-ctec-modal-kpi-scale {
-      color: #f9a8d4;
+      color: #c4b5fd;
     }
     .dark .bc-paper-ctec-modal-kpi-label {
-      color: #d4b9c5;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-kpi-mean {
-      color: #fff6fb;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-kpi-scale {
-      color: #d4b9c5;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-kpi-delta.is-positive { color: #6ee7b7; }
     .dark .bc-paper-ctec-modal-kpi-delta.is-negative { color: #fda4af; }
     .dark .bc-paper-ctec-modal-kpi-delta.is-muted {
-      color: #d4b9c5;
+      color: #737373;
     }
     .dark .bc-paper-ctec-modal-kpi-delta-note {
-      color: #d4b9c5;
-    }
-    .dark .bc-paper-ctec-modal-kpi .bc-paper-ctec-modal-sparkline polyline {
-      stroke: #fbcfe8;
-    }
-    .dark .bc-paper-ctec-modal-kpi .bc-paper-ctec-modal-sparkline circle {
-      fill: #fbcfe8;
+      color: #737373;
     }
     .dark .bc-paper-ctec-modal-card-section {
-      border-color: rgba(252, 165, 207, 0.14);
-      background: rgba(17, 24, 39, 0.4);
-      color: #f5e7ee;
+      border-color: #404040;
+      background: #404040;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-card-title {
-      color: #fff6fb;
+      color: #fafafa;
     }
     .dark .bc-paper-ctec-modal-card-meta {
-      color: #cbd5e1;
+      color: #a3a3a3;
     }
     .dark .bc-paper-ctec-modal-card-cta {
-      color: #f5e7ee;
-      border-color: rgba(252, 165, 207, 0.18);
-      background: rgba(17, 24, 39, 0.3);
+      color: #fafafa;
+      border-color: #525252;
+      background: #525252;
     }
-    .dark .bc-paper-ctec-modal-card-body {
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.92);
-      color: #1f2937;
-      padding: 10px 12px;
+    .dark .bc-paper-ctec-modal-trend-empty {
+      color: #a3a3a3;
+      background: #262626;
+    }
+    .dark .bc-paper-ctec-chart-histogram-loading {
+      color: #a3a3a3;
+    }
+    .dark .bc-paper-ctec-chart-histogram-error {
+      color: #fda4af;
+      background: rgba(127, 29, 29, 0.32);
+    }
+    .dark .bc-paper-ctec-modal-dist-empty {
+      background: #262626;
+      color: #a3a3a3;
+    }
+    .dark .bc-paper-ctec-modal-dist-num {
+      color: #a3a3a3;
+    }
+    .dark .bc-paper-ctec-modal-dist-bar {
+      background: #d8b4fe;
+    }
+    .dark .bc-paper-ctec-modal-dist-label {
+      color: #a3a3a3;
+    }
+    .dark .bc-paper-ctec-modal-multibar-legend {
+      color: #a3a3a3;
+    }
+    .dark .bc-paper-ctec-modal-hours-bar {
+      border-color: #525252;
+    }
+    .dark .bc-paper-ctec-modal-hours-labels > div {
+      color: #a3a3a3;
+    }
+    .dark .bc-paper-ctec-modal-hours-summary {
+      color: #a3a3a3;
+    }
+    .dark .bc-paper-ctec-modal-hours-summary strong {
+      color: #fafafa;
+    }
+    /* Override SVG inline fill/stroke on chart elements via CSS attribute
+       selectors. CSS fill/stroke takes precedence over SVG presentation
+       attributes, so [stroke="#xxx"] { stroke: ... } actually flips them. */
+    .dark .bc-paper-ctec-modal-trend-svg [stroke="#f1ebef"] { stroke: #525252; }
+    .dark .bc-paper-ctec-modal-trend-svg [fill="#9b8290"] { fill: #a3a3a3; }
+    .dark .bc-paper-ctec-modal-trend-svg [fill="rgba(102,2,60,0.08)"] { fill: rgba(216, 180, 254, 0.12); }
+    .dark .bc-paper-ctec-modal-trend-svg [stroke="#66023c"] { stroke: #d8b4fe; }
+    .dark .bc-paper-ctec-modal-trend-svg [fill="#66023c"] { fill: #d8b4fe; }
+    .dark .bc-paper-ctec-modal-trend-svg [fill="white"] { fill: #262626; }
+    .dark .bc-paper-ctec-modal-trend-svg [fill="#7a596a"] { fill: #a3a3a3; }
+    .dark .bc-paper-ctec-modal-sparkline [stroke="#66023c"] { stroke: #d8b4fe; }
+    .dark .bc-paper-ctec-modal-sparkline [fill="#66023c"] { fill: #d8b4fe; }
+    .dark .bc-paper-ctec-histogram-svg [stroke="#e6e6ea"] { stroke: #525252; }
+    .dark .bc-paper-ctec-histogram-svg [fill="#6b7280"] { fill: #a3a3a3; }
+    .dark .bc-paper-ctec-histogram-svg [fill="#9ca3af"] { fill: #a3a3a3; }
+    .dark .bc-paper-ctec-histogram-svg [fill="#3a2730"] { fill: #fafafa; }
+    .dark .bc-paper-ctec-histogram-svg [stroke="#66023c"] { stroke: #d8b4fe; }
+    .dark .bc-paper-ctec-histogram-svg [fill="#66023c"] { fill: #d8b4fe; }
+    .dark .bc-paper-ctec-histogram-svg [fill="white"] { fill: #1f1147; }
+    .dark .bc-paper-ctec-modal-hours-density-svg [stroke="#e6e6ea"] { stroke: #525252; }
+    .dark .bc-paper-ctec-modal-hours-density-svg [fill="#6b7280"] { fill: #a3a3a3; }
+    .dark .bc-paper-ctec-modal-hours-density-svg [fill="#9ca3af"] { fill: #a3a3a3; }
+    .dark .bc-paper-ctec-modal-hours-density-svg [stroke="#66023c"] { stroke: #d8b4fe; }
+    .dark .bc-paper-ctec-modal-hours-density-svg [fill="#66023c"] { fill: #d8b4fe; }
+    .dark .bc-paper-ctec-modal-hours-density-svg [stroke="#475569"] { stroke: #a3a3a3; }
+    .dark .bc-paper-ctec-modal-hours-density-svg [fill="#475569"] { fill: #a3a3a3; }
+    .dark .bc-paper-ctec-modal-hours-density-svg [fill="white"] { fill: #1f1147; }
+    .dark .bc-paper-ctec-histogram-svg stop[stop-color="rgba(102,2,60,0.45)"] { stop-color: rgba(216, 180, 254, 0.5); }
+    .dark .bc-paper-ctec-histogram-svg stop[stop-color="rgba(102,2,60,0.05)"] { stop-color: rgba(216, 180, 254, 0.05); }
+    .dark .bc-paper-ctec-modal-hours-density-svg stop[stop-color="rgba(102,2,60,0.45)"] { stop-color: rgba(216, 180, 254, 0.5); }
+    .dark .bc-paper-ctec-modal-hours-density-svg stop[stop-color="rgba(102,2,60,0.05)"] { stop-color: rgba(216, 180, 254, 0.05); }
+    /* Distribution image fallback (raw PNG from Bluera) — inverted so the
+       light-on-light chart becomes light-on-dark in the modal. */
+    .dark .bc-paper-ctec-modal-dist-image img,
+    .dark .bc-paper-ctec-modal-term-chart-image img {
+      filter: invert(0.92) hue-rotate(180deg);
     }
   `;
 }
