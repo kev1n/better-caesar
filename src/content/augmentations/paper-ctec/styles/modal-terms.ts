@@ -281,9 +281,6 @@ export function modalTermStyles(): string {
       .bc-paper-ctec-modal-drill {
         grid-template-columns: 1fr;
       }
-      .bc-paper-ctec-modal-kpi-strip {
-        grid-template-columns: repeat(3, 1fr);
-      }
     }
     @media (max-width: 720px) {
       .bc-paper-ctec-modal-comments {

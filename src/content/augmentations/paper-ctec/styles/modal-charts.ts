@@ -4,10 +4,15 @@
 export function modalChartStyles(): string {
   return `
     /* Outer strip is one column per gestalt group; each group's column
-       width is set inline by the renderer based on card count so cards
-       end up roughly the same visual width across groups. */
+       width is set via the --bc-paper-ctec-kpi-cols custom property
+       (set on the element by overview.ts based on card count) so cards
+       end up roughly the same visual width across groups. Using a
+       custom property — instead of inline grid-template-columns — lets
+       the responsive media queries below override the layout at narrow
+       widths. */
     .bc-paper-ctec-modal-kpi-strip {
       display: grid;
+      grid-template-columns: var(--bc-paper-ctec-kpi-cols, 1fr);
       gap: 14px;
       margin-bottom: 20px;
     }
@@ -29,12 +34,39 @@ export function modalChartStyles(): string {
        and gives the gestalt grouping an actual visible boundary. */
     .bc-paper-ctec-modal-kpi-group-cards {
       display: grid;
+      grid-template-columns: var(--bc-paper-ctec-kpi-card-cols, 1fr);
       gap: 8px;
       padding: 8px;
       border: 1px solid #d1d5db;
       border-radius: 12px;
       background: rgba(15, 23, 42, 0.025);
       min-width: 0;
+    }
+    /* Tablet: stack groups vertically so each gets full width. The
+       inner card grid stays as-is (e.g. Quality keeps 3 cards side by
+       side) since the row now has the whole modal width to spend. */
+    @media (max-width: 1100px) {
+      .bc-paper-ctec-modal-kpi-strip {
+        grid-template-columns: 1fr;
+      }
+    }
+    /* Phone: let the inner card grids wrap so 3-card groups (Quality)
+       break to two rows instead of cramming. Tighten card padding and
+       value font-size so the pill + sparkline still fit on ~140px wide
+       columns. */
+    @media (max-width: 640px) {
+      .bc-paper-ctec-modal-kpi-group-cards {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      }
+      .bc-paper-ctec-modal-kpi {
+        padding: 10px 12px;
+      }
+      .bc-paper-ctec-modal-kpi-mean {
+        font-size: 20px;
+      }
+      .bc-paper-ctec-modal-kpi.is-global .bc-paper-ctec-modal-kpi-mean {
+        font-size: 28px;
+      }
     }
     .bc-paper-ctec-modal-kpi {
       position: relative;

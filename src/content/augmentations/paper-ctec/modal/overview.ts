@@ -364,9 +364,13 @@ function renderKpiStrip(
 
   const strip = doc.createElement("div");
   strip.className = "bc-paper-ctec-modal-kpi-strip";
-  strip.style.gridTemplateColumns = groups
-    .map((group) => `${group.cards.length}fr`)
-    .join(" ");
+  // Set column templates via CSS custom properties (not inline
+  // grid-template-columns) so the responsive media queries in
+  // styles/modal-charts.ts can override them at narrow widths.
+  strip.style.setProperty(
+    "--bc-paper-ctec-kpi-cols",
+    groups.map((group) => `${group.cards.length}fr`).join(" ")
+  );
 
   for (const group of groups) {
     const groupEl = doc.createElement("div");
@@ -379,7 +383,10 @@ function renderKpiStrip(
 
     const cardsEl = doc.createElement("div");
     cardsEl.className = "bc-paper-ctec-modal-kpi-group-cards";
-    cardsEl.style.gridTemplateColumns = `repeat(${group.cards.length}, 1fr)`;
+    cardsEl.style.setProperty(
+      "--bc-paper-ctec-kpi-card-cols",
+      `repeat(${group.cards.length}, minmax(0, 1fr))`
+    );
     for (const card of group.cards) cardsEl.append(card);
     groupEl.append(cardsEl);
 
