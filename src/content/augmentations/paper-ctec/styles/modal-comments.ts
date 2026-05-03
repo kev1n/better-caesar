@@ -280,10 +280,13 @@ export function modalCommentStyles(): string {
       position: relative;
     }
     .bc-paper-ctec-modal-comment-text.is-clamped {
-      max-height: 9em;
+      display: -webkit-box;
+      -webkit-line-clamp: 6;
+      -webkit-box-orient: vertical;
+      max-height: calc(1.6em * 6);
       overflow: hidden;
-      mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+      mask-image: linear-gradient(to bottom, black calc(100% - 1.6em), transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 1.6em), transparent 100%);
     }
     .bc-paper-ctec-modal-comment-toggle {
       border: 0;

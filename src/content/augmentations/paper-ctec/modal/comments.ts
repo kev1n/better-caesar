@@ -420,24 +420,31 @@ function renderCommentCard(
   }
 
   const text = doc.createElement("div");
-  text.className = "bc-paper-ctec-modal-comment-text";
+  text.className = "bc-paper-ctec-modal-comment-text is-clamped";
   appendHighlighted(text, comment.text, highlights);
   card.append(text);
 
-  // Heuristic clamp + show more / less.
-  if (comment.text.length > 320) {
-    text.classList.add("is-clamped");
-    const toggle = doc.createElement("button");
-    toggle.type = "button";
-    toggle.className = "bc-paper-ctec-modal-comment-toggle";
-    toggle.textContent = "↓ Show more";
-    toggle.addEventListener("click", (event) => {
-      preventAndStop(event);
-      const expanded = text.classList.toggle("is-clamped");
-      toggle.textContent = expanded ? "↓ Show more" : "↑ Show less";
-    });
-    card.append(toggle);
-  }
+  const toggle = doc.createElement("button");
+  toggle.type = "button";
+  toggle.className = "bc-paper-ctec-modal-comment-toggle";
+  toggle.textContent = "↓ Show more";
+  toggle.hidden = true;
+  toggle.addEventListener("click", (event) => {
+    preventAndStop(event);
+    const expanded = text.classList.toggle("is-clamped");
+    toggle.textContent = expanded ? "↓ Show more" : "↑ Show less";
+  });
+  card.append(toggle);
+
+  // Only show the toggle when the clamped text actually overflows — keeps
+  // us from offering "Show more" on text that's already fully visible.
+  requestAnimationFrame(() => {
+    if (text.scrollHeight > text.clientHeight + 1) {
+      toggle.hidden = false;
+    } else {
+      text.classList.remove("is-clamped");
+    }
+  });
 
   if (comment.topics.length > 0) {
     const topics = doc.createElement("div");
