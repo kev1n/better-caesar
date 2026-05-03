@@ -1,4 +1,5 @@
 import { runPeopleSoftTask } from "../../peoplesoft";
+import { getLiveSearchEntryForm, serializeSearchForm } from "../../peoplesoft/context";
 import { fetchPeopleSoft, fetchPeopleSoftGet } from "../../peoplesoft/http";
 import { extractHiddenInputs } from "../../peoplesoft/params";
 import { extractErrorMessage } from "../../peoplesoft/parsers";
@@ -12,7 +13,6 @@ import {
   SEARCH_ENDPOINT,
   SEARCH_ENTRY_URL
 } from "../../peoplesoft/shared";
-import type { LookupClassSuccess } from "../../../shared/messages";
 
 import { bareCatalogNumber, formatCatalogForDisplay } from "./catalog-format";
 
@@ -35,7 +35,6 @@ export type CaesarSection = {
   // so cart-add can short-circuit with a clear message instead of issuing
   // a doomed POST.
   selectAvailable: boolean;
-  rowIndex: number; // N
 };
 
 export type CaesarStatus = "Open" | "Closed" | "Wait List" | "Unknown";
@@ -65,19 +64,9 @@ export type CartFlowResult =
       classNumber: string;
       sectionLabel: string;
       courseTitle: string;
-      // Raw SSR_CLSRCH_DTL HTML from the cart chain's MTG_CLASSNAME step.
-      // Includes capacity, enrollment totals, class notes, etc. Caller
-      // pipes this through seats-notes' parser to populate the shared
-      // cache so the shopping-cart augmentation sees the data without
-      // any extra fetches.
-      detailHtml: string;
-      // Same payload, pre-shaped as a LookupClassResponse so the caller
-      // can hand it straight to `toSeatsNotesResult` without rebuilding
-      // a synthetic search/detail pair.
-      seatsNotesPayload: LookupClassSuccess;
       // Parsed groups from the class-number search response. Always
       // contains the matched group with one section row carrying live
-      // status / instructor / room. Caller can stamp this into its
+      // status / instructor / room. Caller stamps this into its
       // live-status cache so badges populate on the section row without
       // a separate "Load CAESAR data" subject search.
       searchGroups: CaesarCourseGroup[];
@@ -88,11 +77,7 @@ export type CartFlowResult =
       classNumber?: string;
       // True when CAESAR returned the section row but omitted the Select
       // button — meaning the user already has it in their shopping cart.
-      // The UI uses this to render a friendlier "Already in cart" state
-      // instead of a generic failure.
       alreadyInCart?: boolean;
-      detailHtml?: string;
-      seatsNotesPayload?: LookupClassSuccess;
       searchGroups?: CaesarCourseGroup[];
     };
 
@@ -137,8 +122,6 @@ export async function addSectionToCart(input: CartFlowInput): Promise<CartFlowRe
 type FailExtras = {
   classNumber?: string;
   alreadyInCart?: boolean;
-  detailHtml?: string;
-  seatsNotesPayload?: LookupClassSuccess;
   searchGroups?: CaesarCourseGroup[];
 };
 
@@ -149,9 +132,7 @@ function fail(error: string, extras: FailExtras = {}): CartFlowResult {
 async function searchCaesarCatalogInternal(
   input: CaesarSearchInput
 ): Promise<CaesarSearchResult> {
-  const entryHtml = await fetchPeopleSoftGet(resolveActionUrl(SEARCH_ENTRY_URL));
-  const entryDoc = parseAjaxFragment(entryHtml);
-  const baseParams = serializeFormFromDoc(entryDoc);
+  const baseParams = await getEntryFormState();
   if (!baseParams.has("ICSID")) {
     throw new Error("Missing PeopleSoft session — try refreshing the page.");
   }
@@ -166,6 +147,17 @@ async function searchCaesarCatalogInternal(
   return { groups };
 }
 
+// Skip the entry GET when we're already sitting on the search entry page —
+// `document.forms.win0` already carries the latest ICSID/ICStateNum. Falls
+// back to a real GET for callers running outside that page (defensive: this
+// module is only invoked from the class-search augmentation today).
+async function getEntryFormState(): Promise<URLSearchParams> {
+  const liveForm = getLiveSearchEntryForm();
+  if (liveForm) return serializeSearchForm(liveForm);
+  const entryHtml = await fetchPeopleSoftGet(resolveActionUrl(SEARCH_ENTRY_URL));
+  return serializeFormFromDoc(parseAjaxFragment(entryHtml));
+}
+
 async function addSectionToCartInternal(input: CartFlowInput): Promise<CartFlowResult> {
   try {
     const classNumber = input.classNumber.trim();
@@ -173,15 +165,12 @@ async function addSectionToCartInternal(input: CartFlowInput): Promise<CartFlowR
       return { ok: false, error: "Missing CAESAR class number — load CAESAR data first." };
     }
 
-    // Step 1: GET the search entry page to seed PeopleSoft session state.
-    const entryHtml = await fetchPeopleSoftGet(resolveActionUrl(SEARCH_ENTRY_URL));
-    const entryDoc = parseAjaxFragment(entryHtml);
-    const baseParams = serializeFormFromDoc(entryDoc);
+    const baseParams = await getEntryFormState();
     if (!baseParams.has("ICSID")) {
       return { ok: false, error: "Missing PeopleSoft session — try refreshing the page." };
     }
 
-    // Step 2: POST class-number search → search results page.
+    // Step 1: POST class-number search → search results page.
     const searchPost = buildClassNumberSearchParams(baseParams, {
       termId: input.termId,
       career: input.career,
@@ -214,73 +203,41 @@ async function addSectionToCartInternal(input: CartFlowInput): Promise<CartFlowR
       });
     }
 
-    // Step 3: POST MTG_CLASSNAME$N → SSR_CLSRCH_DTL ("Class Detail").
-    // Going through the section-name link instead of the row's Select
-    // button gets us the canonical SSR_CLSRCH_DTL page in the same hop —
-    // that page carries the SSR_CLS_DTL_WRK_* fields the seats-notes
-    // parser needs, so we don't have to issue a second GET-entry +
-    // search + MTG_CLASSNAME chain to warm the cache afterward.
+    // Step 2: POST SSR_PB_SELECT$N → "Confirm Your Selection". This is the
+    // wizard path; MTG_CLASSNAME shows a non-wizard detail page that has
+    // no NEXT button, so it can't be used to advance the cart-add chain.
     const searchState = extractHiddenInputs(searchHtml);
-    const mtgActionId = `MTG_CLASSNAME$${match.section.rowIndex}`;
-    const detailParams = buildActionParams(searchState, mtgActionId);
-    const detailHtml = await fetchPeopleSoft(resolveActionUrl(SEARCH_ENDPOINT), detailParams);
-    if (looksLikeError(detailHtml)) {
-      return fail(extractErrorMessage(detailHtml) ?? "CAESAR rejected the section selection.", {
+    const selectParams = buildActionParams(searchState, match.section.selectActionId);
+    const confirmHtml = await fetchPeopleSoft(resolveActionUrl(SEARCH_ENDPOINT), selectParams);
+    if (looksLikeError(confirmHtml)) {
+      return fail(extractErrorMessage(confirmHtml) ?? "CAESAR rejected the section selection.", {
         classNumber: match.section.classNumber,
-        detailHtml,
         searchGroups: groups
       });
     }
 
-    // Shape the detail page into the LookupClassResponse contract so the
-    // caller can pipe it straight through `toSeatsNotesResult`.
-    const seatsNotesPayload = buildSeatsNotesPayloadFromDetail(
-      match.section.classNumber,
-      detailHtml
-    );
-
-    // Steps 4+: walk the DERIVED_CLS_DTL_NEXT_PB chain until CAESAR stops
-    // offering one. Reaching SSR_CLSRCH_DTL gives us a "Select Class"
-    // (NEXT_PB) button that advances to the wizard's "Confirm Your
-    // Selection" page; that page also has a NEXT_PB button that finally
-    // commits the cart-add. Walking the chain instead of hard-coding two
-    // hops keeps us robust if CAESAR ever drops or adds an intermediate
-    // step (e.g. preferences) for some sections.
-    let currentHtml = detailHtml;
-    const MAX_NEXT_HOPS = 3;
-    let hops = 0;
-    while (hops < MAX_NEXT_HOPS) {
-      const nextActionId = findNextActionId(currentHtml);
-      if (!nextActionId) break;
-      hops += 1;
-      const state = extractHiddenInputs(currentHtml);
-      const nextParams = buildActionParams(state, nextActionId);
-      const nextHtml = await fetchPeopleSoft(resolveActionUrl(SEARCH_ENDPOINT), nextParams);
-      if (looksLikeError(nextHtml)) {
-        return fail(extractErrorMessage(nextHtml) ?? "CAESAR refused to add the class.", {
-          classNumber: match.section.classNumber,
-          detailHtml,
-          seatsNotesPayload,
-          searchGroups: groups
-        });
-      }
-      currentHtml = nextHtml;
-    }
-    if (hops === 0) {
+    // Step 3: POST DERIVED_CLS_DTL_NEXT_PB → cart landing page.
+    const nextActionId = findNextActionId(confirmHtml);
+    if (!nextActionId) {
       return fail("Section needs extra confirmation in CAESAR. Use Classic Search for this one.", {
         classNumber: match.section.classNumber,
-        detailHtml,
-        seatsNotesPayload,
+        searchGroups: groups
+      });
+    }
+    const confirmState = extractHiddenInputs(confirmHtml);
+    const finalParams = buildActionParams(confirmState, nextActionId);
+    const finalHtml = await fetchPeopleSoft(resolveActionUrl(SEARCH_ENDPOINT), finalParams);
+    if (looksLikeError(finalHtml)) {
+      return fail(extractErrorMessage(finalHtml) ?? "CAESAR refused to add the class.", {
+        classNumber: match.section.classNumber,
         searchGroups: groups
       });
     }
 
-    const success = isCartLandingPage(currentHtml, match.section.classNumber);
+    const success = isCartLandingPage(finalHtml, match.section.classNumber);
     if (!success.ok) {
       return fail(success.reason, {
         classNumber: match.section.classNumber,
-        detailHtml,
-        seatsNotesPayload,
         searchGroups: groups
       });
     }
@@ -290,8 +247,6 @@ async function addSectionToCartInternal(input: CartFlowInput): Promise<CartFlowR
       classNumber: match.section.classNumber,
       sectionLabel: match.section.sectionLabel,
       courseTitle: match.group.title,
-      detailHtml,
-      seatsNotesPayload,
       searchGroups: groups
     };
   } catch (error) {
@@ -300,33 +255,6 @@ async function addSectionToCartInternal(input: CartFlowInput): Promise<CartFlowR
       error: error instanceof Error ? error.message : String(error)
     };
   }
-}
-
-// Re-package an SSR_CLSRCH_DTL HTML response into the LookupClassResponse
-// shape so the seats-notes parser can consume it without changes. Only
-// the fields `toSeatsNotesResult` actually reads need to be populated.
-function buildSeatsNotesPayloadFromDetail(
-  classNumber: string,
-  detailHtml: string
-): LookupClassSuccess {
-  return {
-    ok: true,
-    requestedClassNumber: classNumber,
-    criteriaClassNumber: classNumber,
-    firstResultClassNumber: classNumber,
-    firstResultCourseTitle: null,
-    firstResultSection: null,
-    firstResultInstructor: null,
-    firstResultDaysTimes: null,
-    firstResultRoom: null,
-    firstResultMeetingDates: null,
-    firstResultGrading: null,
-    firstResultStatus: null,
-    nextActionForDetails: null,
-    searchPageId: null,
-    detailPageId: "SSR_CLSRCH_DTL",
-    detailResponseText: detailHtml
-  };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -423,8 +351,7 @@ function parseSectionRow(doc: Document, rowIndex: number): CaesarSection | null 
     grading,
     status,
     selectActionId: `SSR_PB_SELECT$${rowIndex}`,
-    selectAvailable: selectButton !== null,
-    rowIndex
+    selectAvailable: selectButton !== null
   };
 }
 

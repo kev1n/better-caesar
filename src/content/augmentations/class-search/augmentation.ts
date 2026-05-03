@@ -953,14 +953,6 @@ export class ClassSearchAugmentation implements Augmentation {
       }
     }
 
-    // Cart chain now drives via MTG_CLASSNAME → SSR_CLSRCH_DTL, so the
-    // detail HTML it returns is already in the shape seats-notes wants.
-    // Write it straight to the shared cache instead of re-fetching.
-    if (result.seatsNotesPayload) {
-      const seatsResult = toSeatsNotesResult(result.seatsNotesPayload);
-      writeSeatsNotesCache(classNumber, { result: seatsResult, fetchedAt: Date.now() });
-    }
-
     if (result.ok) {
       button.dataset.state = "success";
       button.textContent = "Added ✓";
