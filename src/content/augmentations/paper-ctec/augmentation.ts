@@ -8,17 +8,29 @@ import {
 import {
   fetchCtecReportAggregate,
   getCachedReportAggregate,
+  getCtecCourseAnalyticsSnapshot,
   hasCachedReportAggregate
 } from "../ctec-links/reports";
 import { showToast } from "../seats-notes/toast";
 import { AuthFlow } from "./auth-flow";
+import { buildModalDisplayData, type ModalDisplayData } from "./modal-data";
 import { PAPER_CTEC_CONFIG } from "./config";
 import {
+  ANALYTICS_MODAL_ID,
+  AUTH_MODAL_ID,
   CARD_BORDER_ON_HOVER_FEATURE_ID,
   NO_HOVER_LIFT_CLASS,
+  SIDECARD_ANALYTICS_PANEL_CLASS,
+  SIDECARD_TABS_CLASS,
+  STATUS_BAR_ID,
+  STYLE_ID,
   WIDGET_CLASS
 } from "./constants";
-import { collectScheduleTargets, extractSideCardContext } from "./dom";
+import {
+  collectScheduleTargets,
+  extractSideCardContext,
+  teardownCardForCleanup
+} from "./dom";
 import { ModalController } from "./modal-controller";
 import { buildStatusBarData, clearAuthRequiredStates } from "./session";
 import type {
@@ -146,6 +158,66 @@ export class PaperCtecAugmentation implements Augmentation {
     this.modal.sync(doc);
   }
 
+  cleanup(doc: Document = document): void {
+    // Clear in-memory state so a re-enable doesn't carry stale chip data
+    // forward without verifying the underlying cache is still valid.
+    this.inFlight.clear();
+    this.resolved.clear();
+    this.analyticsResolved.clear();
+    this.analyticsInFlight.clear();
+    this.loadingMessages.clear();
+    this.userActivated.clear();
+    this.visibleKeys.clear();
+    this.selectedTabs.clear();
+    this.cartStates.clear();
+    this.cartInFlight.clear();
+    for (const timer of this.cartResetTimers.values()) clearTimeout(timer);
+    this.cartResetTimers.clear();
+    this.targetSources.clear();
+    this.modal.invalidate();
+
+    // Per-card teardown: widgets, anchors, hover preview, dense-card flatten.
+    for (const card of Array.from(
+      doc.querySelectorAll<HTMLElement>(PAPER_CTEC_CONFIG.selectors.scheduleCard)
+    )) {
+      teardownCardForCleanup(card);
+    }
+
+    // Strip lingering widget/anchor/preview nodes that aren't anchored to a
+    // card we currently see (e.g. cards that were unmounted between renders).
+    for (const orphan of Array.from(
+      doc.querySelectorAll<HTMLElement>(
+        `.${WIDGET_CLASS}, .${WIDGET_CLASS}-analytics-anchor, .${WIDGET_CLASS}-cart-anchor, .${WIDGET_CLASS}-preview`
+      )
+    )) {
+      orphan.remove();
+    }
+
+    // Schedule grid hover-lift override.
+    for (const grid of Array.from(
+      doc.querySelectorAll<HTMLElement>(PAPER_CTEC_CONFIG.selectors.scheduleGrid)
+    )) {
+      grid.classList.remove(NO_HOVER_LIFT_CLASS);
+    }
+
+    // Side panel: drop our tabs + analytics panel and unhide any paper.nu
+    // children that were hidden while the Analytics tab was active.
+    for (const panel of Array.from(
+      doc.querySelectorAll<HTMLElement>(PAPER_CTEC_CONFIG.selectors.sideCardPanel)
+    )) {
+      panel.querySelector<HTMLElement>(`.${SIDECARD_TABS_CLASS}`)?.remove();
+      panel.querySelector<HTMLElement>(`.${SIDECARD_ANALYTICS_PANEL_CLASS}`)?.remove();
+      for (const child of Array.from(panel.children)) {
+        if (child instanceof HTMLElement && child.hidden) child.hidden = false;
+      }
+    }
+
+    doc.getElementById(STATUS_BAR_ID)?.remove();
+    doc.getElementById(AUTH_MODAL_ID)?.remove();
+    doc.getElementById(ANALYTICS_MODAL_ID)?.remove();
+    doc.getElementById(STYLE_ID)?.remove();
+  }
+
   private appliesToPage(doc: Document): boolean {
     if (!isPaperHost()) return false;
     return !!doc.querySelector(PAPER_CTEC_CONFIG.selectors.scheduleGrid);
@@ -192,9 +264,17 @@ export class PaperCtecAugmentation implements Augmentation {
         );
       }
 
+      const getPreviewData = this.previewDataCallbackFor(target.key);
+
       const resolved = this.resolved.get(target.key);
       if (resolved) {
-        renderWidget(target.widget, resolved, () => this.openAuthModal(), openAnalytics);
+        renderWidget(
+          target.widget,
+          resolved,
+          () => this.openAuthModal(),
+          openAnalytics,
+          getPreviewData
+        );
         continue;
       }
 
@@ -219,7 +299,13 @@ export class PaperCtecAugmentation implements Augmentation {
           aggregate: cachedAggregate
         };
         this.resolved.set(target.key, widgetData);
-        renderWidget(target.widget, widgetData, () => this.openAuthModal(), openAnalytics);
+        renderWidget(
+          target.widget,
+          widgetData,
+          () => this.openAuthModal(),
+          openAnalytics,
+          getPreviewData
+        );
         continue;
       }
 
@@ -321,8 +407,15 @@ export class PaperCtecAugmentation implements Augmentation {
 
   private renderForKey(key: string, data: PaperCtecWidgetData): void {
     const openAnalytics = this.openAnalyticsCallbackFor(key);
+    const getPreviewData = this.previewDataCallbackFor(key);
     for (const widget of this.findWidgetsByKey(document, key)) {
-      renderWidget(widget, data, () => this.openAuthModal(), openAnalytics);
+      renderWidget(
+        widget,
+        data,
+        () => this.openAuthModal(),
+        openAnalytics,
+        getPreviewData
+      );
     }
     this.syncStatusBar(document);
     this.syncSideCard(document);
@@ -333,6 +426,27 @@ export class PaperCtecAugmentation implements Augmentation {
     const source = this.targetSources.get(key);
     if (!source) return undefined;
     return () => this.modal.openModal(source);
+  }
+
+  // Lazy snapshot reader for the schedule-chip hover preview. Reads from
+  // the in-memory subject index — no network — and converts to ModalDisplayData
+  // so the popup can reuse the modal's hours-density renderer. Returns null
+  // when nothing usable is cached yet (e.g. the chip is showing a stale
+  // aggregate but the index has been wiped).
+  private previewDataCallbackFor(
+    key: string
+  ): (() => ModalDisplayData | null) | undefined {
+    const source = this.targetSources.get(key);
+    if (!source) return undefined;
+    return () => {
+      const snapshot = getCtecCourseAnalyticsSnapshot(
+        source.params,
+        source.titleHint,
+        PAPER_CTEC_CONFIG.aggregate.recentTerms
+      );
+      if (!snapshot || snapshot.entries.length === 0) return null;
+      return buildModalDisplayData(snapshot, source.params, source.titleHint);
+    };
   }
 
   private findWidgetsByKey(doc: Document, key: string): HTMLElement[] {

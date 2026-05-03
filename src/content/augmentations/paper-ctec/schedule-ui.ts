@@ -1,10 +1,14 @@
 import { isFeatureEnabled } from "../../settings";
+import { getOrCreatePreviewController } from "./analytics-preview";
 import { PAPER_CTEC_CONFIG } from "./config";
 import { COMPACT_CARD_STARS_FEATURE_ID, WIDGET_CLASS } from "./constants";
+import type { ModalDisplayData } from "./modal-data";
 import { ratingPercentSignature } from "./rating-format";
 import type { PaperCtecWidgetData } from "./types";
 import { createIcon, preventAndStop } from "./ui-shared";
-import { buildTooltip, makeChip, metricChip } from "./widget-chips";
+import { buildTooltip, globalChip, makeChip, metricChip } from "./widget-chips";
+
+export type AnalyticsPreviewSource = () => ModalDisplayData | null;
 
 const ANALYTICS_ANCHOR_CLASS = `${WIDGET_CLASS}-analytics-anchor`;
 const CART_ANCHOR_CLASS = `${WIDGET_CLASS}-cart-anchor`;
@@ -95,10 +99,16 @@ export function renderWidget(
   widget: HTMLElement,
   data: PaperCtecWidgetData,
   onAuthChipClick?: () => void,
-  onOpenAnalytics?: () => void
+  onOpenAnalytics?: () => void,
+  getPreviewData?: AnalyticsPreviewSource
 ): void {
-  const signature = `${buildWidgetSignature(data)}|a:${onOpenAnalytics ? "1" : "0"}`;
+  const signature = `${buildWidgetSignature(data)}|a:${onOpenAnalytics ? "1" : "0"}|p:${
+    getPreviewData ? "1" : "0"
+  }`;
   if (widget.dataset.bcPaperCtecSignature === signature) {
+    if (data.state === "found" && getPreviewData) {
+      refreshPreviewSource(widget, getPreviewData);
+    }
     return;
   }
 
@@ -135,15 +145,13 @@ export function renderWidget(
   const { aggregate } = data;
   widget.title = buildTooltip(aggregate);
 
-  // Primary chip set: instruction + course + learned + hours. Drops to a
-  // challenge / interest fallback when none of the primary metrics survived
-  // the parser — some courses only have those secondary metrics published.
-  const chips = [
-    metricChip("Inst", "Instruction", aggregate.metrics.instruction, aggregate, "rating"),
-    metricChip("CRSE", "Course", aggregate.metrics.course, aggregate, "rating"),
-    metricChip("LRN", "Learned", aggregate.metrics.learned, aggregate, "rating"),
-    metricChip("Hrs", "Hours", aggregate.metrics.hours, aggregate, "hours")
-  ].filter((chip): chip is HTMLElement => !!chip);
+  // Primary chip set: a single rolled-up Global rating chip + hours. The
+  // GBL chip averages Instruction / Course / Learned (matching the modal's
+  // Global KPI), and the Hrs chip is unchanged. Hovering either one opens
+  // the analytics preview popup.
+  const gbl = globalChip(aggregate);
+  const hrs = metricChip("Hrs", "Hours", aggregate.metrics.hours, aggregate, "hours");
+  const chips = [gbl, hrs].filter((chip): chip is HTMLElement => !!chip);
 
   if (chips.length === 0) {
     const fallbackChips = [
@@ -159,15 +167,43 @@ export function renderWidget(
           "spark",
           "CTEC detail",
           "is-muted",
-          "Matching CTEC reports were found, but the compact card does not have Inst, CRSE, LRN, Hrs, Challenge, or Interest summary metrics for this course."
+          "Matching CTEC reports were found, but the compact card does not have Global, Hours, Challenge, or Interest summary metrics for this course."
         )
       );
     }
   } else {
     chips.forEach((chip) => summary.appendChild(chip));
+    if (getPreviewData) attachPreviewToChips(widget, chips, getPreviewData);
   }
   attachAnalyticsAnchor(widget, onOpenAnalytics);
   widget.dataset.bcPaperCtecSignature = signature;
+}
+
+function attachPreviewToChips(
+  widget: HTMLElement,
+  chips: HTMLElement[],
+  getPreviewData: AnalyticsPreviewSource
+): void {
+  const card = widget.closest<HTMLElement>(
+    PAPER_CTEC_CONFIG.selectors.scheduleCard
+  );
+  if (!card) return;
+  const controller = getOrCreatePreviewController(card);
+  controller.refreshData(getPreviewData);
+  for (const chip of chips) {
+    controller.attachTrigger(chip);
+  }
+}
+
+function refreshPreviewSource(
+  widget: HTMLElement,
+  getPreviewData: AnalyticsPreviewSource
+): void {
+  const card = widget.closest<HTMLElement>(
+    PAPER_CTEC_CONFIG.selectors.scheduleCard
+  );
+  if (!card) return;
+  getOrCreatePreviewController(card).refreshData(getPreviewData);
 }
 
 export { hideStatusBar, renderStatusBar } from "./status-bar-ui";

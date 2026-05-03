@@ -36,6 +36,48 @@ export function makeChip(
   return chip;
 }
 
+// Builds the GBL (Global) chip from the aggregate. Mirrors the modal's
+// Global KPI: simple average of the response-weighted Instruction / Course
+// / Learned means (skipping any metric that's missing). Returns null when
+// none of the three contribute. Honors the stars-mode toggle just like
+// metricChip so the schedule-card chip set stays visually consistent.
+export function globalChip(aggregate: WidgetAggregate): HTMLElement | null {
+  const components: Array<{ label: string; mean: number; n: number }> = [];
+  for (const [kind, label] of [
+    ["instruction", "Instruction"],
+    ["course", "Course"],
+    ["learned", "Learned"]
+  ] as const) {
+    const m = aggregate.metrics[kind];
+    if (m && Number.isFinite(m.mean)) {
+      components.push({ label, mean: m.mean, n: m.evaluationCount });
+    }
+  }
+  if (components.length === 0) return null;
+
+  const overallMean =
+    components.reduce((sum, c) => sum + c.mean, 0) / components.length;
+
+  const tooltipParts = [
+    `Global ${formatRatingDetail(overallMean)} — avg of ${components
+      .map((c) => `${c.label} ${formatRatingDetail(c.mean)}`)
+      .join(", ")}.`
+  ];
+  const tooltip = tooltipParts.join(" ");
+
+  const starMode = isFeatureEnabled(COMPACT_CARD_STARS_FEATURE_ID);
+  if (starMode) {
+    return makeMetricStarsChip("GBL", overallMean, tooltip);
+  }
+
+  const tone = buildCompactChipTone(
+    overallMean,
+    PAPER_CTEC_CONFIG.aggregate.ratingScaleMax,
+    false
+  );
+  return makeMetricValueChip("GBL", formatChipRating(overallMean), "", tooltip, tone);
+}
+
 // Builds the chip for one CTEC metric (Inst/CRSE/LRN/Hrs/...). Picks
 // stars-mode when the COMPACT_CARD_STARS_FEATURE_ID toggle is on for rating
 // metrics, value-mode otherwise. Hours never use stars (they're not a

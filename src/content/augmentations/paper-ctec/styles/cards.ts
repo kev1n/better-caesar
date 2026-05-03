@@ -296,5 +296,75 @@ export function cardStyles(): string {
     button.${WIDGET_CLASS}-chip-button:hover {
       background: var(--bc-color-warn-rose-fill-20);
     }
+    /* Hover preview popup. Anchors below the schedule card outer host
+       (sibling to the analytics anchor) so it escapes the dense card's
+       overflow:hidden. Hidden by default and toggled via .is-visible
+       from the per-card preview controller. */
+    .${WIDGET_CLASS}-preview-trigger {
+      cursor: help;
+    }
+    .${WIDGET_CLASS}-preview {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      margin-top: 6px;
+      width: 500px;
+      max-width: 92vw;
+      padding: 12px 14px 10px;
+      border: 1px solid var(--bc-color-border);
+      border-radius: var(--bc-radius-lg);
+      background: var(--bc-color-bg);
+      box-shadow: var(--bc-shadow-tooltip);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity var(--bc-tx-base) var(--bc-easing), visibility var(--bc-tx-base) var(--bc-easing);
+      z-index: 30;
+    }
+    .${WIDGET_CLASS}-preview.is-visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .${WIDGET_CLASS}-preview-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .${WIDGET_CLASS}-preview-section {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .${WIDGET_CLASS}-preview-section-title {
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-extrabold);
+      letter-spacing: var(--bc-ls-widest);
+      text-transform: uppercase;
+      color: var(--bc-color-text-muted);
+    }
+    .${WIDGET_CLASS}-preview-methodology {
+      font-size: var(--bc-font-11);
+      line-height: 1.4;
+      color: var(--bc-color-text-soft);
+      margin: -2px 0 2px;
+    }
+    .${WIDGET_CLASS}-preview-trend-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .${WIDGET_CLASS}-preview-empty {
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-text-muted);
+      padding: 4px 0;
+    }
+    /* Keep the schedule card's own hover-lift effect from kicking in while
+       the preview is open — same pattern as the analytics anchor. */
+    ${PAPER_CTEC_CONFIG.selectors.scheduleCard}:has(> .${WIDGET_CLASS}-preview.is-visible) {
+      transform: none !important;
+      box-shadow: none !important;
+      z-index: 30;
+    }
   `;
 }
