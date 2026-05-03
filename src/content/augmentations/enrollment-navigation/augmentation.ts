@@ -1,5 +1,5 @@
 import type { Augmentation } from "../../framework";
-import { acquirePeopleSoftLock, releasePeopleSoftLock } from "../../peoplesoft";
+import { acquirePeopleSoftLock, releasePeopleSoftLock, runPeopleSoftTask } from "../../peoplesoft";
 
 type EnrollmentContext = {
   ACAD_CAREER: string;
@@ -32,6 +32,7 @@ const CONTINUE_BUTTON_SELECTOR = "#DERIVED_SSS_SCT_SSR_PB_GO";
 const STYLE_ID = "better-caesar-enrollment-nav-style";
 const TERM_SWITCHER_ID = "better-caesar-term-switcher";
 const SPINNER_OVERLAY_ID = "better-caesar-term-auto-continue-overlay";
+const EARLY_MASK_ID = "better-caesar-early-term-mask";
 const NAV_LOCK_OWNER = "enrollment-navigation";
 
 export class EnrollmentNavigationAugmentation implements Augmentation {
@@ -58,6 +59,7 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
       this.waitingForLoad = false;
       this.lastSubmittedSignature = null;
       hideTermSpinnerOverlay(doc);
+      hideEarlyTermPageMask(doc);
       return;
     }
 
@@ -174,45 +176,51 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
     const termSelectorUrl = buildTermSelectorUrl(doc);
     if (!termSelectorUrl) return null;
 
-    const res = await fetch(termSelectorUrl, {
-      method: "GET",
-      credentials: "include",
-    });
+    return runPeopleSoftTask(
+      "background",
+      async () => {
+        const res = await fetch(termSelectorUrl, {
+          method: "GET",
+          credentials: "include",
+        });
 
-    if (!res.ok) return null;
+        if (!res.ok) return null;
 
-    const html = await res.text();
-    const parser = new DOMParser();
-    const nextDoc = parser.parseFromString(html, "text/html");
+        const html = await res.text();
+        const parser = new DOMParser();
+        const nextDoc = parser.parseFromString(html, "text/html");
 
-    if (getPageId(nextDoc) !== TERM_PAGE_ID) {
-      const context = extractContextFromHtml(html) ?? parseContext(res.url);
-      if (context) persistContext(context);
-      return null;
-    }
+        if (getPageId(nextDoc) !== TERM_PAGE_ID) {
+          const context = extractContextFromHtml(html) ?? parseContext(res.url);
+          if (context) persistContext(context);
+          return null;
+        }
 
-    const radios = Array.from(
-      nextDoc.querySelectorAll<HTMLInputElement>(TERM_RADIO_SELECTOR),
-    ).filter((radio) => !radio.disabled && radio.name);
+        const radios = Array.from(
+          nextDoc.querySelectorAll<HTMLInputElement>(TERM_RADIO_SELECTOR),
+        ).filter((radio) => !radio.disabled && radio.name);
 
-    if (radios.length === 0) return null;
+        if (radios.length === 0) return null;
 
-    const options: TermOption[] = [];
-    for (const radio of radios) {
-      const rowIndex = radio.id.match(/\$(\d+)\$\$0$/)?.[1] ?? radio.value;
-      const term = textById(nextDoc, `TERM_CAR$${rowIndex}`);
-      const career = textById(nextDoc, `CAREER$${rowIndex}`);
-      const label = [term, career].filter(Boolean).join(" | ") || `Term ${radio.value}`;
+        const options: TermOption[] = [];
+        for (const radio of radios) {
+          const rowIndex = radioRowIndex(radio);
+          const term = getTermLabelForRadio(nextDoc, radio);
+          const career = textById(nextDoc, `CAREER$${rowIndex}`);
+          const label = [term, career].filter(Boolean).join(" | ") || `Term ${radio.value}`;
 
-      options.push({
-        value: radio.value,
-        term,
-        career,
-        label,
-      });
-    }
+          options.push({
+            value: radio.value,
+            term,
+            career,
+            label,
+          });
+        }
 
-    return { termSelectorUrl, options };
+        return { termSelectorUrl, options };
+      },
+      { owner: "enrollment-navigation:term-picker" },
+    );
   }
 
   private autoContinueTermPage(doc: Document): void {
@@ -248,19 +256,19 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
       clearTargetTermSelection();
       releasePeopleSoftLock(NAV_LOCK_OWNER);
       hideTermSpinnerOverlay(doc);
+      hideEarlyTermPageMask(doc);
       return;
     }
 
     const selectedRadio =
       (targetValue ? radios.find((radio) => radio.value === targetValue) : null) ??
-      radios.find((radio) => radio.checked) ??
-      radios[radios.length - 1] ??
-      null;
+      pickDefaultRadio(doc, radios);
 
     if (!selectedRadio) {
       clearTargetTermSelection();
       releasePeopleSoftLock(NAV_LOCK_OWNER);
       hideTermSpinnerOverlay(doc);
+      hideEarlyTermPageMask(doc);
       return;
     }
 
@@ -280,6 +288,7 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
       if (getPageId(document) === TERM_PAGE_ID) {
         releasePeopleSoftLock(NAV_LOCK_OWNER);
         hideTermSpinnerOverlay(document);
+        hideEarlyTermPageMask(document);
       }
     }, 10_000);
   }
@@ -491,6 +500,36 @@ function textById(doc: Document, id: string): string {
   return normalizeText(element.textContent ?? "");
 }
 
+function radioRowIndex(radio: HTMLInputElement): string {
+  return radio.id.match(/\$(\d+)\$\$0$/)?.[1] ?? radio.value;
+}
+
+function getTermLabelForRadio(doc: Document, radio: HTMLInputElement): string {
+  return textById(doc, `TERM_CAR$${radioRowIndex(radio)}`);
+}
+
+function isSummerTermLabel(label: string): boolean {
+  return /\bsummer\b/i.test(label);
+}
+
+function pickDefaultRadio(
+  doc: Document,
+  radios: HTMLInputElement[],
+): HTMLInputElement | null {
+  if (radios.length === 0) return null;
+
+  const lastRadio = radios[radios.length - 1];
+  if (
+    lastRadio &&
+    radios.length >= 2 &&
+    isSummerTermLabel(getTermLabelForRadio(doc, lastRadio))
+  ) {
+    return radios[radios.length - 2];
+  }
+
+  return radios.find((radio) => radio.checked) ?? lastRadio ?? null;
+}
+
 function readCurrentTermSignature(doc: Document): { term: string; career: string } | null {
   const text = textById(doc, "DERIVED_REGFRM1_SSR_STDNTKEY_DESCR$11$");
   if (!text) return null;
@@ -561,6 +600,10 @@ function hideTermSpinnerOverlay(doc: Document): void {
   doc.getElementById(SPINNER_OVERLAY_ID)?.remove();
 }
 
+function hideEarlyTermPageMask(doc: Document): void {
+  doc.getElementById(EARLY_MASK_ID)?.remove();
+}
+
 function resolveTermSwitcherAnchor(doc: Document): Element | null {
   const changeTermButton = doc.querySelector<HTMLInputElement>("#DERIVED_SSS_SCT_SSS_TERM_LINK");
   if (changeTermButton) {
@@ -592,29 +635,29 @@ function injectStyles(doc: Document): void {
       max-width: 320px;
     }
     .better-caesar-term-helper {
-      font-size: 10px;
-      font-weight: 700;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-bold);
       text-transform: uppercase;
       letter-spacing: 0.2px;
-      color: #66023c;
+      color: var(--bc-color-accent);
     }
     .better-caesar-term-select {
       width: 100%;
-      background: #ffffff;
-      color: #3f0126;
-      border: 1px solid #66023c;
-      border-radius: 6px;
-      font-size: 12px;
+      background: var(--bc-color-bg);
+      color: var(--bc-color-accent-pressed);
+      border: 1px solid var(--bc-color-accent);
+      border-radius: var(--bc-radius-md);
+      font-size: var(--bc-font-12);
       padding: 6px 8px;
     }
     .better-caesar-term-select:focus-visible {
-      outline: 2px solid #8a2f5b;
+      outline: 2px solid var(--bc-color-accent);
       outline-offset: 2px;
     }
     .better-caesar-term-status {
       min-height: 14px;
-      font-size: 10px;
-      color: #66023c;
+      font-size: var(--bc-font-10);
+      color: var(--bc-color-accent);
     }
     .better-caesar-term-overlay {
       position: fixed;
@@ -624,20 +667,20 @@ function injectStyles(doc: Document): void {
       align-content: center;
       justify-items: center;
       gap: 12px;
-      background: rgba(255, 255, 255, 0.98);
+      background: var(--bc-color-surface-translucent-98);
     }
     .better-caesar-term-spinner {
       width: 28px;
       height: 28px;
-      border-radius: 50%;
-      border: 3px solid #e1c7d5;
-      border-top-color: #66023c;
+      border-radius: var(--bc-radius-circle);
+      border: 3px solid var(--bc-color-accent-mid-border);
+      border-top-color: var(--bc-color-accent);
       animation: better-caesar-spin 0.8s linear infinite;
     }
     .better-caesar-term-overlay-text {
-      color: #66023c;
-      font-size: 14px;
-      font-weight: 700;
+      color: var(--bc-color-accent);
+      font-size: var(--bc-font-14);
+      font-weight: var(--bc-fw-bold);
     }
     @keyframes better-caesar-spin {
       to { transform: rotate(360deg); }

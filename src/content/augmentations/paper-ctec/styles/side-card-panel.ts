@@ -19,43 +19,29 @@ export function sideCardPanelStyles(): string {
       gap: 10px;
       margin-bottom: 16px;
       padding: 12px;
-      border: 1px solid rgba(102, 2, 60, 0.1);
-      border-radius: 14px;
-      background: rgba(255, 251, 253, 0.86);
+      border: 1px solid var(--bc-color-accent-border-12);
+      border-radius: var(--bc-radius-3xl);
+      background: var(--bc-color-surface-translucent-86);
     }
     .bc-paper-ctec-analytics-group-title {
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-extrabold);
+      letter-spacing: var(--bc-ls-widest);
       text-transform: uppercase;
-      color: #7a596a;
-    }
-    .dark .bc-paper-ctec-analytics-group {
-      border-color: rgba(252, 165, 207, 0.14);
-      background: rgba(17, 24, 39, 0.26);
-    }
-    .dark .bc-paper-ctec-analytics-group-title {
-      color: #d4b9c5;
+      color: var(--bc-color-text-mauve);
     }
     .bc-paper-ctec-analytics-card {
-      border-radius: 12px;
-      border: 1px solid rgba(102, 2, 60, 0.1);
-      background: rgba(255, 255, 255, 0.72);
+      border-radius: var(--bc-radius-2xl);
+      border: 1px solid var(--bc-color-accent-border-12);
+      background: var(--bc-color-surface-translucent-72);
       padding: 10px;
     }
-    .dark .bc-paper-ctec-analytics-card {
-      border-color: rgba(252, 165, 207, 0.14);
-      background: rgba(17, 24, 39, 0.3);
-    }
     .bc-paper-ctec-analytics-card-label {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.03em;
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-wider);
       text-transform: uppercase;
-      color: #7a596a;
-    }
-    .dark .bc-paper-ctec-analytics-card-label {
-      color: #d4b9c5;
+      color: var(--bc-color-text-mauve);
     }
     .bc-paper-ctec-analytics-card-rating {
       display: flex;
@@ -64,22 +50,16 @@ export function sideCardPanelStyles(): string {
       margin-top: 8px;
     }
     .bc-paper-ctec-analytics-card-value {
-      font-size: 14px;
-      font-weight: 800;
-      color: #2f1f29;
+      font-size: var(--bc-font-14);
+      font-weight: var(--bc-fw-extrabold);
+      color: var(--bc-color-text-mauve-deep);
       white-space: nowrap;
-    }
-    .dark .bc-paper-ctec-analytics-card-value {
-      color: #fff6fb;
     }
     .bc-paper-ctec-analytics-card-hours {
       margin-top: 8px;
-      font-size: 15px;
-      font-weight: 800;
-      color: #2f1f29;
-    }
-    .dark .bc-paper-ctec-analytics-card-hours {
-      color: #fff6fb;
+      font-size: var(--bc-font-15);
+      font-weight: var(--bc-fw-extrabold);
+      color: var(--bc-color-text-mauve-deep);
     }
     .bc-paper-ctec-stars {
       display: inline-flex;
@@ -101,34 +81,25 @@ export function sideCardPanelStyles(): string {
       stroke-width: 1.7;
     }
     .bc-paper-ctec-star-base {
-      color: #c9b4bf;
+      color: var(--bc-color-star-base);
     }
     .bc-paper-ctec-star-fill {
       position: absolute;
       inset: 0 auto 0 0;
       overflow: hidden;
-      color: #d97706;
-    }
-    .dark .bc-paper-ctec-star-base {
-      color: rgba(255, 227, 238, 0.36);
-    }
-    .dark .bc-paper-ctec-star-fill {
-      color: #fbbf24;
+      color: var(--bc-color-star-fill);
     }
     .bc-paper-ctec-hours-track {
       margin-top: 8px;
       height: 8px;
-      border-radius: 999px;
-      background: rgba(102, 2, 60, 0.12);
+      border-radius: var(--bc-radius-pill);
+      background: var(--bc-color-accent-fill-12);
       overflow: hidden;
     }
     .bc-paper-ctec-hours-fill {
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #a21caf, #db2777);
-    }
-    .dark .bc-paper-ctec-hours-track {
-      background: rgba(252, 165, 207, 0.16);
+      background: linear-gradient(90deg, var(--bc-color-hours-grad-start), var(--bc-color-hours-grad-end));
     }
     .bc-paper-ctec-hours-meta {
       margin-top: 6px;
@@ -136,23 +107,17 @@ export function sideCardPanelStyles(): string {
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      font-size: 11px;
+      font-size: var(--bc-font-11);
       line-height: 1.35;
-      color: #6b7280;
-    }
-    .dark .bc-paper-ctec-hours-meta {
-      color: #cbd5e1;
+      color: var(--bc-color-text-muted);
     }
     .bc-paper-ctec-analytics-section-title {
       margin: 16px 0 8px;
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-extrabold);
+      letter-spacing: var(--bc-ls-widest);
       text-transform: uppercase;
-      color: #7a596a;
-    }
-    .dark .bc-paper-ctec-analytics-section-title {
-      color: #d4b9c5;
+      color: var(--bc-color-text-mauve);
     }
     .bc-paper-ctec-analytics-term-toolbar {
       display: flex;
@@ -170,29 +135,21 @@ export function sideCardPanelStyles(): string {
       flex: 1 1 auto;
     }
     .bc-paper-ctec-analytics-term-selector label {
-      font-size: 12px;
-      font-weight: 700;
-      color: #6b5a65;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-bold);
+      color: var(--bc-color-text-mauve-soft);
       white-space: nowrap;
-    }
-    .dark .bc-paper-ctec-analytics-term-selector label {
-      color: #d8c7d0;
     }
     .bc-paper-ctec-analytics-term-select {
       min-width: 0;
       flex: 1 1 auto;
-      border: 1px solid rgba(102, 2, 60, 0.14);
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.84);
-      color: #2f1f29;
-      font-size: 12px;
-      font-weight: 600;
+      border: 1px solid var(--bc-color-accent-border-14);
+      border-radius: var(--bc-radius-xl);
+      background: var(--bc-color-surface-translucent-84);
+      color: var(--bc-color-text-mauve-deep);
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-semibold);
       padding: 8px 10px;
-    }
-    .dark .bc-paper-ctec-analytics-term-select {
-      border-color: rgba(252, 165, 207, 0.18);
-      background: rgba(17, 24, 39, 0.35);
-      color: #fff6fb;
     }
     .bc-paper-ctec-analytics-term-summary {
       display: flex;
@@ -201,49 +158,33 @@ export function sideCardPanelStyles(): string {
       gap: 10px;
       margin-bottom: 10px;
       padding: 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(102, 2, 60, 0.08);
-      background: rgba(255, 255, 255, 0.56);
-    }
-    .dark .bc-paper-ctec-analytics-term-summary {
-      border-color: rgba(252, 165, 207, 0.12);
-      background: rgba(17, 24, 39, 0.22);
+      border-radius: var(--bc-radius-2xl);
+      border: 1px solid var(--bc-color-accent-border-08);
+      background: var(--bc-color-surface-translucent-56);
     }
     .bc-paper-ctec-analytics-term-title {
-      font-size: 14px;
-      font-weight: 800;
-      color: #2f1f29;
-    }
-    .dark .bc-paper-ctec-analytics-term-title {
-      color: #fff6fb;
+      font-size: var(--bc-font-14);
+      font-weight: var(--bc-fw-extrabold);
+      color: var(--bc-color-text-mauve-deep);
     }
     .bc-paper-ctec-analytics-term-meta {
       margin-top: 4px;
-      font-size: 12px;
+      font-size: var(--bc-font-12);
       line-height: 1.45;
-      color: #6b7280;
-    }
-    .dark .bc-paper-ctec-analytics-term-meta {
-      color: #cbd5e1;
+      color: var(--bc-color-text-muted);
     }
     .bc-paper-ctec-analytics-term-link {
-      color: #66023c;
-      font-size: 11px;
-      font-weight: 800;
+      color: var(--bc-color-accent-soft);
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-extrabold);
       text-decoration: underline;
       text-underline-offset: 3px;
       white-space: nowrap;
     }
-    .dark .bc-paper-ctec-analytics-term-link {
-      color: #fbcfe8;
-    }
     .bc-paper-ctec-analytics-state-note {
-      font-size: 12px;
+      font-size: var(--bc-font-12);
       line-height: 1.5;
-      color: #6b7280;
-    }
-    .dark .bc-paper-ctec-analytics-state-note {
-      color: #cbd5e1;
+      color: var(--bc-color-text-muted);
     }
     .bc-paper-ctec-analytics-metric-stack {
       display: flex;
@@ -251,14 +192,10 @@ export function sideCardPanelStyles(): string {
       gap: 10px;
     }
     .bc-paper-ctec-analytics-metric-card {
-      border-radius: 12px;
-      border: 1px solid rgba(102, 2, 60, 0.08);
-      background: rgba(255, 255, 255, 0.62);
+      border-radius: var(--bc-radius-2xl);
+      border: 1px solid var(--bc-color-accent-border-08);
+      background: var(--bc-color-surface-translucent-62);
       padding: 12px;
-    }
-    .dark .bc-paper-ctec-analytics-metric-card {
-      border-color: rgba(252, 165, 207, 0.12);
-      background: rgba(17, 24, 39, 0.22);
     }
     .bc-paper-ctec-analytics-metric-card-top {
       display: flex;
@@ -274,10 +211,10 @@ export function sideCardPanelStyles(): string {
       width: 28px;
       height: 28px;
       padding: 0;
-      border: 1px solid rgba(102, 2, 60, 0.12);
-      border-radius: 999px;
-      background: rgba(102, 2, 60, 0.05);
-      color: #66023c;
+      border: 1px solid var(--bc-color-accent-border-12);
+      border-radius: var(--bc-radius-pill);
+      background: var(--bc-color-accent-fill-05);
+      color: var(--bc-color-accent-soft);
       cursor: pointer;
     }
     .bc-paper-ctec-analytics-metric-chart-btn svg {
@@ -286,15 +223,7 @@ export function sideCardPanelStyles(): string {
       stroke-width: 1.9;
     }
     .bc-paper-ctec-analytics-metric-chart-btn:hover {
-      background: rgba(102, 2, 60, 0.1);
-    }
-    .dark .bc-paper-ctec-analytics-metric-chart-btn {
-      border-color: rgba(252, 165, 207, 0.14);
-      background: rgba(252, 165, 207, 0.1);
-      color: #fbcfe8;
-    }
-    .dark .bc-paper-ctec-analytics-metric-chart-btn:hover {
-      background: rgba(252, 165, 207, 0.16);
+      background: var(--bc-color-accent-fill-10);
     }
     .bc-paper-ctec-analytics-inline-chart {
       display: flex;
@@ -302,10 +231,7 @@ export function sideCardPanelStyles(): string {
       gap: 8px;
       margin-top: 12px;
       padding-top: 12px;
-      border-top: 1px solid rgba(102, 2, 60, 0.08);
-    }
-    .dark .bc-paper-ctec-analytics-inline-chart {
-      border-top-color: rgba(252, 165, 207, 0.12);
+      border-top: 1px solid var(--bc-color-accent-border-08);
     }
     .bc-paper-ctec-analytics-inline-chart-head {
       display: flex;
@@ -313,14 +239,14 @@ export function sideCardPanelStyles(): string {
       gap: 10px;
     }
     .bc-paper-ctec-analytics-chart-title {
-      font-size: 12px;
-      font-weight: 700;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-bold);
       line-height: 1.4;
     }
     .bc-paper-ctec-analytics-chart-image {
       width: 100%;
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.88);
+      border-radius: var(--bc-radius-xl);
+      background: var(--bc-color-surface-translucent-88);
     }
     .bc-paper-ctec-analytics-comments-toolbar {
       display: flex;
@@ -331,28 +257,20 @@ export function sideCardPanelStyles(): string {
     }
     .bc-paper-ctec-analytics-comments-search {
       width: 100%;
-      border: 1px solid rgba(102, 2, 60, 0.14);
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.84);
-      color: #2f1f29;
-      font-size: 12px;
-      font-weight: 600;
+      border: 1px solid var(--bc-color-accent-border-14);
+      border-radius: var(--bc-radius-xl);
+      background: var(--bc-color-surface-translucent-84);
+      color: var(--bc-color-text-mauve-deep);
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-semibold);
       padding: 8px 10px;
-    }
-    .dark .bc-paper-ctec-analytics-comments-search {
-      border-color: rgba(252, 165, 207, 0.18);
-      background: rgba(17, 24, 39, 0.35);
-      color: #fff6fb;
     }
     .bc-paper-ctec-analytics-comments-count {
       flex: 0 0 auto;
-      font-size: 11px;
-      font-weight: 700;
-      color: #6b5a65;
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-bold);
+      color: var(--bc-color-text-mauve-soft);
       white-space: nowrap;
-    }
-    .dark .bc-paper-ctec-analytics-comments-count {
-      color: #d8c7d0;
     }
     .bc-paper-ctec-analytics-comments {
       display: flex;
@@ -361,24 +279,17 @@ export function sideCardPanelStyles(): string {
       margin-top: 10px;
     }
     .bc-paper-ctec-analytics-comment-group {
-      border-radius: 12px;
-      border: 1px solid rgba(102, 2, 60, 0.08);
-      background: rgba(255, 255, 255, 0.56);
+      border-radius: var(--bc-radius-2xl);
+      border: 1px solid var(--bc-color-accent-border-08);
+      background: var(--bc-color-surface-translucent-56);
       padding: 12px;
-    }
-    .dark .bc-paper-ctec-analytics-comment-group {
-      border-color: rgba(252, 165, 207, 0.12);
-      background: rgba(17, 24, 39, 0.22);
     }
     .bc-paper-ctec-analytics-comment-prompt {
       margin-bottom: 8px;
-      font-size: 12px;
-      font-weight: 800;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-extrabold);
       line-height: 1.45;
-      color: #5b4451;
-    }
-    .dark .bc-paper-ctec-analytics-comment-prompt {
-      color: #f3e5ed;
+      color: var(--bc-color-text-mauve-warm);
     }
     .bc-paper-ctec-analytics-comment-list {
       display: flex;
@@ -387,25 +298,18 @@ export function sideCardPanelStyles(): string {
     }
     .bc-paper-ctec-analytics-comment-card {
       padding: 10px;
-      border-radius: 10px;
-      background: rgba(102, 2, 60, 0.05);
-      font-size: 12px;
+      border-radius: var(--bc-radius-xl);
+      background: var(--bc-color-accent-fill-05);
+      font-size: var(--bc-font-12);
       line-height: 1.5;
-      color: #4b5563;
+      color: var(--bc-color-text-soft);
       white-space: pre-wrap;
     }
-    .dark .bc-paper-ctec-analytics-comment-card {
-      background: rgba(252, 165, 207, 0.08);
-      color: #e5e7eb;
-    }
     .bc-paper-ctec-comment-highlight {
-      background: rgba(250, 204, 21, 0.38);
+      background: var(--bc-color-comment-highlight-light);
       color: inherit;
-      border-radius: 2px;
+      border-radius: var(--bc-radius-xs);
       padding: 0 1px;
-    }
-    .dark .bc-paper-ctec-comment-highlight {
-      background: rgba(250, 204, 21, 0.24);
     }
     .bc-paper-ctec-analytics-refresh-toolbar {
       display: flex;
@@ -413,13 +317,9 @@ export function sideCardPanelStyles(): string {
       gap: 6px;
       margin: 0 0 14px;
       padding: 12px;
-      border-radius: 12px;
-      border: 1px dashed rgba(102, 2, 60, 0.22);
-      background: rgba(102, 2, 60, 0.04);
-    }
-    .dark .bc-paper-ctec-analytics-refresh-toolbar {
-      border-color: rgba(252, 165, 207, 0.22);
-      background: rgba(252, 165, 207, 0.06);
+      border-radius: var(--bc-radius-2xl);
+      border: 1px dashed var(--bc-color-accent-border-22);
+      background: var(--bc-color-accent-fill-04);
     }
     .bc-paper-ctec-analytics-refresh-row {
       display: flex;
@@ -431,21 +331,15 @@ export function sideCardPanelStyles(): string {
     .bc-paper-ctec-analytics-refresh-copy {
       flex: 1 1 180px;
       min-width: 0;
-      font-size: 12px;
-      font-weight: 700;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-bold);
       line-height: 1.45;
-      color: #5b4451;
-    }
-    .dark .bc-paper-ctec-analytics-refresh-copy {
-      color: #f3e5ed;
+      color: var(--bc-color-text-mauve-warm);
     }
     .bc-paper-ctec-analytics-refresh-explainer {
-      font-size: 11px;
+      font-size: var(--bc-font-11);
       line-height: 1.4;
-      color: #6b5a65;
-    }
-    .dark .bc-paper-ctec-analytics-refresh-explainer {
-      color: #d8c7d0;
+      color: var(--bc-color-text-mauve-soft);
     }
     .bc-paper-ctec-analytics-load-more {
       display: flex;
@@ -455,74 +349,52 @@ export function sideCardPanelStyles(): string {
       gap: 10px;
       margin: 16px 0 8px;
       padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px dashed rgba(102, 2, 60, 0.22);
-      background: rgba(102, 2, 60, 0.04);
-    }
-    .dark .bc-paper-ctec-analytics-load-more {
-      border-color: rgba(252, 165, 207, 0.22);
-      background: rgba(252, 165, 207, 0.06);
+      border-radius: var(--bc-radius-2xl);
+      border: 1px dashed var(--bc-color-accent-border-22);
+      background: var(--bc-color-accent-fill-04);
     }
     .bc-paper-ctec-analytics-load-more-copy {
       flex: 1 1 180px;
       min-width: 0;
-      font-size: 12px;
+      font-size: var(--bc-font-12);
       line-height: 1.4;
-      color: #5b4451;
-    }
-    .dark .bc-paper-ctec-analytics-load-more-copy {
-      color: #f3e5ed;
+      color: var(--bc-color-text-mauve-warm);
     }
     .bc-paper-ctec-analytics-refresh-btn {
       padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(102, 2, 60, 0.32);
-      background: rgba(255, 255, 255, 0.72);
-      color: #66023c;
+      border-radius: var(--bc-radius-pill);
+      border: 1px solid var(--bc-color-accent-border-32);
+      background: var(--bc-color-surface-translucent-72);
+      color: var(--bc-color-accent-soft);
       font: inherit;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-wide);
       cursor: pointer;
     }
     .bc-paper-ctec-analytics-refresh-btn:hover:not(:disabled) {
-      background: rgba(102, 2, 60, 0.12);
+      background: var(--bc-color-accent-fill-12);
     }
     .bc-paper-ctec-analytics-refresh-btn:disabled {
       opacity: 0.55;
       cursor: default;
     }
-    .dark .bc-paper-ctec-analytics-refresh-btn {
-      border-color: rgba(252, 165, 207, 0.36);
-      background: rgba(17, 24, 39, 0.32);
-      color: #fbcfe8;
-    }
-    .dark .bc-paper-ctec-analytics-refresh-btn:hover:not(:disabled) {
-      background: rgba(252, 165, 207, 0.14);
-    }
     .bc-paper-ctec-analytics-load-more-btn {
       flex: 0 0 auto;
       padding: 6px 12px;
-      border-radius: 999px;
-      border: 1px solid #66023c;
-      background: #66023c;
-      color: #ffffff;
+      border-radius: var(--bc-radius-pill);
+      border: 1px solid var(--bc-color-accent-soft);
+      background: var(--bc-color-accent-soft);
+      color: var(--bc-color-accent-soft-on);
       font: inherit;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-wide);
       cursor: pointer;
     }
     .bc-paper-ctec-analytics-load-more-btn:hover {
-      background: #500030;
-    }
-    .dark .bc-paper-ctec-analytics-load-more-btn {
-      background: #fbcfe8;
-      border-color: #fbcfe8;
-      color: #500030;
-    }
-    .dark .bc-paper-ctec-analytics-load-more-btn:hover {
-      background: #f9a8d4;
+      background: var(--bc-color-accent-soft-hover);
+      border-color: var(--bc-color-accent-soft-hover);
     }
   `;
 }

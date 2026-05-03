@@ -3,43 +3,12 @@ export const STYLE_ID = "better-caesar-class-search-styles";
 export function classSearchStyles(): string {
   return `
     .bc-cs-root {
-      /* CAESAR-side maroon palette. */
-      --bc-purple: #66023c;
-      --bc-purple-dark: #500030;
-      --bc-purple-darker: #3f0126;
-      --bc-purple-soft: #f6ecf2;
-      --bc-purple-tint: #faf3f7;
-      --bc-purple-border: rgba(102, 2, 60, 0.18);
-      --bc-purple-ring: rgba(102, 2, 60, 0.18);
-
-      /* paper.nu-side accents (kept purple) for tags that signal
-         "this data came from paper.nu's catalog". */
-      --bc-paper: #4e2a84;
-      --bc-paper-dark: #3a1f63;
-      --bc-paper-soft: #f3eef9;
-
-      --bc-text: #1f2937;
-      --bc-text-muted: #6b7280;
-      --bc-text-subtle: #9ca3af;
-      --bc-border: #e5e7eb;
-      --bc-border-strong: #d1d5db;
-      --bc-bg: #ffffff;
-      --bc-bg-soft: #f9fafb;
-      --bc-bg-inset: #faf7f9;
-
-      --bc-success: #15803d;
-      --bc-success-bg: #dcfce7;
-      --bc-warn: #b45309;
-      --bc-warn-bg: #fef3c7;
-      --bc-danger: #b91c1c;
-      --bc-danger-bg: #fee2e2;
-
       position: relative;
       margin: 12px auto 32px;
       max-width: 1180px;
       padding: 0 16px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      color: var(--bc-text);
+      color: var(--bc-color-text);
       box-sizing: border-box;
     }
     .bc-cs-root *, .bc-cs-root *::before, .bc-cs-root *::after { box-sizing: border-box; }
@@ -54,18 +23,18 @@ export function classSearchStyles(): string {
       flex-wrap: wrap;
     }
     .bc-cs-title {
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      color: var(--bc-purple);
+      font-size: var(--bc-font-22);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-snug);
+      color: var(--bc-color-accent);
       margin: 0;
     }
     .bc-cs-subtitle {
-      font-size: 12px;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-12);
+      color: var(--bc-color-text-muted);
       line-height: 1.4;
     }
-    .bc-cs-subtitle a { color: var(--bc-purple); text-decoration: none; }
+    .bc-cs-subtitle a { color: var(--bc-color-accent); text-decoration: none; }
     .bc-cs-subtitle a:hover { text-decoration: underline; }
 
     /* ── Tabs ───────────────────────────────────────────────────────────── */
@@ -78,7 +47,7 @@ export function classSearchStyles(): string {
       max-width: 1180px;
       margin: 12px auto 0;
       padding: 0 16px;
-      border-bottom: 1px solid var(--bc-border);
+      border-bottom: 1px solid var(--bc-color-border-divider);
     }
     .bc-cs-tab {
       position: relative;
@@ -86,37 +55,37 @@ export function classSearchStyles(): string {
       background: transparent;
       border: 1px solid transparent;
       border-bottom: none;
-      border-radius: 8px 8px 0 0;
+      border-radius: var(--bc-radius-lg) var(--bc-radius-lg) 0 0;
       padding: 8px 14px;
       font: inherit;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-semibold);
+      letter-spacing: var(--bc-ls-wide);
+      color: var(--bc-color-text-muted);
       cursor: pointer;
-      transition: color 80ms, background-color 80ms;
+      transition: color var(--bc-tx-fast), background-color var(--bc-tx-fast);
     }
     .bc-cs-tab:hover {
-      color: var(--bc-purple);
-      background: var(--bc-purple-tint);
+      color: var(--bc-color-accent);
+      background: var(--bc-color-accent-surface-tint);
     }
     .bc-cs-tab[data-active="true"] {
-      background: var(--bc-bg);
-      border-color: var(--bc-border);
-      color: var(--bc-purple);
-      box-shadow: 0 -1px 2px rgba(15, 23, 42, 0.04);
+      background: var(--bc-color-bg);
+      border-color: var(--bc-color-border-divider);
+      color: var(--bc-color-accent);
+      box-shadow: var(--bc-shadow-card-soft);
     }
     .bc-cs-tab[data-active="true"]:hover {
-      background: var(--bc-bg);
+      background: var(--bc-color-bg);
     }
 
     /* ── Card / form ────────────────────────────────────────────────────── */
     .bc-cs-card {
-      background: var(--bc-bg);
-      border: 1px solid var(--bc-border);
-      border-radius: 12px;
+      background: var(--bc-color-bg);
+      border: 1px solid var(--bc-color-border-divider);
+      border-radius: var(--bc-radius-2xl);
       padding: 14px;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      box-shadow: var(--bc-shadow-elev-1);
     }
     .bc-cs-form {
       display: grid;
@@ -126,36 +95,36 @@ export function classSearchStyles(): string {
     }
     .bc-cs-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .bc-cs-field label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-caps);
+      color: var(--bc-color-text-muted);
       text-transform: uppercase;
     }
     .bc-cs-input, .bc-cs-select {
       width: 100%;
       font: inherit;
-      font-size: 14px;
+      font-size: var(--bc-font-14);
       padding: 8px 10px;
-      border: 1px solid var(--bc-border-strong);
-      border-radius: 8px;
-      background: var(--bc-bg);
-      color: var(--bc-text);
+      border: 1px solid var(--bc-color-border-strong);
+      border-radius: var(--bc-radius-lg);
+      background: var(--bc-color-bg);
+      color: var(--bc-color-text);
       transition: border-color 100ms, box-shadow 100ms;
     }
     .bc-cs-input:focus, .bc-cs-select:focus {
       outline: none;
-      border-color: var(--bc-purple);
+      border-color: var(--bc-color-accent);
       box-shadow:
-        0 0 0 3px var(--bc-purple-ring),
-        inset 0 1px 2px rgba(15, 23, 42, 0.04);
+        var(--bc-shadow-input-focus-ring),
+        var(--bc-shadow-input-focus-inner);
     }
     .bc-cs-input-query {
-      font-size: 16px;
+      font-size: var(--bc-font-16);
       padding: 12px 14px;
       letter-spacing: 0.005em;
     }
-    .bc-cs-input::placeholder { color: var(--bc-text-subtle); }
+    .bc-cs-input::placeholder { color: var(--bc-color-text-subtle); }
 
     /* ── Filter pills ───────────────────────────────────────────────────── */
     .bc-cs-toggles {
@@ -164,7 +133,7 @@ export function classSearchStyles(): string {
       gap: 6px;
       margin-top: 10px;
       padding-top: 10px;
-      border-top: 1px dashed var(--bc-border);
+      border-top: 1px dashed var(--bc-color-border-divider);
       align-items: center;
     }
     .bc-cs-checkbox {
@@ -172,71 +141,71 @@ export function classSearchStyles(): string {
       gap: 5px;
       align-items: center;
       padding: 4px 10px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--bc-text);
-      background: var(--bc-bg-soft);
-      border: 1px solid var(--bc-border);
-      border-radius: 999px;
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text);
+      background: var(--bc-color-surface-soft);
+      border: 1px solid var(--bc-color-border-divider);
+      border-radius: var(--bc-radius-pill);
       cursor: pointer;
       user-select: none;
-      transition: background-color 80ms, border-color 80ms;
+      transition: background-color var(--bc-tx-fast), border-color var(--bc-tx-fast);
     }
     .bc-cs-checkbox:hover {
-      border-color: var(--bc-border-strong);
-      background: var(--bc-bg);
+      border-color: var(--bc-color-border-strong);
+      background: var(--bc-color-bg);
     }
     .bc-cs-checkbox input {
-      accent-color: var(--bc-purple);
+      accent-color: var(--bc-color-accent);
       margin: 0;
       width: 12px;
       height: 12px;
     }
     .bc-cs-checkbox:has(input:checked) {
-      background: var(--bc-purple-soft);
-      border-color: var(--bc-purple-border);
-      color: var(--bc-purple-darker);
+      background: var(--bc-color-accent-surface-tile);
+      border-color: var(--bc-color-accent-border-18);
+      color: var(--bc-color-accent-pressed);
     }
     .bc-cs-clear {
       margin-left: auto;
       background: transparent;
-      border: 1px solid var(--bc-border-strong);
-      border-radius: 8px;
+      border: 1px solid var(--bc-color-border-strong);
+      border-radius: var(--bc-radius-lg);
       font: inherit;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text-muted);
       padding: 5px 10px;
       cursor: pointer;
-      transition: color 80ms, border-color 80ms;
+      transition: color var(--bc-tx-fast), border-color var(--bc-tx-fast);
     }
     .bc-cs-clear:hover {
-      color: var(--bc-purple);
-      border-color: var(--bc-purple);
+      color: var(--bc-color-accent);
+      border-color: var(--bc-color-accent);
     }
 
     /* ── Status row ─────────────────────────────────────────────────────── */
     .bc-cs-status {
       margin-top: 10px;
-      font-size: 12px;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-12);
+      color: var(--bc-color-text-muted);
       display: flex;
       align-items: center;
       gap: 8px;
       min-height: 16px;
     }
-    .bc-cs-status[data-state="error"] { color: var(--bc-danger); }
+    .bc-cs-status[data-state="error"] { color: var(--bc-color-danger); }
     .bc-cs-spinner {
       width: 12px;
       height: 12px;
-      border: 2px solid var(--bc-purple-ring);
-      border-top-color: var(--bc-purple);
-      border-radius: 50%;
+      border: 2px solid var(--bc-color-accent-fill-18);
+      border-top-color: var(--bc-color-accent);
+      border-radius: var(--bc-radius-circle);
       animation: bc-cs-spin 0.7s linear infinite;
     }
     @keyframes bc-cs-spin { to { transform: rotate(360deg); } }
 
-    .bc-cs-meta { font-size: 11px; color: var(--bc-text-muted); }
+    .bc-cs-meta { font-size: var(--bc-font-11); color: var(--bc-color-text-muted); }
 
     /* ── Results ────────────────────────────────────────────────────────── */
     .bc-cs-results {
@@ -248,22 +217,22 @@ export function classSearchStyles(): string {
     .bc-cs-empty {
       padding: 32px 20px;
       text-align: center;
-      color: var(--bc-text-muted);
-      border: 1px dashed var(--bc-border);
-      border-radius: 12px;
-      background: var(--bc-bg-soft);
+      color: var(--bc-color-text-muted);
+      border: 1px dashed var(--bc-color-border-divider);
+      border-radius: var(--bc-radius-2xl);
+      background: var(--bc-color-surface-soft);
     }
 
     .bc-cs-course {
-      background: var(--bc-bg);
-      border: 1px solid var(--bc-border);
-      border-radius: 12px;
+      background: var(--bc-color-bg);
+      border: 1px solid var(--bc-color-border-divider);
+      border-radius: var(--bc-radius-2xl);
       overflow: hidden;
       transition: border-color 100ms, box-shadow 100ms;
     }
     .bc-cs-course:hover {
-      border-color: var(--bc-border-strong);
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+      border-color: var(--bc-color-border-strong);
+      box-shadow: var(--bc-shadow-elev-2);
     }
 
     .bc-cs-course-head {
@@ -273,27 +242,27 @@ export function classSearchStyles(): string {
       padding: 12px 16px;
       align-items: baseline;
       cursor: pointer;
-      background: linear-gradient(180deg, var(--bc-purple-tint) 0%, var(--bc-bg) 100%);
-      border-bottom: 1px solid var(--bc-border);
+      background: linear-gradient(180deg, var(--bc-color-accent-surface-tint) 0%, var(--bc-color-bg) 100%);
+      border-bottom: 1px solid var(--bc-color-border-divider);
     }
     .bc-cs-course-id {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--bc-purple);
-      letter-spacing: 0.02em;
+      font-size: var(--bc-font-13);
+      font-weight: var(--bc-fw-bold);
+      color: var(--bc-color-accent);
+      letter-spacing: var(--bc-ls-wide);
     }
     .bc-cs-course-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--bc-text);
+      font-size: var(--bc-font-14);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .bc-cs-course-units {
-      font-size: 11px;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-text-muted);
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
@@ -306,28 +275,28 @@ export function classSearchStyles(): string {
       padding: 10px 16px 0;
     }
     .bc-cs-tag {
-      font-size: 10px;
-      font-weight: 700;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-bold);
       padding: 3px 8px;
-      border-radius: 999px;
-      background: var(--bc-paper-soft);
-      color: var(--bc-paper-dark);
-      letter-spacing: 0.03em;
+      border-radius: var(--bc-radius-pill);
+      background: var(--bc-color-paper-soft);
+      color: var(--bc-color-paper-deep);
+      letter-spacing: var(--bc-ls-wider);
       line-height: 1.4;
       text-transform: none;
     }
     /* paper.nu-sourced tags keep their purple tint to read as
        "from paper.nu". */
-    .bc-cs-tag[data-kind="distro"]     { background: #ecfdf5; color: #065f46; }
-    .bc-cs-tag[data-kind="discipline"] { background: #fef3c7; color: #92400e; }
-    .bc-cs-tag[data-kind="school"]     { background: var(--bc-paper-soft); color: var(--bc-paper); }
-    .bc-cs-tag[data-kind="open"]       { background: var(--bc-success-bg); color: var(--bc-success); }
-    .bc-cs-tag[data-kind="closed"]     { background: var(--bc-danger-bg); color: var(--bc-danger); }
-    .bc-cs-tag[data-kind="wait"]       { background: var(--bc-warn-bg); color: var(--bc-warn); }
+    .bc-cs-tag[data-kind="distro"]     { background: var(--bc-color-success-distro-bg); color: var(--bc-color-success-distro-text); }
+    .bc-cs-tag[data-kind="discipline"] { background: var(--bc-color-warn-bg); color: var(--bc-color-warn-text-discipline); }
+    .bc-cs-tag[data-kind="school"]     { background: var(--bc-color-paper-soft); color: var(--bc-color-paper); }
+    .bc-cs-tag[data-kind="open"]       { background: var(--bc-color-success-bg); color: var(--bc-color-success); }
+    .bc-cs-tag[data-kind="closed"]     { background: var(--bc-color-danger-bg); color: var(--bc-color-danger); }
+    .bc-cs-tag[data-kind="wait"]       { background: var(--bc-color-warn-bg); color: var(--bc-color-warn); }
 
     .bc-cs-course-desc {
-      font-size: 12px;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-12);
+      color: var(--bc-color-text-muted);
       padding: 6px 16px 12px;
       line-height: 1.5;
       max-height: 4.5em;
@@ -341,37 +310,37 @@ export function classSearchStyles(): string {
     .bc-cs-live-btn {
       margin-left: auto;
       background: transparent;
-      border: 1px solid var(--bc-border-strong);
-      border-radius: 8px;
+      border: 1px solid var(--bc-color-border-strong);
+      border-radius: var(--bc-radius-lg);
       padding: 4px 10px;
       font: inherit;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text-muted);
       cursor: pointer;
-      letter-spacing: 0.02em;
-      transition: color 80ms, border-color 80ms, background-color 80ms;
+      letter-spacing: var(--bc-ls-wide);
+      transition: color var(--bc-tx-fast), border-color var(--bc-tx-fast), background-color var(--bc-tx-fast);
     }
     .bc-cs-live-btn:hover {
-      color: var(--bc-purple);
-      border-color: var(--bc-purple);
-      background: var(--bc-purple-tint);
+      color: var(--bc-color-accent);
+      border-color: var(--bc-color-accent);
+      background: var(--bc-color-accent-surface-tint);
     }
     .bc-cs-live-btn[data-state="loading"] {
-      color: var(--bc-purple);
-      border-color: var(--bc-purple);
-      background: var(--bc-purple-tint);
+      color: var(--bc-color-accent);
+      border-color: var(--bc-color-accent);
+      background: var(--bc-color-accent-surface-tint);
       cursor: progress;
     }
     .bc-cs-live-btn[data-state="ready"] {
-      color: var(--bc-purple);
-      border-color: var(--bc-purple);
-      background: var(--bc-purple-soft);
+      color: var(--bc-color-accent);
+      border-color: var(--bc-color-accent);
+      background: var(--bc-color-accent-surface-tile);
     }
     .bc-cs-live-btn[data-state="error"] {
-      color: var(--bc-danger);
-      border-color: var(--bc-danger);
-      background: var(--bc-danger-bg);
+      color: var(--bc-color-danger);
+      border-color: var(--bc-color-danger);
+      background: var(--bc-color-danger-bg);
     }
 
     /* ── Section rows ───────────────────────────────────────────────────── */
@@ -386,67 +355,67 @@ export function classSearchStyles(): string {
       gap: 10px;
       align-items: center;
       padding: 10px 16px;
-      border-top: 1px solid var(--bc-border);
-      font-size: 13px;
-      transition: background-color 80ms;
+      border-top: 1px solid var(--bc-color-border-divider);
+      font-size: var(--bc-font-13);
+      transition: background-color var(--bc-tx-fast);
     }
-    .bc-cs-section:hover { background: var(--bc-bg-soft); }
+    .bc-cs-section:hover { background: var(--bc-color-surface-soft); }
     .bc-cs-section-id {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--bc-text);
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text);
     }
-    .bc-cs-section-component { color: var(--bc-text-muted); font-size: 12px; }
-    .bc-cs-section-time { color: var(--bc-text); font-size: 12px; line-height: 1.4; }
-    .bc-cs-section-time .bc-cs-mute { color: var(--bc-text-subtle); font-size: 11px; }
+    .bc-cs-section-component { color: var(--bc-color-text-muted); font-size: var(--bc-font-12); }
+    .bc-cs-section-time { color: var(--bc-color-text); font-size: var(--bc-font-12); line-height: 1.4; }
+    .bc-cs-section-time .bc-cs-mute { color: var(--bc-color-text-subtle); font-size: var(--bc-font-11); }
     .bc-cs-section-instructor {
-      color: var(--bc-text);
-      font-size: 12px;
+      color: var(--bc-color-text);
+      font-size: var(--bc-font-12);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .bc-cs-section-room {
-      color: var(--bc-text-muted);
-      font-size: 11px;
+      color: var(--bc-color-text-muted);
+      font-size: var(--bc-font-11);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .bc-cs-section-live {
-      font-size: 11px;
+      font-size: var(--bc-font-11);
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 6px;
-      color: var(--bc-text-muted);
+      color: var(--bc-color-text-muted);
     }
     .bc-cs-section-live[data-tone="muted"] {
-      color: var(--bc-text-subtle);
+      color: var(--bc-color-text-subtle);
       font-style: italic;
     }
 
     .bc-cs-status-pill {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-widest);
       text-transform: uppercase;
       padding: 2px 7px;
-      border-radius: 999px;
-      background: var(--bc-bg-soft);
-      color: var(--bc-text-muted);
-      border: 1px solid var(--bc-border);
+      border-radius: var(--bc-radius-pill);
+      background: var(--bc-color-surface-soft);
+      color: var(--bc-color-text-muted);
+      border: 1px solid var(--bc-color-border-divider);
       line-height: 1.4;
     }
-    .bc-cs-status-pill[data-status="Open"]      { background: var(--bc-success-bg); color: var(--bc-success); border-color: transparent; }
-    .bc-cs-status-pill[data-status="Closed"]    { background: var(--bc-danger-bg);  color: var(--bc-danger);  border-color: transparent; }
-    .bc-cs-status-pill[data-status="Wait List"] { background: var(--bc-warn-bg);    color: var(--bc-warn);    border-color: transparent; }
+    .bc-cs-status-pill[data-status="Open"]      { background: var(--bc-color-success-bg); color: var(--bc-color-success); border-color: transparent; }
+    .bc-cs-status-pill[data-status="Closed"]    { background: var(--bc-color-danger-bg);  color: var(--bc-color-danger);  border-color: transparent; }
+    .bc-cs-status-pill[data-status="Wait List"] { background: var(--bc-color-warn-bg);    color: var(--bc-color-warn);    border-color: transparent; }
 
     .bc-cs-class-num {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 11px;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-text-muted);
       font-variant-numeric: tabular-nums;
     }
 
@@ -457,72 +426,190 @@ export function classSearchStyles(): string {
     }
     .bc-cs-details-btn {
       background: transparent;
-      border: 1px solid var(--bc-border-strong);
-      border-radius: 8px;
+      border: 1px solid var(--bc-color-border-strong);
+      border-radius: var(--bc-radius-lg);
       padding: 5px 10px;
       font: inherit;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text-muted);
       cursor: pointer;
-      transition: color 80ms, border-color 80ms, background-color 80ms;
+      transition: color var(--bc-tx-fast), border-color var(--bc-tx-fast), background-color var(--bc-tx-fast);
     }
     .bc-cs-details-btn:hover {
-      color: var(--bc-purple);
-      border-color: var(--bc-purple);
+      color: var(--bc-color-accent);
+      border-color: var(--bc-color-accent);
     }
     .bc-cs-details-btn[data-expanded="true"] {
-      background: var(--bc-purple-soft);
-      color: var(--bc-purple-darker);
-      border-color: var(--bc-purple-border);
+      background: var(--bc-color-accent-surface-tile);
+      color: var(--bc-color-accent-pressed);
+      border-color: var(--bc-color-accent-border-18);
     }
 
     /* ── Add-to-cart: primary CAESAR CTA ────────────────────────────────── */
     .bc-cs-add {
-      background: var(--bc-purple);
-      color: #ffffff;
-      border: 1px solid var(--bc-purple);
-      border-radius: 8px;
+      background: var(--bc-color-accent);
+      color: var(--bc-color-accent-on);
+      border: 1px solid var(--bc-color-accent);
+      border-radius: var(--bc-radius-lg);
       padding: 6px 12px;
       font: inherit;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-wide);
       cursor: pointer;
-      transition: background-color 100ms, transform 80ms, box-shadow 100ms;
+      transition: background-color 100ms, transform var(--bc-tx-fast), box-shadow 100ms;
     }
     .bc-cs-add:hover {
-      background: var(--bc-purple-dark);
-      border-color: var(--bc-purple-dark);
-      box-shadow: 0 2px 6px rgba(102, 2, 60, 0.22);
+      background: var(--bc-color-accent-hover);
+      border-color: var(--bc-color-accent-hover);
+      box-shadow: var(--bc-shadow-add-cta);
     }
     .bc-cs-add:active { transform: translateY(1px); box-shadow: none; }
     .bc-cs-add[disabled] {
-      background: #c7c2d6;
-      border-color: #c7c2d6;
+      background: var(--bc-color-disabled-bg);
+      border-color: var(--bc-color-disabled-bg);
       cursor: progress;
       box-shadow: none;
     }
     .bc-cs-add[data-state="loading"] {
-      background: var(--bc-purple-dark);
-      border-color: var(--bc-purple-dark);
+      background: var(--bc-color-accent-hover);
+      border-color: var(--bc-color-accent-hover);
       cursor: progress;
     }
     .bc-cs-add[data-state="success"] {
-      background: var(--bc-success);
-      border-color: var(--bc-success);
+      background: var(--bc-color-success);
+      border-color: var(--bc-color-success);
     }
     .bc-cs-add[data-state="error"] {
-      background: var(--bc-danger);
-      border-color: var(--bc-danger);
+      background: var(--bc-color-danger);
+      border-color: var(--bc-color-danger);
+    }
+
+    /* ── Related-component picker (lab/discussion required) ──────────────── */
+    .bc-cs-related-row {
+      display: block;
+      padding: 0;
+      border-top: 1px solid var(--bc-color-border-divider);
+      background: var(--bc-color-accent-surface-tile);
+    }
+    .bc-cs-related {
+      padding: 12px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .bc-cs-related-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .bc-cs-related-title {
+      font-size: var(--bc-font-13);
+      font-weight: var(--bc-fw-bold);
+      color: var(--bc-color-accent-pressed);
+    }
+    .bc-cs-related-sub {
+      font-size: var(--bc-font-12);
+      color: var(--bc-color-text-muted);
+      flex: 1;
+    }
+    .bc-cs-related-cancel {
+      appearance: none;
+      background: transparent;
+      border: 1px solid var(--bc-color-border-strong);
+      color: var(--bc-color-text-muted);
+      font-size: var(--bc-font-12);
+      padding: 4px 10px;
+      border-radius: var(--bc-radius-md);
+      cursor: pointer;
+    }
+    .bc-cs-related-cancel:hover {
+      background: var(--bc-color-surface-soft);
+      color: var(--bc-color-text);
+    }
+    .bc-cs-related-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .bc-cs-related-option {
+      appearance: none;
+      width: 100%;
+      text-align: left;
+      background: var(--bc-color-bg);
+      border: 1px solid var(--bc-color-border-divider);
+      border-radius: var(--bc-radius-lg);
+      padding: 10px 12px;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: minmax(80px, auto) minmax(160px, 1fr) minmax(120px, auto);
+      gap: 12px;
+      align-items: center;
+      font-size: var(--bc-font-13);
+      color: var(--bc-color-text);
+      transition: border-color 0.12s, box-shadow 0.12s, transform 0.04s;
+    }
+    .bc-cs-related-option:hover:not(:disabled) {
+      border-color: var(--bc-color-accent);
+      box-shadow: var(--bc-shadow-input-focus-ring);
+    }
+    .bc-cs-related-option:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+    .bc-cs-related-option:disabled {
+      cursor: progress;
+    }
+    .bc-cs-related-option[data-status="Closed"] {
+      background: var(--bc-color-surface-soft);
+    }
+    .bc-cs-related-option-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .bc-cs-related-option-section {
+      font-weight: var(--bc-fw-bold);
+      color: var(--bc-color-accent);
+    }
+    .bc-cs-related-option-num {
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .bc-cs-related-option-mid {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .bc-cs-related-option-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .bc-cs-related-option-instr {
+      font-size: var(--bc-font-12);
+      color: var(--bc-color-text-muted);
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bc-cs-related-option-progress {
+      margin-left: 8px;
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-accent);
+      font-weight: var(--bc-fw-semibold);
     }
 
     /* ── Detail row (seats / notes sub-panel) ───────────────────────────── */
     .bc-cs-detail-row {
       display: block;
       padding: 0 16px 14px;
-      border-top: 1px solid var(--bc-border);
-      background: var(--bc-bg-inset);
+      border-top: 1px solid var(--bc-color-border-divider);
+      background: var(--bc-color-bg-inset);
     }
     .bc-cs-detail {
       padding: 14px 4px 4px;
@@ -531,12 +618,12 @@ export function classSearchStyles(): string {
       gap: 12px;
     }
     .bc-cs-detail-header {
-      font-size: 12px;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-12);
+      color: var(--bc-color-text-muted);
     }
     .bc-cs-detail-header strong {
-      color: var(--bc-text);
-      font-weight: 700;
+      color: var(--bc-color-text);
+      font-weight: var(--bc-fw-bold);
     }
     .bc-cs-detail-stats {
       display: flex;
@@ -549,45 +636,45 @@ export function classSearchStyles(): string {
       gap: 2px;
       min-width: 76px;
       padding: 8px 12px;
-      border-radius: 10px;
-      background: var(--bc-bg);
-      border: 1px solid var(--bc-border);
+      border-radius: var(--bc-radius-xl);
+      background: var(--bc-color-bg);
+      border: 1px solid var(--bc-color-border-divider);
     }
     .bc-cs-stat-value {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--bc-purple);
+      font-size: var(--bc-font-18);
+      font-weight: var(--bc-fw-bold);
+      color: var(--bc-color-accent);
       line-height: 1.1;
       font-variant-numeric: tabular-nums;
     }
     .bc-cs-stat-label {
-      font-size: 9px;
-      letter-spacing: 0.08em;
+      font-size: var(--bc-font-9);
+      letter-spacing: var(--bc-ls-caps-wide);
       text-transform: uppercase;
-      color: var(--bc-text-muted);
-      font-weight: 700;
+      color: var(--bc-color-text-muted);
+      font-weight: var(--bc-fw-bold);
     }
     .bc-cs-detail-block-label {
-      font-size: 10px;
-      letter-spacing: 0.08em;
+      font-size: var(--bc-font-10);
+      letter-spacing: var(--bc-ls-caps-wide);
       text-transform: uppercase;
-      color: var(--bc-text-muted);
-      font-weight: 700;
+      color: var(--bc-color-text-muted);
+      font-weight: var(--bc-fw-bold);
       margin-bottom: 4px;
     }
     .bc-cs-detail-block-body {
-      font-size: 13px;
-      color: var(--bc-text);
+      font-size: var(--bc-font-13);
+      color: var(--bc-color-text);
       line-height: 1.5;
       white-space: pre-line;
     }
     .bc-cs-detail-error {
-      font-size: 12px;
-      color: var(--bc-danger);
+      font-size: var(--bc-font-12);
+      color: var(--bc-color-danger);
     }
     .bc-cs-detail-note {
-      font-size: 11px;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-text-muted);
       font-style: italic;
     }
     .bc-cs-detail-footer {
@@ -595,30 +682,30 @@ export function classSearchStyles(): string {
       align-items: center;
       gap: 10px;
       padding-top: 8px;
-      border-top: 1px dashed var(--bc-border);
+      border-top: 1px dashed var(--bc-color-border-divider);
       margin-top: 4px;
     }
     .bc-cs-detail-stamp {
       flex: 1;
-      font-size: 11px;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-text-muted);
       font-variant-numeric: tabular-nums;
     }
     .bc-cs-detail-refresh {
       background: transparent;
-      border: 1px solid var(--bc-border-strong);
-      border-radius: 6px;
+      border: 1px solid var(--bc-color-border-strong);
+      border-radius: var(--bc-radius-md);
       padding: 4px 10px;
       font: inherit;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--bc-text-muted);
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text-muted);
       cursor: pointer;
-      transition: color 80ms, border-color 80ms;
+      transition: color var(--bc-tx-fast), border-color var(--bc-tx-fast);
     }
     .bc-cs-detail-refresh:hover:not(:disabled) {
-      color: var(--bc-purple);
-      border-color: var(--bc-purple);
+      color: var(--bc-color-accent);
+      border-color: var(--bc-color-accent);
     }
     .bc-cs-detail-refresh:disabled {
       opacity: 0.6;

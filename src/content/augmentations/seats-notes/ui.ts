@@ -116,20 +116,12 @@ export function injectStyles(): void {
   const style = document.createElement("style");
   style.id = STYLE_ID;
   style.textContent = `
-    :root {
-      --bc-tyrian: #66023c;
-      --bc-tyrian-soft: #f6ecf2;
-      --bc-tyrian-mid: #d8b6c8;
-      --bc-tyrian-ink: #3f0126;
-      --bc-good-bg: #e8f5e9;
-      --bc-good-ink: #1b5e20;
-    }
     .${SEATS_HEADER_CLASS},
     .${NOTES_HEADER_CLASS} {
       min-width: 220px;
-      color: #fff;
-      background: var(--bc-tyrian);
-      border-color: var(--bc-tyrian-ink);
+      color: var(--bc-color-accent-on);
+      background: var(--bc-color-accent);
+      border-color: var(--bc-color-accent-pressed);
     }
     .${SEATS_CELL_CLASS},
     .${NOTES_CELL_CLASS} {
@@ -137,7 +129,7 @@ export function injectStyles(): void {
       width: 220px;
       max-width: 320px;
       padding: 4px 6px;
-      border-left: 2px solid var(--bc-tyrian-mid);
+      border-left: 2px solid var(--bc-color-accent-mid-border);
       vertical-align: top;
       overflow: hidden;
       box-sizing: border-box;
@@ -149,54 +141,54 @@ export function injectStyles(): void {
     }
     .better-caesar-load-btn {
       padding: 6px 10px;
-      font: 600 11px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
+      font: var(--bc-fw-semibold) var(--bc-font-11)/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
       letter-spacing: 0.3px;
       cursor: pointer;
-      border: 1px solid var(--bc-tyrian);
-      background: #fff;
-      color: var(--bc-tyrian);
-      border-radius: 4px;
+      border: 1px solid var(--bc-color-accent);
+      background: var(--bc-color-bg);
+      color: var(--bc-color-accent);
+      border-radius: var(--bc-radius-sm);
     }
-    .better-caesar-load-btn:hover { background: var(--bc-tyrian); color: #fff; }
+    .better-caesar-load-btn:hover { background: var(--bc-color-accent); color: var(--bc-color-accent-on); }
     .better-caesar-load-btn:disabled { opacity: 0.6; cursor: default; }
-    .better-caesar-load-btn:disabled:hover { background: #fff; color: var(--bc-tyrian); }
+    .better-caesar-load-btn:disabled:hover { background: var(--bc-color-bg); color: var(--bc-color-accent); }
     .better-caesar-meta {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 6px;
       margin-bottom: 4px;
-      font-size: 10px;
-      color: var(--bc-tyrian);
+      font-size: var(--bc-font-10);
+      color: var(--bc-color-accent);
     }
     .better-caesar-meta-time {
-      font-weight: 600;
+      font-weight: var(--bc-fw-semibold);
       letter-spacing: 0.2px;
     }
     .better-caesar-refresh-btn {
       padding: 2px 6px;
-      font: 600 10px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
+      font: var(--bc-fw-semibold) var(--bc-font-10)/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
       cursor: pointer;
-      border: 1px solid var(--bc-tyrian);
-      background: #fff;
-      color: var(--bc-tyrian);
-      border-radius: 3px;
+      border: 1px solid var(--bc-color-accent);
+      background: var(--bc-color-bg);
+      color: var(--bc-color-accent);
+      border-radius: var(--bc-radius-xs);
     }
-    .better-caesar-refresh-btn:hover { background: var(--bc-tyrian); color: #fff; }
+    .better-caesar-refresh-btn:hover { background: var(--bc-color-accent); color: var(--bc-color-accent-on); }
     .better-caesar-refresh-btn:disabled { opacity: 0.6; cursor: default; }
-    .better-caesar-refresh-btn:disabled:hover { background: #fff; color: var(--bc-tyrian); }
+    .better-caesar-refresh-btn:disabled:hover { background: var(--bc-color-bg); color: var(--bc-color-accent); }
     .better-caesar-hint {
-      font-size: 10px;
+      font-size: var(--bc-font-10);
     }
     .better-caesar-card {
       display: grid;
       gap: 6px;
       padding: 8px;
-      border-radius: 8px;
-      border: 1px solid var(--bc-tyrian-mid);
-      background: var(--bc-tyrian-soft);
-      color: var(--bc-tyrian-ink);
-      font-size: 11px;
+      border-radius: var(--bc-radius-lg);
+      border: 1px solid var(--bc-color-accent-mid-border);
+      background: var(--bc-color-accent-surface-tile);
+      color: var(--bc-color-accent-pressed);
+      font-size: var(--bc-font-11);
       line-height: 1.35;
       width: 100%;
       min-width: 0;
@@ -207,9 +199,9 @@ export function injectStyles(): void {
       display: inline-block;
       justify-self: start;
       padding: 2px 8px;
-      border-radius: 999px;
+      border-radius: var(--bc-radius-pill);
       border: 1px solid transparent;
-      font-weight: 700;
+      font-weight: var(--bc-fw-bold);
       max-width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -221,8 +213,8 @@ export function injectStyles(): void {
       min-width: 0;
     }
     .better-caesar-line {
-      font-size: 11px;
-      color: var(--bc-tyrian-ink);
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-accent-pressed);
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -234,14 +226,14 @@ export function injectStyles(): void {
       min-width: 0;
     }
     .better-caesar-note-label {
-      font-size: 10px;
-      font-weight: 700;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-bold);
       text-transform: uppercase;
       letter-spacing: 0.25px;
-      color: var(--bc-tyrian);
+      color: var(--bc-color-accent);
     }
     .better-caesar-note-text {
-      color: var(--bc-tyrian-ink);
+      color: var(--bc-color-accent-pressed);
       overflow-wrap: anywhere;
       overflow: hidden;
       display: -webkit-box;
@@ -249,17 +241,17 @@ export function injectStyles(): void {
       -webkit-line-clamp: 4;
     }
     .better-caesar-warning {
-      color: #8a2e00;
-      border-top: 1px dashed #d99a66;
+      color: var(--bc-color-seat-warn-row-text);
+      border-top: 1px dashed var(--bc-color-seat-warn-row-border);
       padding-top: 4px;
-      font-weight: 600;
+      font-weight: var(--bc-fw-semibold);
     }
     .better-caesar-muted {
-      color: #5c4c56;
+      color: var(--bc-color-seat-muted-text);
     }
     .better-caesar-error {
-      color: #7a123f;
-      font-size: 11px;
+      color: var(--bc-color-seat-error-text);
+      font-size: var(--bc-font-11);
       padding: 4px 0;
     }
   `;
@@ -401,9 +393,9 @@ function getSeatsTone(response: SeatsNotesSuccess): {
   if (classCapacity !== null) {
     if ((availableSeats !== null && availableSeats <= 0) || (enrollmentTotal !== null && enrollmentTotal >= classCapacity)) {
       return {
-        background: "#fde8e8",
-        border: "#f4a9a9",
-        ink: "#8c1d18"
+        background: "var(--bc-color-seat-full-bg)",
+        border: "var(--bc-color-seat-full-border)",
+        ink: "var(--bc-color-seat-full-ink)"
       };
     }
 
@@ -420,16 +412,16 @@ function getSeatsTone(response: SeatsNotesSuccess): {
 
   if (waitListTotal !== null && waitListTotal > 0) {
     return {
-      background: "#fff0d9",
-      border: "#f1c27a",
-      ink: "#8a4b00"
+      background: "var(--bc-color-seat-waitlist-bg)",
+      border: "var(--bc-color-seat-waitlist-border)",
+      ink: "var(--bc-color-seat-waitlist-ink)"
     };
   }
 
   return {
-    background: "#eef2ff",
-    border: "#c7d2fe",
-    ink: "#3730a3"
+    background: "var(--bc-color-seat-info-bg)",
+    border: "var(--bc-color-seat-info-border)",
+    ink: "var(--bc-color-seat-info-ink)"
   };
 }
 
@@ -440,36 +432,36 @@ function occupancyToTone(occupancy: number): {
 } {
   if (occupancy >= 0.95) {
     return {
-      background: "#fde8e8",
-      border: "#f4a9a9",
-      ink: "#8c1d18"
+      background: "var(--bc-color-seat-full-bg)",
+      border: "var(--bc-color-seat-full-border)",
+      ink: "var(--bc-color-seat-full-ink)"
     };
   }
   if (occupancy >= 0.8) {
     return {
-      background: "#fff1df",
-      border: "#f7c58a",
-      ink: "#94410d"
+      background: "var(--bc-color-seat-warn-bg)",
+      border: "var(--bc-color-seat-warn-border)",
+      ink: "var(--bc-color-seat-warn-ink)"
     };
   }
   if (occupancy >= 0.6) {
     return {
-      background: "#fff8d9",
-      border: "#eed46b",
-      ink: "#7a5d00"
+      background: "var(--bc-color-seat-tight-bg)",
+      border: "var(--bc-color-seat-tight-border)",
+      ink: "var(--bc-color-seat-tight-ink)"
     };
   }
   if (occupancy >= 0.35) {
     return {
-      background: "#eef8d7",
-      border: "#bfdc7d",
-      ink: "#4d6b00"
+      background: "var(--bc-color-seat-room-bg)",
+      border: "var(--bc-color-seat-room-border)",
+      ink: "var(--bc-color-seat-room-ink)"
     };
   }
   return {
-    background: "#e8f5e9",
-    border: "#b9ddbc",
-    ink: "#1b5e20"
+    background: "var(--bc-color-seat-open-bg)",
+    border: "var(--bc-color-seat-open-border)",
+    ink: "var(--bc-color-seat-open-ink)"
   };
 }
 

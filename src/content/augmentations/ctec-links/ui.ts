@@ -12,25 +12,25 @@ export function injectStyles(): void {
 	      max-width: 240px;
 	      width: 180px;
 	      vertical-align: top;
-	      border-left: 2px solid #d8b6c8;
+	      border-left: 2px solid var(--bc-color-accent-mid-border);
 	      overflow: hidden;
 	      box-sizing: border-box;
 	    }
     .${CTEC_HEADER_CLASS} {
       min-width: 120px;
-      color: #fff;
-      background: #66023c;
+      color: var(--bc-color-accent-on);
+      background: var(--bc-color-accent);
     }
 	    .bc-ctec-widget {
-	      font-size: 11px;
+	      font-size: var(--bc-font-11);
 	      line-height: 1.6;
 	      font-family: Helvetica, Arial, sans-serif;
 	      min-width: 0;
 	      overflow: hidden;
 	    }
 	    .bc-ctec-count {
-	      font-weight: 700;
-	      color: #66023c;
+	      font-weight: var(--bc-fw-bold);
+	      color: var(--bc-color-accent);
 	      margin-bottom: 1px;
 	      overflow: hidden;
 	      text-overflow: ellipsis;
@@ -38,7 +38,7 @@ export function injectStyles(): void {
 	    }
 	    .bc-ctec-link {
 	      display: block;
-	      color: #66023c;
+	      color: var(--bc-color-accent);
 	      text-decoration: none;
 	      white-space: nowrap;
 	      overflow: hidden;
@@ -50,47 +50,47 @@ export function injectStyles(): void {
 	      overflow: hidden;
 	      text-overflow: ellipsis;
 	    }
-	    .bc-ctec-muted { color: #888; }
-	    .bc-ctec-warn { color: #a00; }
+	    .bc-ctec-muted { color: var(--bc-color-text-subtle); }
+	    .bc-ctec-warn { color: var(--bc-color-danger); }
     .bc-ctec-auth-link {
-      color: #66023c;
-      font-weight: 600;
+      color: var(--bc-color-accent);
+      font-weight: var(--bc-fw-semibold);
     }
     .bc-ctec-btn {
       margin-top: 2px;
       padding: 2px 6px;
-      font-size: 10px;
+      font-size: var(--bc-font-10);
       cursor: pointer;
-      border: 1px solid #66023c;
-      background: white;
-      color: #66023c;
-      border-radius: 2px;
+      border: 1px solid var(--bc-color-accent);
+      background: var(--bc-color-bg);
+      color: var(--bc-color-accent);
+      border-radius: var(--bc-radius-xs);
     }
-    .bc-ctec-btn:hover { background: #66023c; color: white; }
+    .bc-ctec-btn:hover { background: var(--bc-color-accent); color: var(--bc-color-accent-on); }
     .bc-ctec-expand {
       display: block;
       margin-top: 2px;
       padding: 0;
-      font-size: 10px;
+      font-size: var(--bc-font-10);
       cursor: pointer;
       border: none;
       background: none;
-      color: #888;
+      color: var(--bc-color-text-subtle);
       text-decoration: underline;
     }
-    .bc-ctec-expand:hover { color: #66023c; }
+    .bc-ctec-expand:hover { color: var(--bc-color-accent); }
     .bc-ctec-fetch {
       padding: 2px 7px;
-      font-size: 10px;
-      font-weight: 600;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-semibold);
       cursor: pointer;
-      border: 1px solid #66023c;
-      background: white;
-      color: #66023c;
-      border-radius: 2px;
+      border: 1px solid var(--bc-color-accent);
+      background: var(--bc-color-bg);
+      color: var(--bc-color-accent);
+      border-radius: var(--bc-radius-xs);
       letter-spacing: 0.3px;
     }
-    .bc-ctec-fetch:hover { background: #66023c; color: white; }
+    .bc-ctec-fetch:hover { background: var(--bc-color-accent); color: var(--bc-color-accent-on); }
   `;
   (document.head ?? document.documentElement).appendChild(style);
 }

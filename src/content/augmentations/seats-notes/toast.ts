@@ -94,9 +94,9 @@ function injectToastStyles(): void {
       pointer-events: auto;
       cursor: pointer;
       padding: 8px 12px;
-      border-radius: 6px;
-      font: 500 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      border-radius: var(--bc-radius-md);
+      font: 500 var(--bc-font-12)/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+      box-shadow: var(--bc-shadow-elev-2);
       max-width: 360px;
       animation: bc-toast-in 180ms ease-out;
       border: 1px solid transparent;
@@ -107,36 +107,36 @@ function injectToastStyles(): void {
     .bc-toast-text { flex: 1; }
     .bc-toast-action {
       flex-shrink: 0;
-      background: rgba(255, 255, 255, 0.7);
+      background: var(--bc-color-surface-translucent-72);
       color: inherit;
       border: 1px solid currentColor;
-      border-radius: 5px;
+      border-radius: var(--bc-radius-sm);
       padding: 3px 8px;
       font: inherit;
-      font-size: 11px;
-      font-weight: 600;
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-semibold);
       cursor: pointer;
     }
-    .bc-toast-action:hover { background: rgba(255, 255, 255, 1); }
+    .bc-toast-action:hover { background: var(--bc-color-surface-translucent-92); }
     .bc-toast-info {
-      background: #f6ecf2;
-      border-color: #d8b6c8;
-      color: #3f0126;
+      background: var(--bc-color-accent-surface-tile);
+      border-color: var(--bc-color-accent-mid-border);
+      color: var(--bc-color-accent-pressed);
     }
     .bc-toast-warn {
-      background: #fff4e5;
-      border-color: #f1c27a;
-      color: #6b3a00;
+      background: var(--bc-color-seat-waitlist-bg);
+      border-color: var(--bc-color-seat-waitlist-border);
+      color: var(--bc-color-seat-waitlist-ink);
     }
     .bc-toast-success {
-      background: #ecfdf3;
-      border-color: #abefc6;
-      color: #054f31;
+      background: var(--bc-color-success-bg-soft);
+      border-color: var(--bc-color-success-border);
+      color: var(--bc-color-success-text);
     }
     .bc-toast-error {
-      background: #fef3f2;
-      border-color: #fecdca;
-      color: #912018;
+      background: var(--bc-color-danger-bg-soft);
+      border-color: var(--bc-color-danger-border);
+      color: var(--bc-color-danger-text);
     }
     .bc-toast-leaving {
       animation: bc-toast-out 180ms ease-in forwards;

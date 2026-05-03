@@ -7,6 +7,19 @@ import { createIcon, preventAndStop } from "./ui-shared";
 import { buildTooltip, makeChip, metricChip } from "./widget-chips";
 
 const ANALYTICS_ANCHOR_CLASS = `${WIDGET_CLASS}-analytics-anchor`;
+const CART_ANCHOR_CLASS = `${WIDGET_CLASS}-cart-anchor`;
+
+// Per-card UI state for the inline "+ Cart" button. Lives in the
+// augmentation (passed in to attachCartAnchor) so the button can survive
+// the card's continual re-renders and reflect mid-flight progress without
+// flicker. `kind` drives label + style; the controller flips back to idle
+// after a short delay on success.
+export type CartAnchorState =
+  | { kind: "idle" }
+  | { kind: "adding"; message: string }
+  | { kind: "success"; classNumber: string }
+  | { kind: "already"; classNumber: string }
+  | { kind: "error"; message: string };
 
 // Card-state renderers (idle / loading / data) for the per-class summary
 // widget that paper.nu schedule cards inherit. Status-bar logic lives in
@@ -165,6 +178,89 @@ export { hideStatusBar, renderStatusBar } from "./status-bar-ui";
 // it's not clipped by `overflow: hidden` on the dense-card host. Idempotent:
 // always replaces the previous anchor, so the click handler closure stays
 // in sync with the latest render.
+// Adds (or refreshes) a "+ Cart" button next to the analytics anchor on
+// the schedule card. Always present — independent of CTEC fetch state —
+// because the user might want to add to cart without ever loading CTECs.
+// State-driven label/style: idle → adding → success/already/error.
+export function attachCartAnchor(
+  widget: HTMLElement,
+  state: CartAnchorState,
+  onClick: () => void
+): void {
+  const card = widget.closest<HTMLElement>(
+    PAPER_CTEC_CONFIG.selectors.scheduleCard
+  );
+  if (!card) return;
+
+  const existing = card.querySelector<HTMLElement>(
+    `:scope > .${CART_ANCHOR_CLASS}`
+  );
+  existing?.remove();
+
+  const button = makeCartButton(state, onClick);
+  button.classList.add(CART_ANCHOR_CLASS);
+  card.appendChild(button);
+}
+
+function makeCartButton(
+  state: CartAnchorState,
+  onClick: () => void
+): HTMLElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `${WIDGET_CLASS}-cart-btn`;
+
+  let label = "+ Cart";
+  let title = "Add this section to your CAESAR shopping cart.";
+  let disabled = false;
+  let stateAttr: string | null = null;
+
+  if (state.kind === "adding") {
+    label = state.message || "Adding…";
+    title = state.message;
+    disabled = true;
+    stateAttr = "loading";
+  } else if (state.kind === "success") {
+    label = `Added #${state.classNumber} ✓`;
+    title = `Added class #${state.classNumber} to your CAESAR shopping cart.`;
+    disabled = true;
+    stateAttr = "success";
+  } else if (state.kind === "already") {
+    label = `In cart #${state.classNumber}`;
+    title = `Class #${state.classNumber} is already in your CAESAR shopping cart.`;
+    disabled = true;
+    stateAttr = "success";
+  } else if (state.kind === "error") {
+    label = "Retry";
+    title = state.message;
+    stateAttr = "error";
+  }
+
+  if (stateAttr) button.dataset.cartState = stateAttr;
+  button.title = title;
+  button.disabled = disabled;
+  button.setAttribute("aria-label", title);
+
+  const labelEl = document.createElement("span");
+  labelEl.className = `${WIDGET_CLASS}-cart-btn-label`;
+  labelEl.textContent = label;
+  button.append(labelEl);
+
+  const trigger = (event: Event) => {
+    preventAndStop(event);
+    if (button.disabled) return;
+    onClick();
+  };
+  button.addEventListener("pointerdown", trigger);
+  button.addEventListener("click", preventAndStop);
+  button.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    trigger(event);
+  });
+
+  return button;
+}
+
 function attachAnalyticsAnchor(
   widget: HTMLElement,
   onOpenAnalytics?: () => void

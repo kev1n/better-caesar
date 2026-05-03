@@ -35,10 +35,23 @@ import {
   renderStatusBar,
   renderWidget
 } from "./ui";
+import { addChipSectionToCart } from "./cart-flow";
+import { attachCartAnchor, type CartAnchorState } from "./schedule-ui";
+
+const CART_URL =
+  "https://caesar.ent.northwestern.edu/psc/csnu/EMPLOYEE/SA/c/SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL?Page=SSR_SSENRL_CART&Action=A";
+const CART_SUCCESS_RESET_MS = 10_000;
 
 function isPaperHost(): boolean {
   const host = window.location.hostname;
   return host === "paper.nu" || host === "www.paper.nu";
+}
+
+// paper.nu sets `border-style: dashed` on user-created custom schedule
+// blocks (ScheduleClass.tsx). Real CAESAR sections render with `solid`,
+// so the inline-style check is enough to filter out customs.
+function isCustomScheduleCard(card: HTMLElement): boolean {
+  return card.style.borderStyle === "dashed";
 }
 
 // Top-level orchestration for the paper.nu augmentation. Owns the schedule-
@@ -69,6 +82,15 @@ export class PaperCtecAugmentation implements Augmentation {
 
   private visibleKeys = new Set<string>();
   private readonly selectedTabs = new Map<string, "paper" | "analytics">();
+
+  // Per-card "+ Cart" button state. Persists across the framework's
+  // per-mutation re-renders so the user sees mid-flight progress and the
+  // success/error result. Success/already entries auto-reset to idle after
+  // CART_SUCCESS_RESET_MS; errors stay sticky so the user sees what
+  // happened until they retry.
+  private readonly cartStates = new Map<string, CartAnchorState>();
+  private readonly cartInFlight = new Set<string>();
+  private readonly cartResetTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   // Per-key snapshot of the data needed to open the modal. syncTargets
   // populates this from currently-visible targets so renderForKey /
@@ -156,6 +178,19 @@ export class PaperCtecAugmentation implements Augmentation {
       };
       this.targetSources.set(target.key, source);
       const openAnalytics = () => this.modal.openModal(source);
+
+      // Independent of CTEC fetch state — always render the cart button so
+      // the user can add to cart without ever loading CTECs first. Skip
+      // user-created custom sections (paper.nu marks them with a dashed
+      // border): they have no instructor to disambiguate against and don't
+      // correspond to anything in CAESAR.
+      if (!isCustomScheduleCard(target.card)) {
+        attachCartAnchor(
+          target.widget,
+          this.cartStates.get(target.key) ?? { kind: "idle" },
+          () => this.kickChipCart(target)
+        );
+      }
 
       const resolved = this.resolved.get(target.key);
       if (resolved) {
@@ -382,6 +417,105 @@ export class PaperCtecAugmentation implements Augmentation {
         this.modal.openModal(context);
       }
     );
+  }
+
+  private kickChipCart(target: PaperCtecTarget): void {
+    const key = target.key;
+    if (this.cartInFlight.has(key)) return;
+    this.cartInFlight.add(key);
+    this.clearCartResetTimer(key);
+    this.setCartState(key, { kind: "adding", message: "Looking up section…" });
+
+    void (async () => {
+      const result = await addChipSectionToCart(
+        target.params,
+        target.titleHint,
+        (message) => this.setCartState(key, { kind: "adding", message })
+      );
+
+      if (result.ok) {
+        this.setCartState(key, {
+          kind: "success",
+          classNumber: result.classNumber
+        });
+        this.scheduleCartReset(key);
+        showToast(
+          `Added ${target.params.subject} ${target.params.catalogNumber} ${result.sectionLabel} (#${result.classNumber}) to your CAESAR shopping cart.`,
+          {
+            tone: "success",
+            durationMs: 6000,
+            action: { label: "View cart", run: () => window.open(CART_URL, "_blank") }
+          }
+        );
+      } else if (result.alreadyInCart && result.classNumber) {
+        this.setCartState(key, {
+          kind: "already",
+          classNumber: result.classNumber
+        });
+        this.scheduleCartReset(key);
+        showToast(
+          `${target.params.subject} ${target.params.catalogNumber} #${result.classNumber} is already in your CAESAR shopping cart.`,
+          {
+            tone: "info",
+            durationMs: 5000,
+            action: { label: "View cart", run: () => window.open(CART_URL, "_blank") }
+          }
+        );
+      } else {
+        this.setCartState(key, { kind: "error", message: result.error });
+        showToast(`Couldn't add to cart: ${result.error}`, {
+          tone: "error",
+          durationMs: 7000
+        });
+      }
+
+      this.cartInFlight.delete(key);
+    })();
+  }
+
+  private setCartState(key: string, state: CartAnchorState): void {
+    this.cartStates.set(key, state);
+    for (const widget of this.findWidgetsByKey(document, key)) {
+      const target = this.targetSources.get(key);
+      if (!target) continue;
+      // Re-attach with the latest state. We need a target ref to wire the
+      // click handler; use the cached AnalyticsModalSource as a stand-in
+      // since the click only needs the chip identity (subject + catalog +
+      // instructor + topic), not the live PaperCtecTarget DOM node.
+      attachCartAnchor(widget, state, () => this.kickChipCartFromSource(target));
+    }
+  }
+
+  private kickChipCartFromSource(source: AnalyticsModalSource): void {
+    // Reconstruct a minimal target — kickChipCart only reads target.key,
+    // target.params, and target.titleHint, so we can synthesize one.
+    this.kickChipCart({
+      key: source.key,
+      params: source.params,
+      titleHint: source.titleHint,
+      card: document.body, // unused by kickChipCart
+      widget: document.body // unused by kickChipCart
+    } as PaperCtecTarget);
+  }
+
+  private scheduleCartReset(key: string): void {
+    this.clearCartResetTimer(key);
+    const timer = setTimeout(() => {
+      this.cartResetTimers.delete(key);
+      this.cartStates.delete(key);
+      for (const widget of this.findWidgetsByKey(document, key)) {
+        const source = this.targetSources.get(key);
+        if (!source) continue;
+        attachCartAnchor(widget, { kind: "idle" }, () => this.kickChipCartFromSource(source));
+      }
+    }, CART_SUCCESS_RESET_MS);
+    this.cartResetTimers.set(key, timer);
+  }
+
+  private clearCartResetTimer(key: string): void {
+    const existing = this.cartResetTimers.get(key);
+    if (existing) clearTimeout(existing);
+    this.cartResetTimers.delete(key);
   }
 
   private setProgress(key: string, message: string): void {

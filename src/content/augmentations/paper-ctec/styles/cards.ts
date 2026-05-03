@@ -12,27 +12,20 @@ export function cardStyles(): string {
     .${NO_HOVER_LIFT_CLASS} div.absolute.z-10.rounded-lg:hover {
       transform: none !important;
       box-shadow: none !important;
-      outline: 2px solid rgba(17, 24, 39, 0.7);
+      outline: 2px solid var(--bc-color-card-outline);
       outline-offset: -1px;
     }
     .${NO_HOVER_LIFT_CLASS} div.absolute.z-10.rounded-lg.-translate-y-2 {
       transform: none !important;
       box-shadow: none !important;
     }
-    .dark .${NO_HOVER_LIFT_CLASS} div.absolute.z-10.rounded-lg:hover {
-      outline-color: rgba(248, 250, 252, 0.7);
-    }
     .${WIDGET_CLASS} {
       margin-top: 3px;
       padding-top: 3px;
-      border-top: 1px solid rgba(17, 24, 39, 0.12);
+      border-top: 1px solid var(--bc-color-card-divider-soft);
       min-height: 14px;
-      color: #4b5563;
+      color: var(--bc-color-text-soft);
       pointer-events: auto;
-    }
-    .dark .${WIDGET_CLASS} {
-      border-top-color: rgba(255, 255, 255, 0.14);
-      color: #d1d5db;
     }
     .bc-paper-ctec-dense-card {
       display: flex;
@@ -54,45 +47,38 @@ export function cardStyles(): string {
     .bc-paper-ctec-course-line {
       flex: 0 1 auto;
       min-width: 0;
-      font-size: 11px !important;
+      font-size: var(--bc-font-11) !important;
       line-height: 1.15 !important;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .bc-paper-ctec-title-line {
-      font-size: 11px !important;
+      font-size: var(--bc-font-11) !important;
       line-height: 1.2 !important;
-      font-weight: 600;
-      color: #111827;
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text-strong);
       display: -webkit-box;
       overflow: hidden;
       text-overflow: ellipsis;
       -webkit-line-clamp: 1;
       -webkit-box-orient: vertical;
     }
-    .dark .bc-paper-ctec-title-line {
-      color: #f9fafb;
-    }
     .bc-paper-ctec-instructor-line {
       flex: 0 0 auto;
       max-width: 44%;
       margin-left: auto !important;
       padding: 1px 6px;
-      border-radius: 999px;
-      background: rgba(17, 24, 39, 0.06);
-      font-size: 10px !important;
-      font-weight: 600 !important;
+      border-radius: var(--bc-radius-pill);
+      background: var(--bc-color-ink-instructor-pill-bg);
+      font-size: var(--bc-font-10) !important;
+      font-weight: var(--bc-fw-semibold) !important;
       line-height: 1.15 !important;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       opacity: 1 !important;
-      color: #4b5563 !important;
-    }
-    .dark .bc-paper-ctec-instructor-line {
-      background: rgba(255, 255, 255, 0.08);
-      color: #e5e7eb !important;
+      color: var(--bc-color-text-soft) !important;
     }
     .${WIDGET_CLASS}-summary {
       display: flex;
@@ -100,21 +86,17 @@ export function cardStyles(): string {
       gap: 4px;
       flex-wrap: wrap;
       min-width: 0;
-      font-size: 10px;
+      font-size: var(--bc-font-10);
       line-height: 1.1;
     }
     .${WIDGET_CLASS}-spinner {
       width: 10px;
       height: 10px;
       flex: 0 0 auto;
-      border-radius: 50%;
-      border: 1.5px solid rgba(102, 2, 60, 0.24);
-      border-top-color: #66023c;
+      border-radius: var(--bc-radius-circle);
+      border: 1.5px solid var(--bc-color-accent-fill-24);
+      border-top-color: var(--bc-color-accent-soft);
       animation: bc-paper-ctec-widget-spin 900ms linear infinite;
-    }
-    .dark .${WIDGET_CLASS}-spinner {
-      border-color: rgba(244, 114, 182, 0.28);
-      border-top-color: #f472b6;
     }
     @keyframes bc-paper-ctec-widget-spin {
       to { transform: rotate(360deg); }
@@ -126,23 +108,23 @@ export function cardStyles(): string {
       min-width: 0;
       max-width: 100%;
       padding: 1px 4px;
-      border-radius: 999px;
+      border-radius: var(--bc-radius-pill);
       border: 1px solid var(--bc-paper-ctec-chip-border, transparent);
-      background: var(--bc-paper-ctec-chip-bg, rgba(255, 255, 255, 0.56));
-      color: var(--bc-paper-ctec-chip-fg, #374151);
+      background: var(--bc-paper-ctec-chip-bg, var(--bc-color-surface-translucent-56));
+      color: var(--bc-paper-ctec-chip-fg, var(--bc-color-text));
       white-space: nowrap;
-      font-weight: 600;
+      font-weight: var(--bc-fw-semibold);
     }
     .${WIDGET_CLASS}-chip-label {
       opacity: 0.72;
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
+      font-size: var(--bc-font-9);
+      font-weight: var(--bc-fw-extrabold);
+      letter-spacing: var(--bc-ls-widest);
       text-transform: uppercase;
     }
     .${WIDGET_CLASS}-chip-value {
-      font-size: 10px;
-      font-weight: 800;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-extrabold);
     }
     .${WIDGET_CLASS}-chip-stars {
       display: inline-flex;
@@ -156,11 +138,6 @@ export function cardStyles(): string {
       width: ${PAPER_CTEC_CONFIG.ui.summaryChipStarSizePx}px;
       height: ${PAPER_CTEC_CONFIG.ui.summaryChipStarSizePx}px;
     }
-    .dark .${WIDGET_CLASS}-chip {
-      border-color: var(--bc-paper-ctec-chip-border-dark, transparent);
-      background: var(--bc-paper-ctec-chip-bg-dark, rgba(17, 24, 39, 0.54));
-      color: var(--bc-paper-ctec-chip-fg-dark, #e5e7eb);
-    }
     .${WIDGET_CLASS}-chip svg {
       width: ${PAPER_CTEC_CONFIG.ui.summaryChipIconSizePx}px;
       height: ${PAPER_CTEC_CONFIG.ui.summaryChipIconSizePx}px;
@@ -168,23 +145,16 @@ export function cardStyles(): string {
       stroke-width: ${PAPER_CTEC_CONFIG.ui.summaryChipStrokeWidth};
     }
     .${WIDGET_CLASS}-chip.is-muted {
-      font-weight: 500;
-      color: #6b7280;
-    }
-    .dark .${WIDGET_CLASS}-chip.is-muted {
-      color: #cbd5e1;
+      font-weight: var(--bc-fw-medium);
+      color: var(--bc-color-text-muted);
     }
     .${WIDGET_CLASS}-chip.is-warn {
-      background: rgba(190, 24, 93, 0.12);
-      color: #9f1239;
-    }
-    .dark .${WIDGET_CLASS}-chip.is-warn {
-      background: rgba(251, 113, 133, 0.14);
-      color: #fecdd3;
+      background: var(--bc-color-warn-rose-fill-12);
+      color: var(--bc-color-warn-rose-text);
     }
     button.${WIDGET_CLASS}-chip-button {
       appearance: none;
-      border: 1px solid rgba(190, 24, 93, 0.32);
+      border: 1px solid var(--bc-color-warn-rose-border-32);
       cursor: pointer;
       font: inherit;
       padding: 1px 6px;
@@ -202,29 +172,102 @@ export function cardStyles(): string {
       gap: 4px;
       height: 18px;
       padding: 0 9px;
-      border: 1px solid rgba(102, 2, 60, 0.45);
-      border-radius: 999px;
-      background: #66023c;
-      color: #fdf2f8;
+      border: 1px solid var(--bc-color-accent-border-45);
+      border-radius: var(--bc-radius-pill);
+      background: var(--bc-color-accent-soft);
+      color: var(--bc-color-accent-soft-on);
       cursor: pointer;
       font: inherit;
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
+      font-size: var(--bc-font-9);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-widest);
       text-transform: uppercase;
       line-height: 1;
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+      box-shadow: var(--bc-shadow-button);
     }
     button.${WIDGET_CLASS}-analytics-anchor {
       position: absolute;
       bottom: 0;
       right: 12px;
       transform: translateY(80%);
-      transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+      transition: transform var(--bc-tx-base) var(--bc-easing), box-shadow var(--bc-tx-base) var(--bc-easing), background var(--bc-tx-base) var(--bc-easing);
       z-index: 12;
     }
     button.${WIDGET_CLASS}-analytics-anchor:hover {
       transform: translateY(70%);
+    }
+    /* Cart anchor sits to the LEFT of the analytics anchor on the same
+       hanging row. Independent button so it can show progress / success
+       state without disturbing the analytics pill. */
+    button.${WIDGET_CLASS}-cart-btn {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 18px;
+      padding: 0 9px;
+      border: 1px solid var(--bc-color-cart-border);
+      border-radius: var(--bc-radius-pill);
+      background: var(--bc-color-cart-bg);
+      color: var(--bc-color-cart-text);
+      cursor: pointer;
+      font: inherit;
+      font-size: var(--bc-font-9);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-widest);
+      text-transform: uppercase;
+      line-height: 1;
+      box-shadow: var(--bc-shadow-button);
+    }
+    button.${WIDGET_CLASS}-cart-anchor {
+      position: absolute;
+      bottom: 0;
+      /* Sits to the left of the analytics anchor (which starts at right:12px
+         and is roughly 78px wide once the "Analytics" label is laid out).
+         Leave a small gap so the two pills don't touch. */
+      right: 100px;
+      transform: translateY(80%);
+      transition: transform var(--bc-tx-base) var(--bc-easing), box-shadow var(--bc-tx-base) var(--bc-easing), background var(--bc-tx-base) var(--bc-easing);
+      z-index: 12;
+    }
+    button.${WIDGET_CLASS}-cart-anchor:hover {
+      transform: translateY(70%);
+    }
+    button.${WIDGET_CLASS}-cart-btn:hover:not(:disabled) {
+      background: var(--bc-color-cart-bg-hover);
+      border-color: var(--bc-color-cart-border-hover);
+      box-shadow: var(--bc-shadow-button-hover);
+    }
+    button.${WIDGET_CLASS}-cart-btn[data-cart-state="success"] {
+      background: var(--bc-color-cart-success-bg);
+      border-color: var(--bc-color-cart-success-border);
+      color: var(--bc-color-cart-success-text);
+    }
+    button.${WIDGET_CLASS}-cart-btn[data-cart-state="error"] {
+      background: var(--bc-color-cart-error-bg);
+      border-color: var(--bc-color-cart-error-border);
+      color: var(--bc-color-cart-error-text);
+    }
+    button.${WIDGET_CLASS}-cart-btn[data-cart-state="loading"] {
+      background: var(--bc-color-cart-loading-bg);
+      border-color: var(--bc-color-cart-loading-border);
+      color: var(--bc-color-cart-loading-text);
+      cursor: progress;
+      animation: bc-paper-ctec-cart-pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes bc-paper-ctec-cart-pulse {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1; }
+    }
+    .${WIDGET_CLASS}-cart-btn-label {
+      white-space: nowrap;
+    }
+    ${PAPER_CTEC_CONFIG.selectors.scheduleCard}:has(> .${WIDGET_CLASS}-cart-anchor:hover) {
+      transform: none !important;
+      box-shadow: none !important;
+    }
+    .${NO_HOVER_LIFT_CLASS} ${PAPER_CTEC_CONFIG.selectors.scheduleCard}:has(> .${WIDGET_CLASS}-cart-anchor:hover) {
+      outline-color: transparent !important;
     }
     /* Suppress paper.nu's card-hover effect while the cursor is on the
        analytics anchor — the anchor visually overlaps the card so users
@@ -246,18 +289,12 @@ export function cardStyles(): string {
       white-space: nowrap;
     }
     button.${WIDGET_CLASS}-analytics-btn:hover {
-      background: #4d0230;
-      border-color: rgba(102, 2, 60, 0.7);
-      box-shadow: 0 3px 8px rgba(15, 23, 42, 0.22);
+      background: var(--bc-color-accent-soft-hover);
+      border-color: var(--bc-color-accent-border-45);
+      box-shadow: var(--bc-shadow-button-hover);
     }
     button.${WIDGET_CLASS}-chip-button:hover {
-      background: rgba(190, 24, 93, 0.2);
-    }
-    .dark button.${WIDGET_CLASS}-chip-button {
-      border-color: rgba(251, 113, 133, 0.4);
-    }
-    .dark button.${WIDGET_CLASS}-chip-button:hover {
-      background: rgba(251, 113, 133, 0.22);
+      background: var(--bc-color-warn-rose-fill-20);
     }
   `;
 }

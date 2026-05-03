@@ -10,9 +10,9 @@ export function modalCommentStyles(): string {
       grid-template-columns: 260px 1fr;
     }
     .bc-paper-ctec-modal-rail {
-      border-right: 1px solid #e6e6ea;
+      border-right: 1px solid var(--bc-color-border);
       padding: 20px 18px 28px;
-      background: white;
+      background: var(--bc-color-bg);
       overflow-y: auto;
       min-height: 0;
     }
@@ -21,10 +21,10 @@ export function modalCommentStyles(): string {
       min-height: 0;
     }
     .bc-paper-ctec-modal-rail-header {
-      font-size: 10px;
-      font-weight: 700;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-bold);
       letter-spacing: 0.12em;
-      color: #6b7280;
+      color: var(--bc-color-text-muted);
       text-transform: uppercase;
       margin: 14px 0 6px;
     }
@@ -38,44 +38,44 @@ export function modalCommentStyles(): string {
       align-items: center;
       width: 100%;
       padding: 7px 10px;
-      border-radius: 6px;
+      border-radius: var(--bc-radius-md);
       border: 0;
       background: transparent;
       cursor: pointer;
       text-align: left;
       font-family: inherit;
-      color: #1f2937;
+      color: var(--bc-color-text);
     }
     .bc-paper-ctec-modal-rail-btn.is-active {
-      background: #f6ecf2;
-      color: #66023c;
+      background: var(--bc-color-accent-surface-soft);
+      color: var(--bc-color-accent);
     }
     .bc-paper-ctec-modal-rail-btn:hover:not(.is-active) {
-      background: #f7f7f8;
+      background: var(--bc-color-surface-hover);
     }
     .bc-paper-ctec-modal-rail-dot {
       width: 8px;
       height: 8px;
-      border-radius: 50%;
+      border-radius: var(--bc-radius-circle);
       grid-column: auto;
     }
     .bc-paper-ctec-modal-rail-label {
-      font-size: 12px;
-      font-weight: 500;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-medium);
     }
     .bc-paper-ctec-modal-rail-btn.is-active .bc-paper-ctec-modal-rail-label {
-      font-weight: 600;
+      font-weight: var(--bc-fw-semibold);
     }
     .bc-paper-ctec-modal-rail-count {
-      font-size: 10px;
+      font-size: var(--bc-font-10);
       font-family: ui-monospace, monospace;
-      color: #9ca3af;
+      color: var(--bc-color-text-subtle);
     }
     .bc-paper-ctec-modal-rail-empty {
       padding: 6px 10px 4px;
-      font-size: 11px;
+      font-size: var(--bc-font-11);
       line-height: 1.4;
-      color: #9ca3af;
+      color: var(--bc-color-text-subtle);
     }
     .bc-paper-ctec-modal-rail-btn.has-sentiment {
       grid-template-rows: auto auto;
@@ -87,9 +87,9 @@ export function modalCommentStyles(): string {
       display: flex;
       width: 100%;
       height: 4px;
-      border-radius: 999px;
+      border-radius: var(--bc-radius-pill);
       overflow: hidden;
-      background: #f1ebef;
+      background: var(--bc-color-chart-trend-axis);
     }
     .bc-paper-ctec-modal-rail-tone-seg {
       height: 100%;
@@ -98,8 +98,8 @@ export function modalCommentStyles(): string {
       flex-basis: 0;
     }
     .bc-paper-ctec-modal-comment-theme.is-active {
-      background: #fef08a;
-      color: #713f12;
+      background: var(--bc-color-highlight);
+      color: var(--bc-color-highlight-text);
     }
     .bc-paper-ctec-modal-comments-main {
       padding: 20px 28px 32px;
@@ -115,39 +115,43 @@ export function modalCommentStyles(): string {
       display: flex;
       align-items: center;
       gap: 10px;
-      border: 1px solid #e6e6ea;
-      border-radius: 10px;
+      border: 1px solid var(--bc-color-border);
+      border-radius: var(--bc-radius-xl);
       padding: 8px 12px;
-      background: white;
+      background: var(--bc-color-surface-hover);
       flex: 1;
       min-width: 240px;
     }
     .bc-paper-ctec-modal-comments-search-icon {
-      color: #9ca3af;
+      color: var(--bc-color-text-subtle);
     }
     .bc-paper-ctec-modal-comments-input {
       border: 0;
       outline: 0;
-      font-size: 14px;
+      font-size: var(--bc-font-14);
       flex: 1;
       background: transparent;
-      color: #1f2937;
+      color: var(--bc-color-text);
       font-family: inherit;
+    }
+    .bc-paper-ctec-modal-comments-input::placeholder {
+      color: var(--bc-color-text-subtle);
     }
     .bc-paper-ctec-modal-comments-sort {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 12px;
-      color: #6b7280;
+      font-size: var(--bc-font-12);
+      color: var(--bc-color-text-muted);
     }
     .bc-paper-ctec-modal-comments-sort-select {
       font-family: inherit;
-      font-size: 12px;
+      font-size: var(--bc-font-12);
       padding: 5px 8px;
-      border: 1px solid #e6e6ea;
-      border-radius: 6px;
-      background: white;
+      border: 1px solid var(--bc-color-border);
+      border-radius: var(--bc-radius-md);
+      background: var(--bc-color-surface-hover);
+      color: var(--bc-color-text);
     }
     .bc-paper-ctec-modal-filter-chips {
       display: flex;
@@ -155,49 +159,49 @@ export function modalCommentStyles(): string {
       align-items: center;
       margin-bottom: 14px;
       flex-wrap: wrap;
-      font-size: 12px;
+      font-size: var(--bc-font-12);
     }
     .bc-paper-ctec-modal-filter-chips:empty {
       display: none;
     }
     .bc-paper-ctec-modal-filter-label {
-      color: #6b7280;
+      color: var(--bc-color-text-muted);
     }
     .bc-paper-ctec-modal-filter-chip {
       display: inline-flex;
       align-items: center;
       gap: 4px;
       padding: 3px 4px 3px 10px;
-      background: #f6ecf2;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 600;
-      color: #66023c;
+      background: var(--bc-color-accent-surface-soft);
+      border-radius: var(--bc-radius-2xl);
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-accent);
     }
     .bc-paper-ctec-modal-filter-chip-x {
       border: 0;
       background: transparent;
-      color: #66023c;
+      color: var(--bc-color-accent);
       cursor: pointer;
       padding: 0 6px;
-      font-size: 12px;
+      font-size: var(--bc-font-12);
       line-height: 1;
     }
     .bc-paper-ctec-modal-filter-clear {
       border: 0;
       background: transparent;
-      color: #6b7280;
+      color: var(--bc-color-text-muted);
       cursor: pointer;
       text-decoration: underline;
-      font-size: 12px;
+      font-size: var(--bc-font-12);
     }
     .bc-paper-ctec-modal-comments-count {
-      font-size: 12px;
-      color: #6b7280;
+      font-size: var(--bc-font-12);
+      color: var(--bc-color-text-muted);
       margin-bottom: 12px;
     }
     .bc-paper-ctec-modal-comments-count strong {
-      color: #1f2937;
+      color: var(--bc-color-text);
     }
     .bc-paper-ctec-modal-comments-list {
       display: flex;
@@ -207,17 +211,17 @@ export function modalCommentStyles(): string {
     .bc-paper-ctec-modal-comments-empty {
       padding: 60px 20px;
       text-align: center;
-      color: #6b7280;
-      font-size: 14px;
-      background: white;
-      border-radius: 10px;
-      border: 1px dashed #e6e6ea;
+      color: var(--bc-color-text-muted);
+      font-size: var(--bc-font-14);
+      background: var(--bc-color-bg);
+      border-radius: var(--bc-radius-xl);
+      border: 1px dashed var(--bc-color-border);
     }
     .bc-paper-ctec-modal-comment-card {
-      background: white;
-      border: 1px solid #e6e6ea;
+      background: var(--bc-color-surface-hover);
+      border: 1px solid var(--bc-color-border-strong);
       border-left-width: 3px;
-      border-radius: 10px;
+      border-radius: var(--bc-radius-xl);
       padding: 14px 18px 16px;
     }
     .bc-paper-ctec-modal-comment-meta {
@@ -238,40 +242,40 @@ export function modalCommentStyles(): string {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-caps-wide);
       text-transform: uppercase;
       padding: 3px 8px;
-      border-radius: 4px;
+      border-radius: var(--bc-radius-sm);
     }
     .bc-paper-ctec-modal-comment-tag-dot {
       width: 6px;
       height: 6px;
-      border-radius: 50%;
+      border-radius: var(--bc-radius-circle);
     }
     .bc-paper-ctec-modal-comment-term {
-      font-size: 12px;
-      color: #6b7280;
+      font-size: var(--bc-font-12);
+      color: var(--bc-color-text-muted);
     }
     .bc-paper-ctec-modal-comment-term strong {
-      color: #1f2937;
+      color: var(--bc-color-text);
     }
     .bc-paper-ctec-modal-comment-length {
-      font-size: 10px;
-      color: #9ca3af;
+      font-size: var(--bc-font-10);
+      color: var(--bc-color-text-subtle);
       font-family: ui-monospace, monospace;
     }
     .bc-paper-ctec-modal-comment-prompt {
-      font-size: 11px;
-      color: #6b7280;
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-text-muted);
       font-style: italic;
       margin-bottom: 8px;
     }
     .bc-paper-ctec-modal-comment-text {
-      font-size: 14px;
+      font-size: var(--bc-font-14);
       line-height: 1.6;
-      color: #1f2937;
+      color: var(--bc-color-text);
       white-space: pre-wrap;
       position: relative;
     }
@@ -284,10 +288,10 @@ export function modalCommentStyles(): string {
     .bc-paper-ctec-modal-comment-toggle {
       border: 0;
       background: transparent;
-      color: #66023c;
+      color: var(--bc-color-accent);
       cursor: pointer;
-      font-size: 12px;
-      font-weight: 600;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-semibold);
       padding: 6px 0 0;
       font-family: inherit;
     }
@@ -298,23 +302,23 @@ export function modalCommentStyles(): string {
       flex-wrap: wrap;
     }
     .bc-paper-ctec-modal-comment-theme {
-      font-size: 10px;
+      font-size: var(--bc-font-10);
       padding: 3px 8px;
-      background: #f7f7f8;
-      color: #6b7280;
-      border-radius: 10px;
-      font-weight: 500;
+      background: var(--bc-color-surface-hover-strong);
+      color: var(--bc-color-text-soft);
+      border-radius: var(--bc-radius-xl);
+      font-weight: var(--bc-fw-medium);
     }
     .bc-paper-ctec-modal-highlight {
-      background: rgba(254, 240, 138, 0.7);
+      background: var(--bc-color-highlight-mark);
       padding: 1px 2px;
-      border-radius: 2px;
+      border-radius: var(--bc-radius-xs);
     }
-    .dark .bc-paper-ctec-modal-rail,
-    .dark .bc-paper-ctec-modal-comments-main,
-    .dark .bc-paper-ctec-modal-overview,
-    .dark .bc-paper-ctec-modal-terms {
-      scrollbar-color: #525252 #262626;
+    .bc-paper-ctec-modal-rail,
+    .bc-paper-ctec-modal-comments-main,
+    .bc-paper-ctec-modal-overview,
+    .bc-paper-ctec-modal-terms {
+      scrollbar-color: var(--bc-color-border-strong) var(--bc-color-bg);
     }
     .dark .bc-paper-ctec-modal-rail::-webkit-scrollbar,
     .dark .bc-paper-ctec-modal-comments-main::-webkit-scrollbar,
@@ -327,126 +331,21 @@ export function modalCommentStyles(): string {
     .dark .bc-paper-ctec-modal-comments-main::-webkit-scrollbar-track,
     .dark .bc-paper-ctec-modal-overview::-webkit-scrollbar-track,
     .dark .bc-paper-ctec-modal-terms::-webkit-scrollbar-track {
-      background: #262626;
+      background: var(--bc-color-bg);
     }
     .dark .bc-paper-ctec-modal-rail::-webkit-scrollbar-thumb,
     .dark .bc-paper-ctec-modal-comments-main::-webkit-scrollbar-thumb,
     .dark .bc-paper-ctec-modal-overview::-webkit-scrollbar-thumb,
     .dark .bc-paper-ctec-modal-terms::-webkit-scrollbar-thumb {
-      background: #525252;
-      border-radius: 8px;
-      border: 2px solid #262626;
+      background: var(--bc-color-border-strong);
+      border-radius: var(--bc-radius-lg);
+      border: 2px solid var(--bc-color-bg);
     }
     .dark .bc-paper-ctec-modal-rail::-webkit-scrollbar-thumb:hover,
     .dark .bc-paper-ctec-modal-comments-main::-webkit-scrollbar-thumb:hover,
     .dark .bc-paper-ctec-modal-overview::-webkit-scrollbar-thumb:hover,
     .dark .bc-paper-ctec-modal-terms::-webkit-scrollbar-thumb:hover {
-      background: #737373;
-    }
-    .dark .bc-paper-ctec-modal-rail {
-      border-right-color: #404040;
-      background: #262626;
-    }
-    .dark .bc-paper-ctec-modal-rail-header {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-rail-btn {
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-rail-btn.is-active {
-      background: rgba(216, 180, 254, 0.16);
-      color: #d8b4fe;
-    }
-    .dark .bc-paper-ctec-modal-rail-btn:hover:not(.is-active) {
-      background: #404040;
-    }
-    .dark .bc-paper-ctec-modal-rail-count {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-rail-empty {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-rail-tone {
-      background: #404040;
-    }
-    .dark .bc-paper-ctec-modal-comment-theme.is-active {
-      background: rgba(254, 240, 138, 0.85);
-      color: #1f1147;
-    }
-    .dark .bc-paper-ctec-modal-comments-search {
-      border-color: #404040;
-      background: #404040;
-    }
-    .dark .bc-paper-ctec-modal-comments-search-icon {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-comments-input {
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-comments-input::placeholder {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-comments-sort {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-comments-sort-select {
-      border-color: #404040;
-      background: #404040;
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-filter-label {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-filter-chip {
-      background: rgba(216, 180, 254, 0.18);
-      color: #d8b4fe;
-    }
-    .dark .bc-paper-ctec-modal-filter-chip-x {
-      color: #d8b4fe;
-    }
-    .dark .bc-paper-ctec-modal-filter-clear {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-comments-count {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-comments-count strong {
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-comments-empty {
-      background: #262626;
-      border-color: #404040;
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-comment-card {
-      background: #404040;
-      border-color: #525252;
-    }
-    .dark .bc-paper-ctec-modal-comment-term {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-comment-term strong {
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-comment-length {
-      color: #737373;
-    }
-    .dark .bc-paper-ctec-modal-comment-prompt {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-comment-text {
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-comment-toggle {
-      color: #d8b4fe;
-    }
-    .dark .bc-paper-ctec-modal-comment-theme {
-      background: #525252;
-      color: #d4d4d4;
-    }
-    .dark .bc-paper-ctec-modal-highlight {
-      background: rgba(254, 240, 138, 0.35);
-      color: #fef9c3;
+      background: var(--bc-color-text-subtle);
     }
   `;
 }

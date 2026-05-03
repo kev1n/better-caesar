@@ -17,42 +17,33 @@ export function statusBarStyles(): string {
       max-width: none;
       min-height: ${PAPER_CTEC_CONFIG.ui.statusBarMinHeightPx}px;
       padding: 4px 10px;
-      border: 1px solid rgba(102, 2, 60, 0.18);
-      border-radius: 8px;
-      background: rgba(102, 2, 60, 0.08);
-      color: #66023c;
-      font-size: 11px;
-      font-weight: 600;
+      border: 1px solid var(--bc-color-accent-border-18);
+      border-radius: var(--bc-radius-lg);
+      background: var(--bc-color-accent-fill-08);
+      color: var(--bc-color-accent-soft);
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-semibold);
       line-height: 1;
       flex: 1 1 auto;
       box-sizing: border-box;
       overflow: hidden;
     }
     #${STATUS_BAR_ID}.is-loading {
-      background: rgba(102, 2, 60, 0.08);
+      background: var(--bc-color-accent-fill-08);
     }
     #${STATUS_BAR_ID}.is-auth {
-      border-color: rgba(102, 2, 60, 0.28);
-      background: rgba(102, 2, 60, 0.12);
+      border-color: var(--bc-color-accent-border-28);
+      background: var(--bc-color-accent-fill-12);
     }
     #${STATUS_BAR_ID}.is-ready {
-      border-color: rgba(102, 2, 60, 0.14);
-      background: rgba(102, 2, 60, 0.05);
+      border-color: var(--bc-color-accent-border-14);
+      background: var(--bc-color-accent-fill-05);
     }
     #${STATUS_BAR_ID} svg {
       width: ${PAPER_CTEC_CONFIG.ui.statusIconSizePx}px;
       height: ${PAPER_CTEC_CONFIG.ui.statusIconSizePx}px;
       flex: 0 0 auto;
       stroke-width: ${PAPER_CTEC_CONFIG.ui.statusIconStrokeWidth};
-    }
-    .dark #${STATUS_BAR_ID} {
-      border-color: rgba(252, 165, 207, 0.2);
-      background: rgba(157, 23, 77, 0.18);
-      color: #fbcfe8;
-    }
-    .dark #${STATUS_BAR_ID}.is-auth {
-      border-color: rgba(252, 165, 207, 0.34);
-      background: rgba(157, 23, 77, 0.26);
     }
     .${STATUS_STACK_CLASS} {
       display: flex;
@@ -69,8 +60,8 @@ export function statusBarStyles(): string {
       flex-shrink: 0;
     }
     .bc-paper-ctec-status-brand {
-      font-weight: 800;
-      letter-spacing: 0.03em;
+      font-weight: var(--bc-fw-extrabold);
+      letter-spacing: var(--bc-ls-wider);
       text-transform: uppercase;
       white-space: nowrap;
     }
@@ -80,7 +71,7 @@ export function statusBarStyles(): string {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      opacity: 0.95;
+      color: var(--bc-color-text-mauve-soft);
     }
     .bc-paper-ctec-status-action {
       display: inline-flex;
@@ -88,59 +79,43 @@ export function statusBarStyles(): string {
       flex-shrink: 0;
       margin-left: auto;
       padding: 3px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(102, 2, 60, 0.24);
-      background: rgba(255, 255, 255, 0.72);
+      border-radius: var(--bc-radius-pill);
+      border: 1px solid var(--bc-color-accent-border-22);
+      background: var(--bc-color-surface-translucent-72);
       color: inherit;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.03em;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-extrabold);
+      letter-spacing: var(--bc-ls-wider);
       text-decoration: none;
       text-transform: uppercase;
       white-space: nowrap;
     }
     .bc-paper-ctec-status-action:hover {
-      background: rgba(255, 255, 255, 0.92);
-    }
-    .dark .bc-paper-ctec-status-action {
-      border-color: rgba(252, 165, 207, 0.26);
-      background: rgba(17, 24, 39, 0.28);
-    }
-    .dark .bc-paper-ctec-status-action:hover {
-      background: rgba(17, 24, 39, 0.4);
+      background: var(--bc-color-surface-translucent-92);
     }
     #${STATUS_LEGEND_ID} {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
       min-width: 0;
-      font-size: 10px;
+      font-size: var(--bc-font-10);
       line-height: 1.2;
-      color: #6b5a65;
-    }
-    .dark #${STATUS_LEGEND_ID} {
-      color: #d8c7d0;
+      color: var(--bc-color-text-mauve-soft);
     }
     .bc-paper-ctec-legend-item {
       display: inline-flex;
       align-items: center;
       gap: 4px;
       padding: 2px 6px;
-      border-radius: 999px;
-      background: rgba(102, 2, 60, 0.06);
+      border-radius: var(--bc-radius-pill);
+      background: var(--bc-color-accent-fill-06);
       white-space: nowrap;
     }
-    .dark .bc-paper-ctec-legend-item {
-      background: rgba(252, 165, 207, 0.08);
-    }
     .bc-paper-ctec-legend-key {
-      font-weight: 800;
-      letter-spacing: 0.03em;
+      font-weight: var(--bc-fw-extrabold);
+      letter-spacing: var(--bc-ls-wider);
       text-transform: uppercase;
-      color: #66023c;
-    }
-    .dark .bc-paper-ctec-legend-key {
-      color: #fbcfe8;
+      color: var(--bc-color-accent-soft);
     }
   `;
 }

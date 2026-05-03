@@ -17,28 +17,20 @@ export function modalTermStyles(): string {
     .bc-paper-ctec-modal-heatmap-toggle {
       align-self: center;
       appearance: none;
-      border: 1px solid rgba(102, 2, 60, 0.32);
-      background: rgba(102, 2, 60, 0.06);
-      color: #66023c;
+      border: 1px solid var(--bc-color-accent-border-32);
+      background: var(--bc-color-accent-fill-12);
+      color: var(--bc-color-accent-soft);
       font: inherit;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-widest);
       text-transform: uppercase;
       padding: 5px 12px;
-      border-radius: 6px;
+      border-radius: var(--bc-radius-md);
       cursor: pointer;
     }
     .bc-paper-ctec-modal-heatmap-toggle:hover {
-      background: rgba(102, 2, 60, 0.12);
-    }
-    .dark .bc-paper-ctec-modal-heatmap-toggle {
-      border-color: rgba(252, 165, 207, 0.36);
-      background: rgba(252, 165, 207, 0.12);
-      color: #fbcfe8;
-    }
-    .dark .bc-paper-ctec-modal-heatmap-toggle:hover {
-      background: rgba(252, 165, 207, 0.22);
+      background: var(--bc-color-accent-fill-22);
     }
     .bc-paper-ctec-modal-heatmap {
       display: grid;
@@ -50,29 +42,29 @@ export function modalTermStyles(): string {
        categories (Overall / Quality / Character / Workload). */
     .bc-paper-ctec-modal-heatmap-group {
       padding: 4px 8px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-caps-widest);
       text-transform: uppercase;
-      color: #6b7280;
+      color: var(--bc-color-text-muted);
       text-align: center;
-      border-radius: 6px;
-      background: rgba(15, 23, 42, 0.04);
+      border-radius: var(--bc-radius-md);
+      background: var(--bc-color-ink-fill-04);
     }
     .bc-paper-ctec-modal-heatmap-group.is-group-overall {
-      color: #66023c;
-      background: rgba(102, 2, 60, 0.08);
+      color: var(--bc-color-accent-soft);
+      background: var(--bc-color-accent-fill-08);
     }
     .bc-paper-ctec-modal-heatmap-header {
-      font-size: 10px;
-      color: #6b7280;
-      font-weight: 600;
+      font-size: var(--bc-font-10);
+      color: var(--bc-color-text-muted);
+      font-weight: var(--bc-fw-semibold);
       text-align: center;
-      letter-spacing: 0.06em;
+      letter-spacing: var(--bc-ls-caps);
       text-transform: uppercase;
     }
     .bc-paper-ctec-modal-heatmap-header.is-group-overall {
-      color: #66023c;
+      color: var(--bc-color-accent-soft);
     }
     .bc-paper-ctec-modal-heatmap-term {
       padding: 8px 8px 8px 0;
@@ -80,25 +72,28 @@ export function modalTermStyles(): string {
       font-family: inherit;
     }
     .bc-paper-ctec-modal-heatmap-term-title {
-      font-size: 12px;
-      font-weight: 600;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text);
     }
     .bc-paper-ctec-modal-heatmap-term-sub {
-      font-size: 10px;
-      color: #6b7280;
+      font-size: var(--bc-font-10);
+      color: var(--bc-color-text-muted);
     }
     .bc-paper-ctec-modal-heatmap-cell {
-      color: white;
-      border-radius: 6px;
+      /* Cell background is set inline by JS (saturated heatmap scale color),
+         so text must stay near-white in both light and dark modes. */
+      color: var(--bc-color-on-saturated);
+      border-radius: var(--bc-radius-md);
       padding: 10px 0;
       text-align: center;
-      font-size: 13px;
-      font-weight: 600;
+      font-size: var(--bc-font-13);
+      font-weight: var(--bc-fw-semibold);
       font-family: ui-monospace, monospace;
     }
     .bc-paper-ctec-modal-heatmap-cell.is-empty {
-      color: #9ca3af;
-      background: #f7f7f8;
+      color: var(--bc-color-text-subtle);
+      background: var(--bc-color-surface-hover);
     }
     .bc-paper-ctec-modal-drill {
       display: grid;
@@ -115,8 +110,9 @@ export function modalTermStyles(): string {
       flex-direction: column;
       gap: 8px;
       padding: 12px 14px;
-      background: #f7f7f8;
-      border-radius: 10px;
+      background: var(--bc-color-surface-hover);
+      border-radius: var(--bc-radius-xl);
+      color: var(--bc-color-text);
     }
     .bc-paper-ctec-modal-term-block-head {
       display: grid;
@@ -126,11 +122,11 @@ export function modalTermStyles(): string {
       align-items: baseline;
     }
     .bc-paper-ctec-modal-term-block-label {
-      font-size: 10px;
-      color: #6b7280;
-      font-weight: 600;
+      font-size: var(--bc-font-10);
+      color: var(--bc-color-text-muted);
+      font-weight: var(--bc-fw-semibold);
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: var(--bc-ls-caps);
       grid-column: 1;
       grid-row: 1;
     }
@@ -141,30 +137,31 @@ export function modalTermStyles(): string {
       display: flex;
       align-items: baseline;
       gap: 4px;
-      font-size: 22px;
-      font-weight: 600;
+      font-size: var(--bc-font-22);
+      font-weight: var(--bc-fw-semibold);
       line-height: 1;
+      color: var(--bc-color-text);
     }
     .bc-paper-ctec-modal-term-block-unit {
-      font-size: 10px;
-      color: #9ca3af;
-      font-weight: 500;
+      font-size: var(--bc-font-10);
+      color: var(--bc-color-text-subtle);
+      font-weight: var(--bc-fw-medium);
     }
     .bc-paper-ctec-modal-term-block-delta {
       grid-column: 1;
       grid-row: 2;
-      font-size: 10px;
-      font-weight: 600;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-semibold);
     }
-    .bc-paper-ctec-modal-term-block-delta.is-positive { color: #15803d; }
-    .bc-paper-ctec-modal-term-block-delta.is-negative { color: #9f1239; }
+    .bc-paper-ctec-modal-term-block-delta.is-positive { color: var(--bc-color-success); }
+    .bc-paper-ctec-modal-term-block-delta.is-negative { color: var(--bc-color-danger-rose); }
     .bc-paper-ctec-modal-term-block-delta.is-muted {
-      color: #9ca3af;
-      font-weight: 400;
+      color: var(--bc-color-text-subtle);
+      font-weight: var(--bc-fw-regular);
     }
     .bc-paper-ctec-modal-term-block-delta-note {
-      color: #9ca3af;
-      font-weight: 400;
+      color: var(--bc-color-text-subtle);
+      font-weight: var(--bc-fw-regular);
     }
     .bc-paper-ctec-modal-term-block-chart {
       min-height: 120px;
@@ -172,8 +169,8 @@ export function modalTermStyles(): string {
       align-items: center;
       justify-content: center;
       padding: 8px;
-      background: white;
-      border-radius: 8px;
+      background: var(--bc-color-surface-hover-strong);
+      border-radius: var(--bc-radius-lg);
     }
     .bc-paper-ctec-modal-term-metrics {
       display: grid;
@@ -183,42 +180,43 @@ export function modalTermStyles(): string {
     }
     .bc-paper-ctec-modal-term-metric {
       padding: 12px 14px;
-      background: #f7f7f8;
-      border-radius: 8px;
+      background: var(--bc-color-surface-hover);
+      border-radius: var(--bc-radius-lg);
     }
     .bc-paper-ctec-modal-term-metric-label {
-      font-size: 10px;
-      color: #6b7280;
-      font-weight: 600;
+      font-size: var(--bc-font-10);
+      color: var(--bc-color-text-muted);
+      font-weight: var(--bc-fw-semibold);
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: var(--bc-ls-caps);
     }
     .bc-paper-ctec-modal-term-metric-value {
       display: flex;
       align-items: baseline;
       gap: 4px;
       margin-top: 2px;
-      font-size: 20px;
-      font-weight: 600;
+      font-size: var(--bc-font-20);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text);
     }
     .bc-paper-ctec-modal-term-metric-unit {
-      font-size: 10px;
-      color: #9ca3af;
+      font-size: var(--bc-font-10);
+      color: var(--bc-color-text-subtle);
     }
     .bc-paper-ctec-modal-term-metric-delta {
-      font-size: 10px;
+      font-size: var(--bc-font-10);
       margin-top: 2px;
-      font-weight: 600;
+      font-weight: var(--bc-fw-semibold);
     }
-    .bc-paper-ctec-modal-term-metric-delta.is-positive { color: #15803d; }
-    .bc-paper-ctec-modal-term-metric-delta.is-negative { color: #9f1239; }
+    .bc-paper-ctec-modal-term-metric-delta.is-positive { color: var(--bc-color-success); }
+    .bc-paper-ctec-modal-term-metric-delta.is-negative { color: var(--bc-color-danger-rose); }
     .bc-paper-ctec-modal-term-metric-delta.is-muted {
-      color: #9ca3af;
-      font-weight: 400;
+      color: var(--bc-color-text-subtle);
+      font-weight: var(--bc-fw-regular);
     }
     .bc-paper-ctec-modal-term-metric-delta-note {
-      color: #9ca3af;
-      font-weight: 400;
+      color: var(--bc-color-text-subtle);
+      font-weight: var(--bc-fw-regular);
     }
     .bc-paper-ctec-modal-term-charts {
       display: grid;
@@ -226,10 +224,10 @@ export function modalTermStyles(): string {
       gap: 10px;
     }
     .bc-paper-ctec-modal-term-chart-card {
-      border: 1px solid #e6e6ea;
-      border-radius: 10px;
+      border: 1px solid var(--bc-color-border-strong);
+      border-radius: var(--bc-radius-xl);
       padding: 8px 10px 10px;
-      background: white;
+      background: var(--bc-color-surface-hover);
       display: flex;
       flex-direction: column;
       gap: 6px;
@@ -241,17 +239,17 @@ export function modalTermStyles(): string {
       gap: 8px;
     }
     .bc-paper-ctec-modal-term-chart-label {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-widest);
       text-transform: uppercase;
-      color: #7a596a;
+      color: var(--bc-color-chart-trend-text-strong);
     }
     .bc-paper-ctec-modal-term-chart-value {
-      font-size: 13px;
-      font-weight: 700;
+      font-size: var(--bc-font-13);
+      font-weight: var(--bc-fw-bold);
       font-family: ui-monospace, monospace;
-      color: #2f1f29;
+      color: var(--bc-color-text-mauve-deep);
     }
     .bc-paper-ctec-modal-term-chart-body {
       min-height: 110px;
@@ -264,7 +262,8 @@ export function modalTermStyles(): string {
       max-height: 160px;
       width: 100%;
       display: block;
-      border-radius: 6px;
+      border-radius: var(--bc-radius-md);
+      background: transparent;
     }
     .bc-paper-ctec-modal-term-chart-image img.bc-paper-ctec-chart-histogram-fallback {
       max-width: 100%;
@@ -288,93 +287,7 @@ export function modalTermStyles(): string {
       }
       .bc-paper-ctec-modal-rail {
         border-right: 0;
-        border-bottom: 1px solid #e6e6ea;
-      }
-    }
-    .dark .bc-paper-ctec-modal-heatmap-header {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-heatmap-header.is-group-overall {
-      color: #fbcfe8;
-    }
-    .dark .bc-paper-ctec-modal-heatmap-group {
-      color: #a3a3a3;
-      background: rgba(248, 250, 252, 0.06);
-    }
-    .dark .bc-paper-ctec-modal-heatmap-group.is-group-overall {
-      color: #fbcfe8;
-      background: rgba(252, 165, 207, 0.14);
-    }
-    .dark .bc-paper-ctec-modal-heatmap-term-title {
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-heatmap-term-sub {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-heatmap-cell.is-empty {
-      color: #737373;
-      background: #262626;
-    }
-    .dark .bc-paper-ctec-modal-term-block {
-      background: #404040;
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-term-block-label {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-term-block-value {
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-term-block-unit {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-term-block-delta.is-positive { color: #6ee7b7; }
-    .dark .bc-paper-ctec-modal-term-block-delta.is-negative { color: #fda4af; }
-    .dark .bc-paper-ctec-modal-term-block-delta.is-muted {
-      color: #737373;
-    }
-    .dark .bc-paper-ctec-modal-term-block-delta-note {
-      color: #737373;
-    }
-    .dark .bc-paper-ctec-modal-term-block-chart {
-      background: #525252;
-    }
-    .dark .bc-paper-ctec-modal-term-metric {
-      background: #404040;
-    }
-    .dark .bc-paper-ctec-modal-term-metric-label {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-term-metric-value {
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-term-metric-unit {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-term-metric-delta.is-positive { color: #6ee7b7; }
-    .dark .bc-paper-ctec-modal-term-metric-delta.is-negative { color: #fda4af; }
-    .dark .bc-paper-ctec-modal-term-metric-delta.is-muted {
-      color: #737373;
-    }
-    .dark .bc-paper-ctec-modal-term-metric-delta-note {
-      color: #737373;
-    }
-    .dark .bc-paper-ctec-modal-term-chart-card {
-      border-color: #525252;
-      background: #404040;
-    }
-    .dark .bc-paper-ctec-modal-term-chart-label {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-term-chart-value {
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-term-chart-image {
-      background: transparent;
-    }
-    @media (max-width: 720px) {
-      .dark .bc-paper-ctec-modal-rail {
-        border-bottom-color: #404040;
+        border-bottom: 1px solid var(--bc-color-border);
       }
     }
   `;

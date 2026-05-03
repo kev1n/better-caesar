@@ -1,9 +1,11 @@
 import { startAccessGate } from "./access-gate";
 import { mountAccessGateToast } from "./access-gate/toast";
 import { augmentationRegistry } from "./augmentations/registry";
+import { bootstrapTheme } from "./design";
 import { AugmentationRunner } from "./framework";
 import { registerLookupMessageHandler } from "./messaging";
 
+void bootstrapTheme();
 injectEarlyTermPageMask();
 registerLookupMessageHandler();
 void startAccessGate();
@@ -17,6 +19,9 @@ function injectEarlyTermPageMask(): void {
 
   const style = document.createElement("style");
   style.id = "better-caesar-early-term-mask";
+  // Inlined raw colors here (not vars) because this style runs BEFORE
+  // bootstrapTheme() injects --bc-* tokens — the design system isn't
+  // available yet on the very first paint of a term-switch page.
   style.textContent = `
     body > * { visibility: hidden !important; }
     body::before {

@@ -12,12 +12,14 @@ import type { SeatsNotesResult, SeatsNotesSuccess } from "../seats-notes/types";
 
 import {
   addSectionToCart,
+  continueCartAddWithRelated,
   matchCaesarGroup,
   matchCaesarSection,
   searchCaesarCatalog,
   type CaesarCourseGroup,
   type CaesarSection,
-  type CaesarSearchResult
+  type CaesarSearchResult,
+  type RelatedSectionOption
 } from "./caesar-search";
 import {
   bareCatalogNumber,
@@ -173,7 +175,6 @@ export class ClassSearchAugmentation implements Augmentation {
         filters: {
           termId: initialTerm,
           query: "",
-          distros: new Set(),
           disciplines: new Set()
         },
         info,
@@ -276,9 +277,6 @@ export class ClassSearchAugmentation implements Augmentation {
 
     const toggles = doc.createElement("div");
     toggles.className = "bc-cs-toggles";
-    for (const code of Object.keys(PAPER_DISTRO_LABELS)) {
-      toggles.appendChild(this.buildDistroToggle(state, code));
-    }
     for (const code of Object.keys(PAPER_DISCIPLINE_LABELS)) {
       toggles.appendChild(this.buildDisciplineToggle(state, code));
     }
@@ -351,24 +349,6 @@ export class ClassSearchAugmentation implements Augmentation {
     return field;
   }
 
-  private buildDistroToggle(state: MountedState, code: string): HTMLLabelElement {
-    const { doc } = state;
-    const wrap = doc.createElement("label");
-    wrap.className = "bc-cs-checkbox";
-    const cb = doc.createElement("input");
-    cb.type = "checkbox";
-    cb.addEventListener("change", () => {
-      if (cb.checked) state.filters.distros.add(code);
-      else state.filters.distros.delete(code);
-      this.scheduleSearch(state);
-    });
-    const span = doc.createElement("span");
-    span.textContent = `Dist ${code}`;
-    span.title = PAPER_DISTRO_LABELS[code];
-    wrap.append(cb, span);
-    return wrap;
-  }
-
   private buildDisciplineToggle(state: MountedState, code: string): HTMLLabelElement {
     const { doc } = state;
     const wrap = doc.createElement("label");
@@ -389,7 +369,6 @@ export class ClassSearchAugmentation implements Augmentation {
 
   private clearFilters(state: MountedState): void {
     state.filters.query = "";
-    state.filters.distros = new Set();
     state.filters.disciplines = new Set();
     const queryInput = state.doc.getElementById("bc-cs-query") as HTMLInputElement | null;
     if (queryInput) queryInput.value = "";
@@ -970,6 +949,14 @@ export class ClassSearchAugmentation implements Augmentation {
           }
         }
       );
+    } else if ("needsRelatedSection" in result) {
+      // CAESAR is asking the user to pick a discussion/lab/recitation
+      // before the cart-add can finalize. Drop a picker UI under the row
+      // and pause the button until they choose.
+      button.dataset.state = "needs-related";
+      button.textContent = "Pick section…";
+      button.disabled = true;
+      this.openRelatedPicker(state, row, section, button, result);
     } else if (result.alreadyInCart) {
       // Friendlier UX: show the button as already-handled and surface a
       // pointer to the cart instead of a generic error.
@@ -1009,6 +996,214 @@ export class ClassSearchAugmentation implements Augmentation {
               }
             }
           : undefined
+      });
+    }
+  }
+
+  // ── Related-component picker (lab/discussion required) ──────────────────
+
+  private openRelatedPicker(
+    state: MountedState,
+    row: ResultRow,
+    section: PaperSection,
+    button: HTMLButtonElement,
+    pending: {
+      classNumber: string;
+      sectionLabel: string;
+      courseTitle: string;
+      relatedOptions: RelatedSectionOption[];
+      continuationFormState: string;
+      searchGroups: CaesarCourseGroup[];
+    }
+  ): void {
+    const { doc } = state;
+    const li = button.closest<HTMLLIElement>("li.bc-cs-section");
+    if (!li) return;
+
+    // Replace any earlier picker for this section so re-clicking Add doesn't
+    // stack pickers.
+    const next = li.nextElementSibling;
+    if (next instanceof HTMLLIElement && next.classList.contains("bc-cs-related-row")) {
+      next.remove();
+    }
+
+    const pickerLi = doc.createElement("li");
+    pickerLi.className = "bc-cs-related-row";
+    li.parentElement?.insertBefore(pickerLi, li.nextSibling);
+
+    const wrap = doc.createElement("div");
+    wrap.className = "bc-cs-related";
+
+    const header = doc.createElement("div");
+    header.className = "bc-cs-related-header";
+    const title = doc.createElement("div");
+    title.className = "bc-cs-related-title";
+    title.textContent = `${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} needs a related section`;
+    const sub = doc.createElement("div");
+    sub.className = "bc-cs-related-sub";
+    sub.textContent = "Pick one to finish adding to your cart.";
+    header.append(title, sub);
+
+    const cancel = doc.createElement("button");
+    cancel.type = "button";
+    cancel.className = "bc-cs-related-cancel";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", () => {
+      pickerLi.remove();
+      button.dataset.state = "";
+      button.textContent = "Add to cart";
+      button.disabled = false;
+    });
+    header.appendChild(cancel);
+    wrap.appendChild(header);
+
+    const list = doc.createElement("div");
+    list.className = "bc-cs-related-list";
+    for (const option of pending.relatedOptions) {
+      list.appendChild(this.buildRelatedOptionRow(state, row, section, button, pickerLi, pending, option));
+    }
+    wrap.appendChild(list);
+
+    pickerLi.appendChild(wrap);
+  }
+
+  private buildRelatedOptionRow(
+    state: MountedState,
+    row: ResultRow,
+    section: PaperSection,
+    button: HTMLButtonElement,
+    pickerLi: HTMLLIElement,
+    pending: {
+      classNumber: string;
+      sectionLabel: string;
+      courseTitle: string;
+      relatedOptions: RelatedSectionOption[];
+      continuationFormState: string;
+      searchGroups: CaesarCourseGroup[];
+    },
+    option: RelatedSectionOption
+  ): HTMLElement {
+    const { doc } = state;
+    const item = doc.createElement("button");
+    item.type = "button";
+    item.className = "bc-cs-related-option";
+    item.dataset.status = option.status;
+
+    const left = doc.createElement("div");
+    left.className = "bc-cs-related-option-left";
+    const sec = doc.createElement("div");
+    sec.className = "bc-cs-related-option-section";
+    sec.textContent = option.section || "—";
+    const num = doc.createElement("div");
+    num.className = "bc-cs-related-option-num";
+    num.textContent = `#${option.classNumber}`;
+    left.append(sec, num);
+
+    const mid = doc.createElement("div");
+    mid.className = "bc-cs-related-option-mid";
+    const sched = doc.createElement("div");
+    sched.textContent = option.schedule || "—";
+    const room = doc.createElement("div");
+    room.className = "bc-cs-mute";
+    room.textContent = option.room || "";
+    mid.append(sched, room);
+
+    const right = doc.createElement("div");
+    right.className = "bc-cs-related-option-right";
+    const instr = doc.createElement("div");
+    instr.className = "bc-cs-related-option-instr";
+    instr.textContent = option.instructor || "—";
+    const status = doc.createElement("span");
+    status.className = "bc-cs-status-pill";
+    status.dataset.status = option.status;
+    status.textContent = option.status;
+    right.append(instr, status);
+
+    item.append(left, mid, right);
+    item.addEventListener("click", () => {
+      void this.handleRelatedPick(state, row, section, button, pickerLi, pending, option);
+    });
+    return item;
+  }
+
+  private async handleRelatedPick(
+    state: MountedState,
+    row: ResultRow,
+    section: PaperSection,
+    button: HTMLButtonElement,
+    pickerLi: HTMLLIElement,
+    pending: {
+      classNumber: string;
+      sectionLabel: string;
+      courseTitle: string;
+      relatedOptions: RelatedSectionOption[];
+      continuationFormState: string;
+      searchGroups: CaesarCourseGroup[];
+    },
+    option: RelatedSectionOption
+  ): Promise<void> {
+    // Disable all option buttons while we run the continuation so the user
+    // can't double-fire.
+    const buttons = pickerLi.querySelectorAll<HTMLButtonElement>(".bc-cs-related-option");
+    buttons.forEach((b) => {
+      b.disabled = true;
+      if (b.dataset.picked !== "true") b.style.opacity = "0.5";
+    });
+    const clicked = Array.from(buttons).find((b) =>
+      b.querySelector(".bc-cs-related-option-num")?.textContent?.includes(option.classNumber)
+    );
+    if (clicked) {
+      clicked.dataset.picked = "true";
+      clicked.style.opacity = "1";
+      const stamp = state.doc.createElement("span");
+      stamp.className = "bc-cs-related-option-progress";
+      stamp.textContent = "Adding…";
+      clicked.appendChild(stamp);
+    }
+    button.textContent = `Adding #${pending.classNumber}…`;
+
+    const result = await continueCartAddWithRelated({
+      continuationFormState: pending.continuationFormState,
+      selectedRowIndex: option.rowIndex,
+      classNumber: pending.classNumber,
+      sectionLabel: pending.sectionLabel,
+      courseTitle: pending.courseTitle,
+      searchGroups: pending.searchGroups
+    });
+
+    pickerLi.remove();
+
+    if (result.ok) {
+      button.dataset.state = "success";
+      button.textContent = "Added ✓";
+      button.disabled = true;
+      showToast(
+        `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} (#${result.classNumber}) with section ${option.section} to your shopping cart.`,
+        {
+          tone: "success",
+          durationMs: 6000,
+          action: {
+            label: "View cart",
+            run: () => {
+              window.location.assign(CART_URL);
+            }
+          }
+        }
+      );
+    } else if ("needsRelatedSection" in result) {
+      // CAESAR served another picker after the first pick — rare, but
+      // recurse so the user can finish.
+      button.dataset.state = "needs-related";
+      button.textContent = "Pick section…";
+      button.disabled = true;
+      this.openRelatedPicker(state, row, section, button, result);
+    } else {
+      button.dataset.state = "error";
+      button.textContent = "Try again";
+      button.disabled = false;
+      showToast(result.error ?? "Couldn't add to cart.", {
+        tone: "error",
+        durationMs: 6000
       });
     }
   }
@@ -1274,12 +1469,12 @@ function renderFatalError(root: HTMLElement, doc: Document, message: string): vo
   wrap.className = "bc-cs-root";
   const card = doc.createElement("div");
   card.className = "bc-cs-card";
-  card.style.borderColor = "#fca5a5";
+  card.style.borderColor = "var(--bc-color-danger-border)";
   card.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:#b91c1c;">
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:var(--bc-font-13);color:var(--bc-color-danger);">
       <strong>Couldn't load paper.nu catalog data.</strong>
-      <span style="color:#6b7280;">${escapeHtml(message)}</span>
-      <span style="color:#6b7280;font-size:12px;">Reload the page to try again, or switch to Classic CAESAR using the tab above.</span>
+      <span style="color:var(--bc-color-text-muted);">${escapeHtml(message)}</span>
+      <span style="color:var(--bc-color-text-muted);font-size:var(--bc-font-12);">Reload the page to try again, or switch to Classic CAESAR using the tab above.</span>
     </div>
   `;
   wrap.appendChild(card);
@@ -1301,7 +1496,7 @@ function buildLoadingShell(doc: Document): HTMLElement {
   const card = doc.createElement("div");
   card.className = "bc-cs-card";
   card.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;color:#6b7280;font-size:13px;">
+    <div style="display:flex;align-items:center;gap:10px;color:var(--bc-color-text-muted);font-size:var(--bc-font-13);">
       <span class="bc-cs-spinner"></span>
       <span>Loading paper.nu catalog data…</span>
     </div>
@@ -1311,10 +1506,6 @@ function buildLoadingShell(doc: Document): HTMLElement {
 }
 
 function hasAnyFilter(filters: SearchFilters): boolean {
-  return (
-    filters.query.trim().length > 0 ||
-    filters.distros.size > 0 ||
-    filters.disciplines.size > 0
-  );
+  return filters.query.trim().length > 0 || filters.disciplines.size > 0;
 }
 

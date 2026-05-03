@@ -58,6 +58,18 @@ export type CaesarSearchInput = {
   bareCatalog: string; // bare number — NOT the full "111-0"
 };
 
+// Row from a related-component picker page (the page CAESAR shows after
+// SELECT for courses that require pairing a discussion/lab/recitation).
+export type RelatedSectionOption = {
+  rowIndex: number;
+  classNumber: string;
+  section: string;
+  schedule: string;
+  room: string;
+  instructor: string;
+  status: CaesarStatus;
+};
+
 export type CartFlowResult =
   | {
       ok: true;
@@ -69,6 +81,21 @@ export type CartFlowResult =
       // status / instructor / room. Caller stamps this into its
       // live-status cache so badges populate on the section row without
       // a separate "Load CAESAR data" subject search.
+      searchGroups: CaesarCourseGroup[];
+    }
+  | {
+      ok: false;
+      // CAESAR is asking the user to pick a discussion/lab/recitation
+      // before the add can finish. The picker UI calls
+      // `continueCartAddWithRelated` with a chosen rowIndex.
+      needsRelatedSection: true;
+      classNumber: string;
+      courseTitle: string;
+      relatedOptions: RelatedSectionOption[];
+      // Serialized URLSearchParams of the related-component page's hidden
+      // inputs. Caller hands this back to continue the wizard.
+      continuationFormState: string;
+      sectionLabel: string;
       searchGroups: CaesarCourseGroup[];
     }
   | {
@@ -86,6 +113,15 @@ export type CartFlowInput = {
   termId: string;
   career: string;
   institution: string;
+};
+
+export type CartFlowContinuationInput = {
+  continuationFormState: string;
+  selectedRowIndex: number;
+  classNumber: string;
+  sectionLabel: string;
+  courseTitle: string;
+  searchGroups: CaesarCourseGroup[];
 };
 
 const INSTITUTION_DEFAULT = "NWUNV";
@@ -113,6 +149,20 @@ export async function addSectionToCart(input: CartFlowInput): Promise<CartFlowRe
     "user",
     () => addSectionToCartInternal(input),
     { owner: "class-search-add" }
+  );
+}
+
+// Continue a cart-add that paused on the related-component picker. Takes the
+// `continuationFormState` returned by the previous call plus the row index
+// the user picked, completes the wizard, and returns the same shape as
+// `addSectionToCart`.
+export async function continueCartAddWithRelated(
+  input: CartFlowContinuationInput
+): Promise<CartFlowResult> {
+  return runPeopleSoftTask(
+    "user",
+    () => continueCartAddWithRelatedInternal(input),
+    { owner: "class-search-add-related" }
   );
 }
 
@@ -216,6 +266,23 @@ async function addSectionToCartInternal(input: CartFlowInput): Promise<CartFlowR
       });
     }
 
+    // Required-related-component branch: CAESAR served the discussion/lab
+    // picker. Surface the options to the caller and pause the wizard until
+    // the user picks one — `continueCartAddWithRelated` resumes from here.
+    const relatedOptions = parseRelatedComponentOptions(confirmHtml);
+    if (relatedOptions && relatedOptions.length > 0) {
+      return {
+        ok: false,
+        needsRelatedSection: true,
+        classNumber: match.section.classNumber,
+        sectionLabel: match.section.sectionLabel,
+        courseTitle: match.group.title,
+        relatedOptions,
+        continuationFormState: extractHiddenInputs(confirmHtml).toString(),
+        searchGroups: groups
+      };
+    }
+
     // Step 3: POST DERIVED_CLS_DTL_NEXT_PB → cart landing page.
     const nextActionId = findNextActionId(confirmHtml);
     if (!nextActionId) {
@@ -257,6 +324,80 @@ async function addSectionToCartInternal(input: CartFlowInput): Promise<CartFlowR
   }
 }
 
+async function continueCartAddWithRelatedInternal(
+  input: CartFlowContinuationInput
+): Promise<CartFlowResult> {
+  try {
+    const baseState = new URLSearchParams(input.continuationFormState);
+    if (!baseState.has("ICSID")) {
+      return fail("CAESAR session expired — try adding again.", {
+        classNumber: input.classNumber,
+        searchGroups: input.searchGroups
+      });
+    }
+
+    // Step A: POST DERIVED_CLS_DTL_NEXT_PB with the chosen radio.
+    // CAESAR's grid radios share `name='SSR_CLS_TBL_R1$sels$0'` but the
+    // wire format observed sends `name='SSR_CLS_TBL_R1$sels$<row>$$0'` with
+    // the same numeric value. We send both to be safe; PeopleSoft tolerates
+    // the redundancy.
+    const params = buildActionParams(baseState, "DERIVED_CLS_DTL_NEXT_PB");
+    params.set("SSR_CLS_TBL_R1$sels$0", String(input.selectedRowIndex));
+    params.set(
+      `SSR_CLS_TBL_R1$sels$${input.selectedRowIndex}$$0`,
+      String(input.selectedRowIndex)
+    );
+    let currentHtml = await fetchPeopleSoft(resolveActionUrl(SEARCH_ENDPOINT), params);
+    if (looksLikeError(currentHtml)) {
+      return fail(
+        extractErrorMessage(currentHtml) ?? "CAESAR rejected the related-component pick.",
+        { classNumber: input.classNumber, searchGroups: input.searchGroups }
+      );
+    }
+
+    // Steps B+: walk DERIVED_CLS_DTL_NEXT_PB hops (Class Preferences page,
+    // then final commit). Bound the loop so a wizard glitch can't spin.
+    const MAX_HOPS = 3;
+    let hops = 0;
+    while (hops < MAX_HOPS) {
+      const nextActionId = findNextActionId(currentHtml);
+      if (!nextActionId) break;
+      hops += 1;
+      const state = extractHiddenInputs(currentHtml);
+      const nextParams = buildActionParams(state, nextActionId);
+      const nextHtml = await fetchPeopleSoft(resolveActionUrl(SEARCH_ENDPOINT), nextParams);
+      if (looksLikeError(nextHtml)) {
+        return fail(extractErrorMessage(nextHtml) ?? "CAESAR refused to add the class.", {
+          classNumber: input.classNumber,
+          searchGroups: input.searchGroups
+        });
+      }
+      currentHtml = nextHtml;
+    }
+
+    const success = isCartLandingPage(currentHtml, input.classNumber);
+    if (!success.ok) {
+      return fail(success.reason, {
+        classNumber: input.classNumber,
+        searchGroups: input.searchGroups
+      });
+    }
+
+    return {
+      ok: true,
+      classNumber: input.classNumber,
+      sectionLabel: input.sectionLabel,
+      courseTitle: input.courseTitle,
+      searchGroups: input.searchGroups
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Parsing
 
@@ -268,6 +409,53 @@ function parseAjaxFragment(payload: string): Document {
   );
   const html = cdataMatch?.[1] ?? payload;
   return new DOMParser().parseFromString(`<html><body>${html}</body></html>`, "text/html");
+}
+
+// Parse the related-component picker page (SSR_CLS_RELCOMP / SSR_SSENRL_RC).
+// Returns null when the response isn't that page. We locate the picker via
+// the radio inputs in the `SSR_CLS_TBL_R1` grid and read each row's data
+// from its `<tr>` so we don't depend on the wizard's dynamic positional
+// suffixes (e.g. `$190$`).
+function parseRelatedComponentOptions(html: string): RelatedSectionOption[] | null {
+  const doc = parseAjaxFragment(html);
+  const radios = doc.querySelectorAll<HTMLInputElement>(
+    "input[type='radio'][id^='SSR_CLS_TBL_R1$sels$']"
+  );
+  if (radios.length === 0) return null;
+
+  const options: RelatedSectionOption[] = [];
+  for (const radio of Array.from(radios)) {
+    const idMatch = /\$sels\$(\d+)\$\$\d+$/.exec(radio.id);
+    if (!idMatch) continue;
+    const rowIndex = Number(idMatch[1]);
+
+    const tr = radio.closest("tr");
+    if (!tr) continue;
+    const cells = Array.from(tr.querySelectorAll<HTMLElement>("td"));
+    const cellText = (n: number) =>
+      decodeEntities((cells[n]?.textContent ?? "").trim()).replace(/\s+/g, " ");
+
+    // Column order on CAESAR: radio | Class Nbr | Section | Schedule | Room | Instructor | Status.
+    const classNumber = cellText(1);
+    const section = cellText(2);
+    const schedule = cellText(3);
+    const room = cellText(4);
+    const instructor = cellText(5);
+    const statusImg = cells[6]?.querySelector<HTMLImageElement>("img");
+    const status = statusFromAlt(statusImg?.getAttribute("alt"));
+
+    if (!classNumber) continue;
+    options.push({ rowIndex, classNumber, section, schedule, room, instructor, status });
+  }
+  return options.length > 0 ? options : null;
+}
+
+function statusFromAlt(alt: string | null | undefined): CaesarStatus {
+  const a = (alt ?? "").toLowerCase();
+  if (a.includes("open")) return "Open";
+  if (a.includes("closed")) return "Closed";
+  if (a.includes("wait")) return "Wait List";
+  return "Unknown";
 }
 
 function parseCaesarGroups(searchHtml: string): CaesarCourseGroup[] {

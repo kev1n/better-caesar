@@ -406,7 +406,12 @@ function renderKpiCard(
   recent: number
 ): HTMLElement {
   const trendEntries = recentTrendEntries(data.trendTerms, kind, recent);
-  const trend = trendEntries.map((entry) => entry.value);
+  const fullTrendEntries = recentTrendEntries(
+    data.trendTerms,
+    kind,
+    data.trendTerms.length
+  );
+  const trend = fullTrendEntries.map((entry) => entry.value);
   const meanValue = recentMean(data.terms, kind, recent);
   const lastEntry = trendEntries[trendEntries.length - 1] ?? null;
   const prevEntry =
@@ -510,7 +515,10 @@ function renderGlobalKpiCard(
   const globalTrendEntries = recentTrendTerms
     .map((term) => ({ value: computeGlobalMean([term]), term }))
     .filter((entry) => entry.value > 0);
-  const trend = globalTrendEntries.map((entry) => entry.value);
+  const fullGlobalTrendEntries = data.trendTerms
+    .map((term) => ({ value: computeGlobalMean([term]), term }))
+    .filter((entry) => entry.value > 0);
+  const trend = fullGlobalTrendEntries.map((entry) => entry.value);
 
   const button = doc.createElement("button");
   button.type = "button";

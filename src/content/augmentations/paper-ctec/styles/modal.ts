@@ -12,7 +12,7 @@ export function modalStyles(): string {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(15, 23, 42, 0.55);
+      background: var(--bc-color-overlay-modal);
       backdrop-filter: blur(2px);
       animation: bc-paper-ctec-modal-fade 140ms ease-out;
       padding: 12px;
@@ -24,13 +24,10 @@ export function modalStyles(): string {
     .bc-paper-ctec-modal-card {
       width: min(1800px, 98vw);
       height: 96vh;
-      background: #ffffff;
-      color: #1f2937;
-      border-radius: 14px;
-      box-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.06),
-        0 30px 60px -10px rgba(0, 0, 0, 0.35),
-        0 0 0 1px rgba(0, 0, 0, 0.04);
+      background: var(--bc-color-bg);
+      color: var(--bc-color-text);
+      border-radius: var(--bc-radius-3xl);
+      box-shadow: var(--bc-shadow-modal);
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -47,24 +44,24 @@ export function modalStyles(): string {
       right: 14px;
       width: 32px;
       height: 32px;
-      border-radius: 8px;
+      border-radius: var(--bc-radius-lg);
       display: grid;
       place-items: center;
-      border: 1px solid #e6e6ea;
-      background: white;
-      color: #6b7280;
+      border: 1px solid var(--bc-color-border);
+      background: var(--bc-color-bg);
+      color: var(--bc-color-text-muted);
       cursor: pointer;
-      font-size: 16px;
+      font-size: var(--bc-font-16);
       z-index: 2;
     }
     .bc-paper-ctec-modal-close:hover {
-      background: #f7f7f8;
-      color: #1f2937;
+      background: var(--bc-color-surface-hover);
+      color: var(--bc-color-text);
     }
     .bc-paper-ctec-modal-header {
       position: relative;
       padding: 22px 32px 0;
-      border-bottom: 1px solid #e6e6ea;
+      border-bottom: 1px solid var(--bc-color-border);
       flex-shrink: 0;
     }
     .bc-paper-ctec-modal-identity {
@@ -75,14 +72,14 @@ export function modalStyles(): string {
     }
     .bc-paper-ctec-modal-code {
       font-family: ui-monospace, monospace;
-      font-size: 13px;
-      color: #6b7280;
-      letter-spacing: 0.02em;
+      font-size: var(--bc-font-13);
+      color: var(--bc-color-text-muted);
+      letter-spacing: var(--bc-ls-wide);
     }
     .bc-paper-ctec-modal-title {
-      font-size: 26px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
+      font-size: var(--bc-font-26);
+      font-weight: var(--bc-fw-semibold);
+      letter-spacing: var(--bc-ls-tight);
       margin: 0;
       line-height: 1.15;
     }
@@ -93,37 +90,37 @@ export function modalStyles(): string {
       gap: 0;
       row-gap: 6px;
       flex-wrap: wrap;
-      font-size: 13px;
-      color: #6b7280;
+      font-size: var(--bc-font-13);
+      color: var(--bc-color-text-muted);
     }
     .bc-paper-ctec-modal-meta > * + *::before {
       content: "";
       display: inline-block;
       width: 1px;
       height: 11px;
-      background: #d1d5db;
+      background: var(--bc-color-border-strong);
       margin: 0 14px;
       vertical-align: -1px;
     }
     .bc-paper-ctec-modal-meta strong {
-      color: #1f2937;
-      font-weight: 600;
+      color: var(--bc-color-text);
+      font-weight: var(--bc-fw-semibold);
     }
     .bc-paper-ctec-modal-report-link {
-      font-size: 12px;
-      color: #1f2937;
+      font-size: var(--bc-font-12);
+      color: var(--bc-color-text);
       text-decoration: none;
-      border: 1px solid #e6e6ea;
+      border: 1px solid var(--bc-color-border);
       padding: 7px 12px;
-      border-radius: 8px;
-      background: white;
+      border-radius: var(--bc-radius-lg);
+      background: var(--bc-color-bg);
       display: inline-flex;
       align-items: center;
       gap: 6px;
       white-space: nowrap;
     }
     .bc-paper-ctec-modal-report-link:hover {
-      background: #f7f7f8;
+      background: var(--bc-color-surface-hover);
     }
     .bc-paper-ctec-modal-actions {
       display: flex;
@@ -134,48 +131,48 @@ export function modalStyles(): string {
     }
     .bc-paper-ctec-modal-action-btn {
       font: inherit;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.01em;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-semibold);
+      letter-spacing: var(--bc-ls-snug);
       padding: 7px 12px;
-      border-radius: 8px;
-      border: 1px solid #e6e6ea;
-      background: white;
-      color: #1f2937;
+      border-radius: var(--bc-radius-lg);
+      border: 1px solid var(--bc-color-border);
+      background: var(--bc-color-bg);
+      color: var(--bc-color-text);
       cursor: pointer;
       white-space: nowrap;
     }
     .bc-paper-ctec-modal-action-btn:hover:not(:disabled) {
-      background: #f7f7f8;
+      background: var(--bc-color-surface-hover);
     }
     .bc-paper-ctec-modal-action-btn.is-primary {
-      border-color: #66023c;
-      background: #66023c;
-      color: #ffffff;
+      border-color: var(--bc-color-accent);
+      background: var(--bc-color-accent);
+      color: var(--bc-color-accent-on);
     }
     .bc-paper-ctec-modal-action-btn.is-primary:hover:not(:disabled) {
-      background: #500030;
+      background: var(--bc-color-accent-hover);
     }
     .bc-paper-ctec-modal-action-btn:disabled {
       opacity: 0.55;
       cursor: default;
     }
     .bc-paper-ctec-modal-action-loadmore {
-      font-weight: 500;
+      font-weight: var(--bc-fw-medium);
       font-size: 11.5px;
       padding: 6px 10px;
-      color: #6b7280;
+      color: var(--bc-color-text-muted);
       background: transparent;
       border-color: transparent;
     }
     .bc-paper-ctec-modal-action-loadmore:hover:not(:disabled) {
-      background: #f3f3f5;
-      color: #1f2937;
+      background: var(--bc-color-surface-hover-strong);
+      color: var(--bc-color-text);
     }
     .bc-paper-ctec-modal-action-refresh:disabled {
       opacity: 1;
-      color: #6b7280;
-      background: #f7f7f8;
+      color: var(--bc-color-text-muted);
+      background: var(--bc-color-surface-hover);
       animation: bc-paper-ctec-refresh-pulse 1.6s ease-in-out infinite;
     }
     @keyframes bc-paper-ctec-refresh-pulse {
@@ -188,7 +185,7 @@ export function modalStyles(): string {
       gap: 10px;
       margin-top: 12px;
       padding: 10px 12px;
-      border-radius: 10px;
+      border-radius: var(--bc-radius-xl);
       border: 1px solid;
       animation: bc-paper-ctec-flash-in 220ms ease-out;
     }
@@ -197,30 +194,30 @@ export function modalStyles(): string {
       to   { opacity: 1; transform: translateY(0); }
     }
     .bc-paper-ctec-modal-flash-success {
-      background: #ecfdf3;
-      border-color: #abefc6;
-      color: #054f31;
+      background: var(--bc-color-success-bg-soft);
+      border-color: var(--bc-color-success-border);
+      color: var(--bc-color-success-text);
     }
     .bc-paper-ctec-modal-flash-auth {
-      background: #fffaeb;
-      border-color: #fedf89;
-      color: #93370d;
+      background: var(--bc-color-warn-bg-soft);
+      border-color: var(--bc-color-warn-border);
+      color: var(--bc-color-warn-text);
     }
     .bc-paper-ctec-modal-flash-error {
-      background: #fef3f2;
-      border-color: #fecdca;
-      color: #912018;
+      background: var(--bc-color-danger-bg-soft);
+      border-color: var(--bc-color-danger-border);
+      color: var(--bc-color-danger-text);
     }
     .bc-paper-ctec-modal-flash-icon {
       flex-shrink: 0;
       width: 22px;
       height: 22px;
-      border-radius: 50%;
+      border-radius: var(--bc-radius-circle);
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
-      font-weight: 700;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-bold);
       background: rgba(255, 255, 255, 0.65);
     }
     .bc-paper-ctec-modal-flash-text {
@@ -231,19 +228,19 @@ export function modalStyles(): string {
       min-width: 0;
     }
     .bc-paper-ctec-modal-flash-title {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: var(--bc-font-13);
+      font-weight: var(--bc-fw-semibold);
     }
     .bc-paper-ctec-modal-flash-body {
-      font-size: 12px;
+      font-size: var(--bc-font-12);
       opacity: 0.85;
     }
     .bc-paper-ctec-modal-flash-action {
       font: inherit;
-      font-size: 12px;
-      font-weight: 600;
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-semibold);
       padding: 6px 10px;
-      border-radius: 6px;
+      border-radius: var(--bc-radius-md);
       border: 1px solid currentColor;
       background: rgba(255, 255, 255, 0.7);
       color: inherit;
@@ -256,11 +253,11 @@ export function modalStyles(): string {
     }
     .bc-paper-ctec-modal-flash-dismiss {
       font: inherit;
-      font-size: 14px;
+      font-size: var(--bc-font-14);
       line-height: 1;
       width: 22px;
       height: 22px;
-      border-radius: 6px;
+      border-radius: var(--bc-radius-md);
       border: none;
       background: transparent;
       color: inherit;
@@ -270,7 +267,7 @@ export function modalStyles(): string {
     }
     .bc-paper-ctec-modal-flash-dismiss:hover {
       opacity: 1;
-      background: rgba(0, 0, 0, 0.06);
+      background: var(--bc-color-overlay-on-light);
     }
     .bc-paper-ctec-modal-status-body {
       flex: 1;
@@ -278,58 +275,58 @@ export function modalStyles(): string {
       display: grid;
       place-items: center;
       padding: 32px;
-      background: #fafafa;
+      background: var(--bc-color-bg-muted);
     }
     .bc-paper-ctec-modal-status-card {
       max-width: 440px;
       padding: 28px 30px;
-      background: white;
-      border: 1px solid #e6e6ea;
-      border-radius: 14px;
+      background: var(--bc-color-bg);
+      border: 1px solid var(--bc-color-border);
+      border-radius: var(--bc-radius-3xl);
       text-align: center;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      box-shadow: var(--bc-shadow-modal-status);
     }
     .bc-paper-ctec-modal-status-card.is-warn {
-      border-color: rgba(190, 24, 93, 0.28);
-      background: #fff7fb;
+      border-color: var(--bc-color-accent-border-28);
+      background: var(--bc-color-accent-surface-faint);
     }
     .bc-paper-ctec-modal-status-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: #1f2937;
+      font-size: var(--bc-font-18);
+      font-weight: var(--bc-fw-bold);
+      color: var(--bc-color-text);
       margin: 0 0 8px;
     }
     .bc-paper-ctec-modal-status-card.is-warn .bc-paper-ctec-modal-status-title {
-      color: #66023c;
+      color: var(--bc-color-accent);
     }
     .bc-paper-ctec-modal-status-text {
-      font-size: 13px;
+      font-size: var(--bc-font-13);
       line-height: 1.5;
-      color: #4b5563;
+      color: var(--bc-color-text-soft);
       margin: 0 0 16px;
     }
     .bc-paper-ctec-modal-status-primary {
       font: inherit;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
+      font-size: var(--bc-font-13);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-wide);
       padding: 9px 16px;
-      border-radius: 999px;
-      border: 1px solid #66023c;
-      background: #66023c;
-      color: #ffffff;
+      border-radius: var(--bc-radius-pill);
+      border: 1px solid var(--bc-color-accent);
+      background: var(--bc-color-accent);
+      color: var(--bc-color-accent-on);
       cursor: pointer;
     }
     .bc-paper-ctec-modal-status-primary:hover {
-      background: #500030;
+      background: var(--bc-color-accent-hover);
     }
     .bc-paper-ctec-modal-status-spinner {
       width: 32px;
       height: 32px;
       margin: 0 auto 14px;
-      border-radius: 50%;
-      border: 3px solid rgba(102, 2, 60, 0.18);
-      border-top-color: #66023c;
+      border-radius: var(--bc-radius-circle);
+      border: 3px solid var(--bc-color-accent-fill-18);
+      border-top-color: var(--bc-color-accent);
       animation: bc-paper-ctec-modal-spin 900ms linear infinite;
     }
     @keyframes bc-paper-ctec-modal-spin {
@@ -341,16 +338,16 @@ export function modalStyles(): string {
       gap: 8px;
       margin-top: 14px;
       padding: 9px 12px;
-      border-radius: 8px;
-      background: #f7f7f8;
-      border: 1px solid #e6e6ea;
+      border-radius: var(--bc-radius-lg);
+      background: var(--bc-color-surface-hover);
+      border: 1px solid var(--bc-color-border);
       font-size: 11.5px;
       line-height: 1.45;
-      color: #4b5563;
+      color: var(--bc-color-text-soft);
     }
     .bc-paper-ctec-modal-disclaimer strong {
-      color: #1f2937;
-      font-weight: 600;
+      color: var(--bc-color-text);
+      font-weight: var(--bc-fw-semibold);
     }
     .bc-paper-ctec-modal-disclaimer-icon {
       flex-shrink: 0;
@@ -360,26 +357,18 @@ export function modalStyles(): string {
       width: 14px;
       height: 14px;
       margin-top: 2px;
-      border-radius: 50%;
+      border-radius: var(--bc-radius-circle);
       border: 1px solid currentColor;
       font-family: ui-serif, Georgia, "Times New Roman", serif;
       font-style: italic;
-      font-weight: 700;
-      font-size: 10px;
+      font-weight: var(--bc-fw-bold);
+      font-size: var(--bc-font-10);
       line-height: 1;
       opacity: 0.7;
     }
     .bc-paper-ctec-modal-disclaimer-text {
       flex: 1;
       min-width: 0;
-    }
-    .dark .bc-paper-ctec-modal-disclaimer {
-      background: #404040;
-      border-color: #525252;
-      color: #d4d4d4;
-    }
-    .dark .bc-paper-ctec-modal-disclaimer strong {
-      color: #fafafa;
     }
     .bc-paper-ctec-modal-tabs {
       display: flex;
@@ -392,9 +381,9 @@ export function modalStyles(): string {
       border-bottom: 2px solid transparent;
       padding: 10px 16px;
       cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      color: #6b7280;
+      font-size: var(--bc-font-13);
+      font-weight: var(--bc-fw-medium);
+      color: var(--bc-color-text-muted);
       font-family: inherit;
       margin-bottom: -1px;
       display: flex;
@@ -402,181 +391,34 @@ export function modalStyles(): string {
       gap: 8px;
     }
     .bc-paper-ctec-modal-tab.is-active {
-      border-bottom-color: #66023c;
-      color: #66023c;
-      font-weight: 600;
+      border-bottom-color: var(--bc-color-accent);
+      color: var(--bc-color-accent);
+      font-weight: var(--bc-fw-semibold);
     }
     .bc-paper-ctec-modal-tab-count {
-      font-size: 10px;
+      font-size: var(--bc-font-10);
       font-family: ui-monospace, monospace;
-      color: #9ca3af;
-      background: #f7f7f8;
+      color: var(--bc-color-text-subtle);
+      background: var(--bc-color-surface-hover);
       padding: 2px 6px;
-      border-radius: 8px;
+      border-radius: var(--bc-radius-lg);
     }
     .bc-paper-ctec-modal-tab.is-active .bc-paper-ctec-modal-tab-count {
-      color: #66023c;
-      background: #f6ecf2;
+      color: var(--bc-color-accent);
+      background: var(--bc-color-accent-surface-tile);
     }
     .bc-paper-ctec-modal-body {
       flex: 1;
       min-height: 0;
       display: flex;
       flex-direction: column;
-      background: #fafafa;
+      background: var(--bc-color-bg-muted);
     }
     .bc-paper-ctec-modal-overview {
       flex: 1;
       min-height: 0;
       overflow: auto;
       padding: 24px 32px 36px;
-    }
-    .dark .bc-paper-ctec-modal-card {
-      background: #262626;
-      color: #fafafa;
-      box-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.4),
-        0 30px 60px -10px rgba(0, 0, 0, 0.65),
-        0 0 0 1px rgba(255, 255, 255, 0.04);
-    }
-    .dark .bc-paper-ctec-modal-close {
-      border-color: #404040;
-      background: #404040;
-      color: #d4d4d4;
-    }
-    .dark .bc-paper-ctec-modal-close:hover {
-      background: #525252;
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-header {
-      border-bottom-color: #404040;
-    }
-    .dark .bc-paper-ctec-modal-code {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-meta {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-meta > * + *::before {
-      background: #525252;
-    }
-    .dark .bc-paper-ctec-modal-meta strong {
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-report-link {
-      color: #fafafa;
-      border-color: #404040;
-      background: #404040;
-    }
-    .dark .bc-paper-ctec-modal-report-link:hover {
-      background: #525252;
-    }
-    .dark .bc-paper-ctec-modal-action-btn {
-      border-color: #404040;
-      background: #404040;
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-action-btn:hover:not(:disabled) {
-      background: #525252;
-    }
-    .dark .bc-paper-ctec-modal-action-btn.is-primary {
-      border-color: #d8b4fe;
-      background: #d8b4fe;
-      color: #1f1147;
-    }
-    .dark .bc-paper-ctec-modal-action-btn.is-primary:hover:not(:disabled) {
-      background: #c084fc;
-    }
-    .dark .bc-paper-ctec-modal-action-loadmore {
-      color: #a3a3a3;
-      background: transparent;
-      border-color: transparent;
-    }
-    .dark .bc-paper-ctec-modal-action-loadmore:hover:not(:disabled) {
-      background: #404040;
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-action-refresh:disabled {
-      color: #a3a3a3;
-      background: #404040;
-    }
-    .dark .bc-paper-ctec-modal-flash-success {
-      background: rgba(16, 78, 53, 0.32);
-      border-color: rgba(110, 231, 183, 0.36);
-      color: #d1fadf;
-    }
-    .dark .bc-paper-ctec-modal-flash-auth {
-      background: rgba(120, 53, 15, 0.32);
-      border-color: rgba(254, 223, 137, 0.36);
-      color: #fef3c7;
-    }
-    .dark .bc-paper-ctec-modal-flash-error {
-      background: rgba(127, 29, 29, 0.32);
-      border-color: rgba(254, 205, 202, 0.36);
-      color: #fee4e2;
-    }
-    .dark .bc-paper-ctec-modal-flash-icon {
-      background: rgba(255, 255, 255, 0.14);
-    }
-    .dark .bc-paper-ctec-modal-flash-action {
-      background: rgba(255, 255, 255, 0.08);
-    }
-    .dark .bc-paper-ctec-modal-flash-action:hover {
-      background: rgba(255, 255, 255, 0.18);
-    }
-    .dark .bc-paper-ctec-modal-flash-dismiss:hover {
-      background: rgba(255, 255, 255, 0.1);
-    }
-    .dark .bc-paper-ctec-modal-status-body {
-      background: #171717;
-    }
-    .dark .bc-paper-ctec-modal-status-card {
-      background: #262626;
-      border-color: #404040;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-    }
-    .dark .bc-paper-ctec-modal-status-card.is-warn {
-      border-color: rgba(216, 180, 254, 0.32);
-      background: rgba(168, 85, 247, 0.14);
-    }
-    .dark .bc-paper-ctec-modal-status-title {
-      color: #fafafa;
-    }
-    .dark .bc-paper-ctec-modal-status-card.is-warn .bc-paper-ctec-modal-status-title {
-      color: #d8b4fe;
-    }
-    .dark .bc-paper-ctec-modal-status-text {
-      color: #d4d4d4;
-    }
-    .dark .bc-paper-ctec-modal-status-primary {
-      border-color: #d8b4fe;
-      background: #d8b4fe;
-      color: #1f1147;
-    }
-    .dark .bc-paper-ctec-modal-status-primary:hover {
-      background: #c084fc;
-    }
-    .dark .bc-paper-ctec-modal-status-spinner {
-      border-color: rgba(216, 180, 254, 0.24);
-      border-top-color: #d8b4fe;
-    }
-    .dark .bc-paper-ctec-modal-tab {
-      color: #a3a3a3;
-    }
-    .dark .bc-paper-ctec-modal-tab.is-active {
-      border-bottom-color: #d8b4fe;
-      color: #d8b4fe;
-    }
-    .dark .bc-paper-ctec-modal-tab-count {
-      color: #a3a3a3;
-      background: #404040;
-    }
-    .dark .bc-paper-ctec-modal-tab.is-active .bc-paper-ctec-modal-tab-count {
-      color: #d8b4fe;
-      background: rgba(216, 180, 254, 0.18);
-    }
-    .dark .bc-paper-ctec-modal-body {
-      background: #171717;
     }
   `;
 }

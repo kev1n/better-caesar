@@ -6,7 +6,6 @@ export type SearchFilters = {
   // matched (regex, `x` as digit wildcard) against the combined haystack of
   // subject display name, subject symbol, catalog number, and title.
   query: string;
-  distros: Set<string>;
   disciplines: Set<string>;
 };
 
