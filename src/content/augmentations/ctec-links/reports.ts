@@ -291,7 +291,7 @@ async function ensureReportEntries(
       signal: getCurrentPeopleSoftTaskSignal() ?? undefined
     });
     if (isAuthResponse(response.text)) {
-      return { state: "auth-required", loginUrl: response.finalUrl || url };
+      return { state: "auth-required", loginUrl: url };
     }
     if (response.status === 401 || response.status === 403) {
       return { state: "auth-required", loginUrl: CTEC_AUTH_URL };

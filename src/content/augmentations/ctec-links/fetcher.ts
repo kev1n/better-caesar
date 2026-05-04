@@ -102,6 +102,29 @@ async function fetchCtecLinksInternal(
     return { state: "not-found" };
   }
 
+  // Discovery already completed in a prior run and there's nothing left to
+  // probe — return the cached entries directly. Avoids re-running the
+  // subject-results GET and course-action POST on every retry (e.g. after
+  // a bluera-side auth-required interrupts the report-fetch loop).
+  const cachedPending = readCoursePendingRowCount(
+    cachedIndex,
+    catalogNumber,
+    instructor
+  );
+  const hasFetchFailed = realCached.some((e) => e.error === "Fetch failed");
+  const courseStateRecorded = !!cachedIndex?.courseState?.[
+    buildCourseStateKey(catalogNumber, instructor)
+  ];
+  if (
+    !forceRefresh &&
+    courseStateRecorded &&
+    cachedPending === 0 &&
+    !hasFetchFailed &&
+    realCached.length > 0
+  ) {
+    return buildFoundResult(realCached, false);
+  }
+
   // Skip rows already fetched (excluding transient "Fetch failed" so they
   // get retried). Each call fetches the next CTEC_BATCH_SIZE uncached rows;
   // callers re-invoke to load more.
@@ -288,10 +311,8 @@ async function fetchCourseEntries(
 ): Promise<FetchCourseResult> {
   const resultsUrl = buildSubjectResultsUrl(subject, career);
   let html: string;
-  let resultsLoginUrl = CTEC_AUTH_URL;
   try {
     const response = await fetchPeopleSoftGetResult(resultsUrl);
-    resultsLoginUrl = response.finalUrl || CTEC_AUTH_URL;
     if (isUnauthorizedStatus(response.status)) {
       return { type: "auth", loginUrl: CTEC_AUTH_URL };
     }
@@ -300,7 +321,7 @@ async function fetchCourseEntries(
     return { type: "error", message: e instanceof Error ? e.message : "Failed to load CTEC page." };
   }
 
-  if (isAuthResponse(html)) return { type: "auth", loginUrl: resultsLoginUrl };
+  if (isAuthResponse(html)) return { type: "auth", loginUrl: CTEC_AUTH_URL };
 
   const doc = new DOMParser().parseFromString(html, "text/html");
   const form = doc.forms.namedItem("win0");
@@ -319,13 +340,11 @@ async function fetchCourseEntries(
   if (!targetCourse) return { type: "not-found" };
 
   let courseResponse: string;
-  let courseLoginUrl = CTEC_AUTH_URL;
   try {
     const response = await fetchPeopleSoftResult(
       actionUrl,
       buildActionParams(baseParams, targetCourse.actionId)
     );
-    courseLoginUrl = response.finalUrl || CTEC_AUTH_URL;
     if (isUnauthorizedStatus(response.status)) {
       return { type: "auth", loginUrl: CTEC_AUTH_URL };
     }
@@ -334,7 +353,7 @@ async function fetchCourseEntries(
     return { type: "error", message: e instanceof Error ? e.message : "Failed to load course." };
   }
 
-  if (isAuthResponse(courseResponse)) return { type: "auth", loginUrl: courseLoginUrl };
+  if (isAuthResponse(courseResponse)) return { type: "auth", loginUrl: CTEC_AUTH_URL };
 
   const allClassRows = collectClassRowsFromText(courseResponse);
   if (allClassRows.length === 0) return { type: "not-found" };
@@ -372,13 +391,11 @@ async function fetchCourseEntries(
     onProgress?.(`Loading evaluation ${i + 1}/${total}…`);
 
     let classResponse: string;
-    let classLoginUrl = CTEC_AUTH_URL;
     try {
       const response = await fetchPeopleSoftResult(
         classActionUrl,
         buildActionParams(classParams, row.actionId)
       );
-      classLoginUrl = response.finalUrl || CTEC_AUTH_URL;
       if (isUnauthorizedStatus(response.status)) {
         return { type: "auth", loginUrl: CTEC_AUTH_URL };
       }
@@ -396,7 +413,7 @@ async function fetchCourseEntries(
       continue;
     }
 
-    if (isAuthResponse(classResponse)) return { type: "auth", loginUrl: classLoginUrl };
+    if (isAuthResponse(classResponse)) return { type: "auth", loginUrl: CTEC_AUTH_URL };
 
     const blueraUrl = extractBlueraUrl(classResponse);
     resultEntries.push({
