@@ -23,7 +23,7 @@ export type GateStatus =
       lastName: string;
       gradYear: number | null;
     }
-  | { kind: "killed"; message: string }
+  | { kind: "killed"; killId: string; message: string }
   | { kind: "needs-caesar" };
 
 const NAME_REFETCH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -62,7 +62,7 @@ export async function evaluateGate(): Promise<GateStatus> {
   // to logged-out paper.nu users.
   const schedule = await getRemoteSchedule();
   if (schedule.kill) {
-    return { kind: "killed", message: schedule.kill.message };
+    return { kind: "killed", killId: schedule.kill.id, message: schedule.kill.message };
   }
 
   const stored = await readStoredName();

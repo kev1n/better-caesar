@@ -8,10 +8,12 @@ import { renderInlineMarkdown } from "./markdown";
 import { writeStoredCode } from "./storage";
 
 const HOST_ID = "better-caesar-gate-toast";
+const DISMISSED_KILL_IDS_STORAGE_KEY = "better-caesar:gate-toast:dismissed-kill-ids:v1";
 
 let lastShownKind: Exclude<GateStatus["kind"], "unlocked"> | null = null;
 let dismissedKind: GateStatus["kind"] | null = null;
 let codeFormOpen = false;
+let dismissedKillIds: Set<string> = new Set();
 
 export function mountAccessGateToast(): void {
   const apply = (status: GateStatus) => {
@@ -26,8 +28,22 @@ export function mountAccessGateToast(): void {
     whenBodyReady(() => render(status));
   };
 
+  void readDismissedKillIds().then((ids) => {
+    dismissedKillIds = ids;
+    apply(getGateStatusSync());
+  });
+
   apply(getGateStatusSync());
   onGateStatusChange(apply);
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+    if (!changes[DISMISSED_KILL_IDS_STORAGE_KEY]) return;
+    void readDismissedKillIds().then((ids) => {
+      dismissedKillIds = ids;
+      apply(getGateStatusSync());
+    });
+  });
 }
 
 function whenBodyReady(cb: () => void): void {
@@ -52,7 +68,11 @@ function render(status: GateStatus): void {
     existing?.remove();
     return;
   }
-  if (dismissedKind === status.kind) {
+  if (status.kind === "killed" && dismissedKillIds.has(status.killId)) {
+    existing?.remove();
+    return;
+  }
+  if (status.kind !== "killed" && dismissedKind === status.kind) {
     existing?.remove();
     return;
   }
@@ -100,7 +120,13 @@ function paint(root: ShadowRoot, status: LockedStatus): void {
   close.setAttribute("aria-label", "Dismiss");
   close.textContent = "×";
   close.addEventListener("click", () => {
-    dismissedKind = status.kind;
+    if (status.kind === "killed") {
+      // Persistent dismissal: cache the kill id so the toast doesn't return
+      // for this build of the kill switch (server can bump id to re-show).
+      void persistDismissedKillId(status.killId);
+    } else {
+      dismissedKind = status.kind;
+    }
     codeFormOpen = false;
     document.getElementById(HOST_ID)?.remove();
   });
@@ -216,6 +242,23 @@ function buildCodeForm(status: LockedStatus, root: ShadowRoot): HTMLElement {
 
 function isCaesarHost(): boolean {
   return window.location.hostname === "caesar.ent.northwestern.edu";
+}
+
+async function readDismissedKillIds(): Promise<Set<string>> {
+  const result = (await chrome.storage.local.get(DISMISSED_KILL_IDS_STORAGE_KEY)) as Record<
+    string,
+    unknown
+  >;
+  const raw = result[DISMISSED_KILL_IDS_STORAGE_KEY];
+  if (!Array.isArray(raw)) return new Set();
+  return new Set(raw.filter((s) => typeof s === "string"));
+}
+
+async function persistDismissedKillId(id: string): Promise<void> {
+  const current = await readDismissedKillIds();
+  if (current.has(id)) return;
+  current.add(id);
+  await chrome.storage.local.set({ [DISMISSED_KILL_IDS_STORAGE_KEY]: [...current] });
 }
 
 const TOAST_STYLES = `

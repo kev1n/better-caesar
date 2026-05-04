@@ -446,3 +446,45 @@ h1 {
   font-size: 11px;
   color: var(--bc-color-text-muted);
 }
+
+.schedule-broadcast {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--bc-color-border-strong);
+  border-radius: var(--bc-radius-lg);
+  background: var(--bc-color-bg-app);
+}
+
+.schedule-broadcast-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 11px;
+}
+
+.schedule-broadcast-label {
+  font-weight: var(--bc-fw-bold);
+  color: var(--bc-color-text-strong);
+}
+
+.schedule-broadcast-status {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--bc-color-text-muted);
+}
+
+.schedule-broadcast-status--active {
+  color: var(--bc-color-accent);
+}
+
+.schedule-broadcast-body {
+  margin-top: 4px;
+  font-size: var(--bc-font-12);
+  color: var(--bc-color-text-strong);
+  line-height: 1.4;
+}
+
+.schedule-broadcast-body a {
+  color: var(--bc-color-accent);
+  text-decoration: underline;
+}

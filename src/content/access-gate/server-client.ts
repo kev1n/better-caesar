@@ -6,9 +6,7 @@ import { FALLBACK_BUCKET_RELEASE_TIMESTAMPS } from "./constants";
 // so the background fetch is allowed.
 export const BUCKET_SCHEDULE_URL = __BC_BUCKET_SCHEDULE_URL__;
 
-// TESTING: dropped to 30s for fast iteration on the local schedule server.
-// Restore to 30 * 60 * 1000 (30 min) before shipping to keep server load sane.
-const SCHEDULE_REFETCH_INTERVAL_MS = 30 * 1000;
+const SCHEDULE_REFETCH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const SCHEDULE_STORAGE_KEY = "better-caesar:access-gate:bucket-schedule:v1";
 
 // Wire format the schedule server must return:
@@ -38,32 +36,39 @@ const SCHEDULE_STORAGE_KEY = "better-caesar:access-gate:bucket-schedule:v1";
 // `message`). The HMAC-code override does NOT bypass the kill switch.
 //
 // `banner` — optional. A passive informational strip that renders at the top
-// of CAESAR and paper.nu pages. Doesn't disable anything; users can dismiss
-// per-message (changing `message` re-shows it).
+// of CAESAR and paper.nu pages. Doesn't disable anything.
 //
-// `kill.message` and `banner.message` both support inline [text](url) links
-// with http(s) URLs; everything else renders as plain text. Omit a key (or
-// send null) to clear it.
+// Both objects require `{ id, message }`. The `id` is the dismissal key:
+// once a user clicks the toast / banner close, that id is cached in
+// chrome.storage.local and won't show up again. Edit `message` while
+// keeping the same `id` to fix typos without re-pestering everyone; bump
+// `id` (e.g. "maint-2026-08-15") to force a re-show. The kill *behavior*
+// applies regardless of toast dismissal — only the toast UI is hidden.
+//
+// `message` supports inline [text](url) links with http(s) URLs; everything
+// else renders as plain text. Omit a key (or send null) to clear it.
 //
 // The server should serve this with permissive CORS (the extension fetches
 // via the background worker, so any 200 response is fine) and a short
 // cache-control max-age — the extension also caches client-side for 30 min.
+export type Broadcast = { id: string; message: string };
+
 export type BucketScheduleResponse = {
   releases: [string, string, string];
-  kill?: { message: string } | null;
-  banner?: { message: string } | null;
+  kill?: Broadcast | null;
+  banner?: Broadcast | null;
 };
 
 export type RemoteSchedule = {
   releases: readonly [number, number, number];
-  kill: { message: string } | null;
-  banner: { message: string } | null;
+  kill: Broadcast | null;
+  banner: Broadcast | null;
 };
 
 type CachedSchedule = {
   releaseAt: [number, number, number];
-  kill: { message: string } | null;
-  banner: { message: string } | null;
+  kill: Broadcast | null;
+  banner: Broadcast | null;
   fetchedAt: number;
 };
 
@@ -124,11 +129,12 @@ async function fetchSchedule(): Promise<RemoteSchedule | null> {
   }
 }
 
-function parseMessageBlock(raw: unknown): { message: string } | null {
+function parseMessageBlock(raw: unknown): Broadcast | null {
   if (!raw || typeof raw !== "object") return null;
-  const message = (raw as { message?: unknown }).message;
-  if (typeof message !== "string" || message.length === 0) return null;
-  return { message };
+  const candidate = raw as { id?: unknown; message?: unknown };
+  if (typeof candidate.id !== "string" || candidate.id.length === 0) return null;
+  if (typeof candidate.message !== "string" || candidate.message.length === 0) return null;
+  return { id: candidate.id, message: candidate.message };
 }
 
 async function readCachedSchedule(): Promise<CachedSchedule | null> {

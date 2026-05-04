@@ -1,8 +1,12 @@
 import { renderInlineMarkdown } from "./markdown";
-import { readCachedRemoteSchedule, SCHEDULE_CACHE_STORAGE_KEY } from "./server-client";
+import {
+  readCachedRemoteSchedule,
+  SCHEDULE_CACHE_STORAGE_KEY,
+  type Broadcast
+} from "./server-client";
 
 const HOST_ID = "better-caesar-server-banner";
-const DISMISSED_STORAGE_KEY = "better-caesar:server-banner:dismissed-message:v1";
+const DISMISSED_IDS_STORAGE_KEY = "better-caesar:server-banner:dismissed-ids:v1";
 
 export function mountServerBanner(): void {
   // Content scripts run in every frame (all_frames: true). A position:fixed
@@ -12,7 +16,7 @@ export function mountServerBanner(): void {
   void renderFromCache();
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
-    if (!changes[SCHEDULE_CACHE_STORAGE_KEY] && !changes[DISMISSED_STORAGE_KEY]) return;
+    if (!changes[SCHEDULE_CACHE_STORAGE_KEY] && !changes[DISMISSED_IDS_STORAGE_KEY]) return;
     void renderFromCache();
   });
 }
@@ -27,9 +31,9 @@ function isTopFrame(): boolean {
 
 async function renderFromCache(): Promise<void> {
   const schedule = await readCachedRemoteSchedule();
-  const message = schedule?.banner?.message ?? null;
-  const dismissed = await readDismissedMessage();
-  whenBodyReady(() => render(message, dismissed));
+  const banner = schedule?.banner ?? null;
+  const dismissed = await readDismissedIds();
+  whenBodyReady(() => render(banner, dismissed));
 }
 
 function whenBodyReady(cb: () => void): void {
@@ -45,15 +49,15 @@ function whenBodyReady(cb: () => void): void {
   observer.observe(document.documentElement, { childList: true });
 }
 
-function render(message: string | null, dismissed: string | null): void {
+function render(banner: Broadcast | null, dismissed: Set<string>): void {
   const existing = document.getElementById(HOST_ID);
-  if (!message || message === dismissed) {
+  if (!banner || dismissed.has(banner.id)) {
     existing?.remove();
     return;
   }
 
   const { root } = ensureHost(existing);
-  paint(root, message);
+  paint(root, banner);
 }
 
 function ensureHost(existing: HTMLElement | null): { host: HTMLElement; root: ShadowRoot } {
@@ -63,8 +67,6 @@ function ensureHost(existing: HTMLElement | null): { host: HTMLElement; root: Sh
   existing?.remove();
   const host = document.createElement("div");
   host.id = HOST_ID;
-  // z-index sits one below the gate toast (2147483647) so the toast wins
-  // when both happen to be visible.
   host.style.cssText = [
     "all: initial",
     "position: fixed",
@@ -80,32 +82,38 @@ function ensureHost(existing: HTMLElement | null): { host: HTMLElement; root: Sh
   return { host, root };
 }
 
-function paint(root: ShadowRoot, message: string): void {
-  const banner = root.querySelector(".banner");
-  if (!(banner instanceof HTMLElement)) return;
-  banner.innerHTML = "";
+function paint(root: ShadowRoot, banner: Broadcast): void {
+  const el = root.querySelector(".banner");
+  if (!(el instanceof HTMLElement)) return;
+  el.innerHTML = "";
 
   const text = document.createElement("div");
   text.className = "text";
-  renderInlineMarkdown(text, message);
+  renderInlineMarkdown(text, banner.message);
 
   const close = document.createElement("button");
   close.className = "close";
   close.type = "button";
   close.setAttribute("aria-label", "Dismiss");
   close.textContent = "×";
-  close.addEventListener("click", () => {
-    void chrome.storage.local.set({ [DISMISSED_STORAGE_KEY]: message });
-    document.getElementById(HOST_ID)?.remove();
-  });
+  close.addEventListener("click", () => void dismiss(banner.id));
 
-  banner.append(text, close);
+  el.append(text, close);
 }
 
-async function readDismissedMessage(): Promise<string | null> {
-  const result = (await chrome.storage.local.get(DISMISSED_STORAGE_KEY)) as Record<string, unknown>;
-  const raw = result[DISMISSED_STORAGE_KEY];
-  return typeof raw === "string" ? raw : null;
+async function dismiss(id: string): Promise<void> {
+  const current = await readDismissedIds();
+  if (current.has(id)) return;
+  current.add(id);
+  await chrome.storage.local.set({ [DISMISSED_IDS_STORAGE_KEY]: [...current] });
+  // Storage onChange listener triggers re-render, which removes the host.
+}
+
+async function readDismissedIds(): Promise<Set<string>> {
+  const result = (await chrome.storage.local.get(DISMISSED_IDS_STORAGE_KEY)) as Record<string, unknown>;
+  const raw = result[DISMISSED_IDS_STORAGE_KEY];
+  if (!Array.isArray(raw)) return new Set();
+  return new Set(raw.filter((s) => typeof s === "string"));
 }
 
 const BANNER_STYLES = `

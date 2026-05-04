@@ -607,13 +607,8 @@ function paintSchedulePanel(root: HTMLElement, schedule: RemoteSchedule | null):
     return;
   }
 
-  const meta = document.createElement("div");
-  meta.className = "schedule-meta";
-  const flags: string[] = [];
-  if (schedule.kill) flags.push("kill on");
-  if (schedule.banner) flags.push("banner on");
-  meta.textContent = flags.length ? `Active: ${flags.join(", ")}` : "No kill or banner active";
-  root.append(meta);
+  root.append(buildBroadcastRow("Kill switch", schedule.kill));
+  root.append(buildBroadcastRow("Banner", schedule.banner));
 
   const list = document.createElement("ul");
   list.className = "schedule-list";
@@ -643,6 +638,33 @@ function paintSchedulePanel(root: HTMLElement, schedule: RemoteSchedule | null):
   }
 
   root.append(list);
+}
+
+function buildBroadcastRow(label: string, broadcast: { id: string; message: string } | null): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "schedule-broadcast";
+
+  const head = document.createElement("div");
+  head.className = "schedule-broadcast-head";
+  const labelEl = document.createElement("span");
+  labelEl.className = "schedule-broadcast-label";
+  labelEl.textContent = label;
+  const status = document.createElement("span");
+  status.className = "schedule-broadcast-status";
+  status.textContent = broadcast ? `active · id: ${broadcast.id}` : "inactive";
+  status.classList.toggle("schedule-broadcast-status--active", !!broadcast);
+  head.append(labelEl, status);
+
+  row.append(head);
+
+  if (broadcast) {
+    const body = document.createElement("div");
+    body.className = "schedule-broadcast-body";
+    renderInlineMarkdown(body, broadcast.message);
+    row.append(body);
+  }
+
+  return row;
 }
 
 function formatCountdown(ms: number): string {
