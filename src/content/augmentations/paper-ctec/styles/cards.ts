@@ -321,6 +321,18 @@ export function cardStyles(): string {
       transition: opacity var(--bc-tx-base) var(--bc-easing), visibility var(--bc-tx-base) var(--bc-easing);
       z-index: 30;
     }
+    /* Invisible hover bridge over the 6px gap so the cursor never enters
+       dead space between the chip and the popup. Without this, the
+       popup's mouseenter only fires after the cursor crosses the gap,
+       and a slow hand can lose the trigger before reaching it. */
+    .${WIDGET_CLASS}-preview::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 100%;
+      height: 12px;
+    }
     .${WIDGET_CLASS}-preview.is-visible {
       opacity: 1;
       visibility: visible;

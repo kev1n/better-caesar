@@ -250,6 +250,14 @@ function createPreviewController(card: HTMLElement): PreviewController {
   const active = new Set<HTMLElement>();
   let built = false;
   let dataSource: () => ModalDisplayData | null = () => null;
+  let hideTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const cancelHide = () => {
+    if (hideTimer !== null) {
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+  };
 
   const ensurePopup = () => {
     if (popup) return popup;
@@ -260,12 +268,13 @@ function createPreviewController(card: HTMLElement): PreviewController {
     // chip's mouseleave fires the moment the cursor crosses into the
     // popup and the user never gets to read the charts.
     el.addEventListener("mouseenter", () => {
+      cancelHide();
       active.add(el);
       el.classList.add("is-visible");
     });
     el.addEventListener("mouseleave", () => {
       active.delete(el);
-      if (active.size === 0) el.classList.remove("is-visible");
+      scheduleHide();
     });
     popup = el;
     return el;
@@ -279,6 +288,7 @@ function createPreviewController(card: HTMLElement): PreviewController {
   };
 
   const show = (chip: HTMLElement) => {
+    cancelHide();
     active.add(chip);
     buildIfNeeded();
     const el = ensurePopup();
@@ -286,17 +296,33 @@ function createPreviewController(card: HTMLElement): PreviewController {
     el.classList.add("is-visible");
   };
 
+  // Defer hiding so the cursor can cross the gap between the chip and
+  // popup without the popup snapping shut. The popup's own mouseenter
+  // cancels the timer, keeping it open as long as the cursor lands.
+  const scheduleHide = () => {
+    if (active.size > 0 || !popup) return;
+    cancelHide();
+    hideTimer = setTimeout(() => {
+      hideTimer = null;
+      if (active.size === 0 && popup) {
+        popup.classList.remove("is-visible");
+      }
+    }, 200);
+  };
+
   const hide = (chip: HTMLElement) => {
     active.delete(chip);
-    if (active.size === 0 && popup) {
-      popup.classList.remove("is-visible");
-    }
+    scheduleHide();
   };
 
   const attachTrigger = (chip: HTMLElement) => {
     if (chip.dataset.bcPaperCtecPreviewBound === "1") return;
     chip.dataset.bcPaperCtecPreviewBound = "1";
     chip.classList.add(TRIGGER_CLASS);
+    chip.removeAttribute("title");
+    for (const el of chip.querySelectorAll<HTMLElement>("[title]")) {
+      el.removeAttribute("title");
+    }
     chip.addEventListener("mouseenter", () => show(chip));
     chip.addEventListener("mouseleave", () => hide(chip));
     chip.addEventListener("focus", () => show(chip));
