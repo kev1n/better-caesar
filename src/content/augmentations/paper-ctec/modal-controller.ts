@@ -250,7 +250,11 @@ export class ModalController {
         awaitingAuth: this.callbacks.isAwaitingRetry(),
         errorMessage,
         notFound,
-        canRefresh: !!data && !authUrl && !errorMessage,
+        // Refresh is the user's recovery path when the resumeIfNeeded
+        // auto-retry was disabled (see commit 0391fd7). Allow it on error
+        // even with no data, otherwise an errored fetch with no parsed
+        // entries leaves the modal as a dead end.
+        canRefresh: !authUrl && (!!data || !!errorMessage),
         canLoadMore,
         loadMoreBatchSize: PAPER_CTEC_CONFIG.aggregate.recentTerms,
         remainingTerms,
