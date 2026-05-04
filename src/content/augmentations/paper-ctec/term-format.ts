@@ -4,8 +4,8 @@
 const SEASON_ABBR: Record<string, string> = {
   Fall: "F",
   Winter: "W",
-  Spring: "Sp",
-  Summer: "Su"
+  Spring: "Spr",
+  Summer: "Sum"
 };
 
 export function abbrTerm(term: string): string {

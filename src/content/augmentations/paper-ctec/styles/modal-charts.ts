@@ -260,19 +260,19 @@ export function modalChartStyles(): string {
       font-size: var(--bc-font-11);
       color: var(--bc-color-text-subtle);
     }
-    .bc-paper-ctec-modal-kpi-delta {
-      font-size: var(--bc-font-11);
+    /* Qualitative descriptor of the headline value ("Great instruction",
+       "Easy", "Light workload"). Pinned to the bottom-right corner of the
+       card; the .bc-paper-ctec-modal-kpi rule already sets position:
+       relative so absolute positioning anchors here. */
+    .bc-paper-ctec-modal-kpi-band {
+      position: absolute;
+      right: 12px;
+      bottom: 10px;
+      font-size: var(--bc-font-10);
       font-weight: var(--bc-fw-semibold);
-    }
-    .bc-paper-ctec-modal-kpi-delta.is-positive { color: var(--bc-color-success); }
-    .bc-paper-ctec-modal-kpi-delta.is-negative { color: var(--bc-color-danger-rose); }
-    .bc-paper-ctec-modal-kpi-delta.is-muted {
-      color: var(--bc-color-text-subtle);
-      font-weight: var(--bc-fw-regular);
-    }
-    .bc-paper-ctec-modal-kpi-delta-note {
-      color: var(--bc-color-text-subtle);
-      font-weight: var(--bc-fw-regular);
+      letter-spacing: 0.2px;
+      color: var(--bc-color-text-muted);
+      pointer-events: none;
     }
     .bc-paper-ctec-modal-charts {
       display: grid;
@@ -524,6 +524,7 @@ export function modalChartStyles(): string {
     .dark .bc-paper-ctec-modal-trend-svg [fill="#7a596a"] { fill: #a3a3a3; }
     .dark .bc-paper-ctec-modal-sparkline [stroke="#66023c"] { stroke: #d8b4fe; }
     .dark .bc-paper-ctec-modal-sparkline [fill="#66023c"] { fill: #d8b4fe; }
+    .dark .bc-paper-ctec-modal-sparkline [fill="#7a596a"] { fill: #a3a3a3; }
     .dark .bc-paper-ctec-histogram-svg [stroke="#e6e6ea"] { stroke: #525252; }
     .dark .bc-paper-ctec-histogram-svg [fill="#6b7280"] { fill: #a3a3a3; }
     .dark .bc-paper-ctec-histogram-svg [fill="#9ca3af"] { fill: #a3a3a3; }

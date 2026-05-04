@@ -21,9 +21,11 @@ const ZONE_TIERS = [
   "rgba(22,163,74,0.10)"
 ] as const;
 
-export const RATING_TREND_ZONES: ChartZone[] = ZONE_TIERS.map(
-  (fill, i) => ({ from: 1 + i, to: 2 + i, fill })
-);
+export const RATING_TREND_ZONES: ChartZone[] = ZONE_TIERS.map((fill, i) => ({
+  from: 1 + i,
+  to: 2 + i,
+  fill
+}));
 
 export const HOURS_TREND_ZONES: ChartZone[] = [...ZONE_TIERS]
   .reverse()

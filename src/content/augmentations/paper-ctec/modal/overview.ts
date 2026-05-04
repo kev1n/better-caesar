@@ -18,6 +18,7 @@ import { COMPACT_CARD_STARS_FEATURE_ID } from "../constants";
 import { formatChipRating, isRatingPercentMode } from "../rating-format";
 import { attachTooltip, createRatingStars, preventAndStop } from "../ui-shared";
 import { pickMetricHue } from "../widget-chips";
+import { appendBandLabel } from "./band-labels";
 import { renderDistChart, renderTrendChart } from "./charts";
 import { abbrTerm } from "../term-format";
 import { pickSelectedTerm, renderCard } from "./common";
@@ -50,24 +51,14 @@ function recentMean(
   }).mean;
 }
 
-// Per-term {value, term} pairs for one metric, oldest → newest, restricted
-// to the most-recent N. Used for the KPI sparkline + delta so they describe
-// the same window as the headline number — and so the delta caption can
-// name the actual term it's comparing against (instead of saying a generic
-// "vs recent term" that leaves users guessing whether a missing-data term
-// silently shifted the comparison).
-function recentTrendEntries(
+function trendValuesFor(
   trendTerms: ModalTerm[],
-  kind: ModalMetricKind,
-  recent: number
-): Array<{ value: number; term: ModalTerm }> {
-  // trendTerms is oldest-first, so the recent N are the LAST N.
-  const slice =
-    recent >= trendTerms.length ? trendTerms : trendTerms.slice(-recent);
-  const out: Array<{ value: number; term: ModalTerm }> = [];
-  for (const term of slice) {
+  kind: ModalMetricKind
+): number[] {
+  const out: number[] = [];
+  for (const term of trendTerms) {
     const v = term.metrics[kind];
-    if (typeof v === "number") out.push({ value: v, term });
+    if (typeof v === "number") out.push(v);
   }
   return out;
 }
@@ -188,10 +179,8 @@ export function renderOverview(
   root.className = "bc-paper-ctec-modal-overview";
 
   const recent = getRecentAggregationTerms();
-  const effectiveRecent = Math.min(recent, data.terms.length);
-  const showDelta = effectiveRecent >= 2;
   root.append(renderKpiScopeNote(doc, data, recent));
-  root.append(renderKpiStrip(doc, data, state, callbacks, showDelta, recent));
+  root.append(renderKpiStrip(doc, data, state, callbacks, recent));
 
   if (state.activeMetric === "global") {
     root.append(renderGlobalSection(doc, data, state, callbacks));
@@ -335,7 +324,6 @@ function renderKpiStrip(
   data: ModalDisplayData,
   state: AnalyticsModalState,
   callbacks: AnalyticsModalCallbacks,
-  showDelta: boolean,
   recent: number
 ): HTMLElement {
   const groups: Array<{
@@ -349,18 +337,18 @@ function renderKpiStrip(
     {
       label: "Quality",
       cards: (["instruction", "course", "learned"] as const).map((kind) =>
-        renderKpiCard(doc, kind, data, state, callbacks, showDelta, recent)
+        renderKpiCard(doc, kind, data, state, callbacks, recent)
       )
     },
     {
       label: "Character",
       cards: (["challenging", "stimulating"] as const).map((kind) =>
-        renderKpiCard(doc, kind, data, state, callbacks, showDelta, recent)
+        renderKpiCard(doc, kind, data, state, callbacks, recent)
       )
     },
     {
       label: "Workload",
-      cards: [renderKpiCard(doc, "hours", data, state, callbacks, showDelta, recent)]
+      cards: [renderKpiCard(doc, "hours", data, state, callbacks, recent)]
     }
   ];
 
@@ -404,24 +392,10 @@ function renderKpiCard(
   data: ModalDisplayData,
   state: AnalyticsModalState,
   callbacks: AnalyticsModalCallbacks,
-  showDelta: boolean,
   recent: number
 ): HTMLElement {
-  const trendEntries = recentTrendEntries(data.trendTerms, kind, recent);
-  const fullTrendEntries = recentTrendEntries(
-    data.trendTerms,
-    kind,
-    data.trendTerms.length
-  );
-  const trend = fullTrendEntries.map((entry) => entry.value);
+  const trend = trendValuesFor(data.trendTerms, kind);
   const meanValue = recentMean(data.terms, kind, recent);
-  const lastEntry = trendEntries[trendEntries.length - 1] ?? null;
-  const prevEntry =
-    trendEntries.length >= 2 ? trendEntries[trendEntries.length - 2] : null;
-  const last = lastEntry?.value ?? null;
-  const prev = prevEntry?.value ?? null;
-  const delta = prev != null && last != null ? last - prev : 0;
-  const positive = kind === "hours" ? delta <= 0 : delta >= 0;
   const isActive = state.activeMetric === kind;
 
   const button = doc.createElement("button");
@@ -441,7 +415,7 @@ function renderKpiCard(
   top.append(label);
 
   if (trend.length >= 2) {
-    top.append(renderSparkline(doc, trend, 56, 18));
+    top.append(renderSparkline(doc, trend, 80, 20, kind));
   }
   button.append(top);
 
@@ -458,25 +432,7 @@ function renderKpiCard(
   }
   button.append(value);
 
-  const deltaRow = doc.createElement("div");
-  deltaRow.className = `bc-paper-ctec-modal-kpi-delta${
-    showDelta ? (positive ? " is-positive" : " is-negative") : " is-muted"
-  }`;
-  if (!showDelta) {
-    deltaRow.textContent = "only term taught";
-  } else if (delta === 0) {
-    deltaRow.textContent = "—";
-  } else {
-    const arrow = positive ? "▲" : "▼";
-    const note = doc.createElement("span");
-    note.className = "bc-paper-ctec-modal-kpi-delta-note";
-    note.textContent = prevEntry ? ` vs ${prevEntry.term.term}` : " vs recent term";
-    deltaRow.append(
-      doc.createTextNode(`${arrow} ${Math.abs(delta).toFixed(1)}`),
-      note
-    );
-  }
-  button.append(deltaRow);
+  appendBandLabel(doc, button, kind, meanValue);
 
   return button;
 }
@@ -495,7 +451,6 @@ function renderGlobalKpiCard(
 ): HTMLElement {
   const isActive: boolean = state.activeMetric === "global";
 
-  const recentTerms = data.terms.slice(0, recent);
   // Build the Global mean from each component metric's response-weighted
   // mean (the same `recentMean` the per-metric KPIs use), then average
   // those across the three metrics. This keeps the Global card consistent
@@ -510,17 +465,9 @@ function renderGlobalKpiCard(
     components.length > 0
       ? components.reduce((sum, v) => sum + v, 0) / components.length
       : 0;
-  const recentTrendTerms =
-    recent >= data.trendTerms.length
-      ? data.trendTerms
-      : data.trendTerms.slice(-recent);
-  const globalTrendEntries = recentTrendTerms
-    .map((term) => ({ value: computeGlobalMean([term]), term }))
-    .filter((entry) => entry.value > 0);
-  const fullGlobalTrendEntries = data.trendTerms
-    .map((term) => ({ value: computeGlobalMean([term]), term }))
-    .filter((entry) => entry.value > 0);
-  const trend = fullGlobalTrendEntries.map((entry) => entry.value);
+  const trend = data.trendTerms
+    .map((term) => computeGlobalMean([term]))
+    .filter((value) => value > 0);
 
   const button = doc.createElement("button");
   button.type = "button";
@@ -555,7 +502,7 @@ function renderGlobalKpiCard(
   top.append(labelGroup);
 
   if (trend.length >= 2) {
-    top.append(renderSparkline(doc, trend, 56, 18));
+    top.append(renderSparkline(doc, trend, 80, 20, "global"));
   }
   button.append(top);
 
@@ -572,39 +519,7 @@ function renderGlobalKpiCard(
   }
   button.append(value);
 
-  const lastGlobalEntry =
-    globalTrendEntries[globalTrendEntries.length - 1] ?? null;
-  const prevGlobalEntry =
-    globalTrendEntries.length >= 2
-      ? globalTrendEntries[globalTrendEntries.length - 2]
-      : null;
-  const last = lastGlobalEntry?.value ?? null;
-  const prev = prevGlobalEntry?.value ?? null;
-  const delta = prev != null && last != null ? last - prev : 0;
-  const positive = delta >= 0;
-  const showDelta = recentTerms.length >= 2;
-
-  const deltaRow = doc.createElement("div");
-  deltaRow.className = `bc-paper-ctec-modal-kpi-delta${
-    showDelta ? (positive ? " is-positive" : " is-negative") : " is-muted"
-  }`;
-  if (!showDelta) {
-    deltaRow.textContent = "only term taught";
-  } else if (delta === 0) {
-    deltaRow.textContent = "—";
-  } else {
-    const arrow = positive ? "▲" : "▼";
-    const note = doc.createElement("span");
-    note.className = "bc-paper-ctec-modal-kpi-delta-note";
-    note.textContent = prevGlobalEntry
-      ? ` vs ${prevGlobalEntry.term.term}`
-      : " vs recent term";
-    deltaRow.append(
-      doc.createTextNode(`${arrow} ${Math.abs(delta).toFixed(1)}`),
-      note
-    );
-  }
-  button.append(deltaRow);
+  appendBandLabel(doc, button, "global", overallMean);
 
   return button;
 }
@@ -613,13 +528,26 @@ function renderSparkline(
   doc: Document,
   values: number[],
   width: number,
-  height: number
+  height: number,
+  kind: ModalMetricKind | "global"
 ): SVGElement {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
+  // Padded scale: shows trend shape without faking magnitude. A 5.0 → 5.2
+  // trend sits in the upper region rather than filling the whole chart.
+  // The padding (1 rating unit, 4 hours) leaves visible breathing room
+  // above and below the line, clamped to the metric's natural bounds.
+  const isHours = kind === "hours";
+  const scaleMin = isHours ? 0 : 1;
+  const scaleMax = isHours ? 20 : 6;
+  const padding = isHours ? 4 : 1;
+  const dataMin = Math.min(...values);
+  const dataMax = Math.max(...values);
+  const yMin = Math.max(scaleMin, Math.floor(dataMin) - padding);
+  const yMax = Math.min(scaleMax, Math.ceil(dataMax) + padding);
+  const span = yMax - yMin || 1;
+
   const xAt = (i: number) => (i / Math.max(1, values.length - 1)) * width;
-  const yAt = (v: number) => height - 1 - ((v - min) / span) * (height - 2);
+  const yAt = (v: number) =>
+    height - 1 - ((v - yMin) / span) * (height - 2);
 
   const svg = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("width", String(width));
@@ -638,9 +566,9 @@ function renderSparkline(
   );
   svg.append(polyline);
 
-  const dot = doc.createElementNS("http://www.w3.org/2000/svg", "circle");
   const lastValue = values[values.length - 1];
   if (typeof lastValue === "number") {
+    const dot = doc.createElementNS("http://www.w3.org/2000/svg", "circle");
     dot.setAttribute("cx", String(xAt(values.length - 1)));
     dot.setAttribute("cy", String(yAt(lastValue)));
     dot.setAttribute("r", "2");
