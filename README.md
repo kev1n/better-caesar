@@ -1,14 +1,14 @@
-# Pencil
+# pencil.nu
 
-Pencil is a Northwestern course-planning browser extension for CAESAR and Paper.
+pencil.nu is a Northwestern course-planning browser extension for CAESAR and Paper.
 
-## Students: get Pencil
+## Students: get pencil.nu
 
 Go to [pencil.nu](https://pencil.nu) for the current install link, release notes, and student-facing setup instructions.
 
-This repository is mainly here for transparency and review. If you just want to use Pencil, start at [pencil.nu](https://pencil.nu), install the browser extension, then open CAESAR or Paper as usual.
+This repository is mainly here for transparency and review. If you just want to use pencil.nu, start at [pencil.nu](https://pencil.nu), install the browser extension, then open CAESAR or Paper as usual.
 
-## What Pencil adds
+## What pencil.nu adds
 
 - Better CAESAR class search powered by Paper catalog data, with live CAESAR status fetched on demand.
 - Seats, notes, requirements, attributes, and section details in CAESAR shopping-cart and class-search views.
@@ -18,14 +18,14 @@ This repository is mainly here for transparency and review. If you just want to 
 
 ## Notes for NUIT
 
-Pencil is a client-side browser extension. It does not run a Pencil-owned backend that receives student CAESAR data, and it does not add third-party analytics or remote logging in the current codebase.
+pencil.nu is a client-side browser extension. It does not run a pencil.nu-owned backend that receives student CAESAR data, and it does not add third-party analytics or remote logging in the current codebase.
 
 Sensitive Northwestern session data stays within the browser and Northwestern services:
 
 - CAESAR and CTEC requests are made from the installed browser extension using the student's existing authenticated browser session.
-- CAESAR form state, PeopleSoft tokens, cookies, and CTEC page responses are not posted to Pencil-owned servers.
+- CAESAR form state, PeopleSoft tokens, cookies, and CTEC page responses are not posted to pencil.nu-owned servers.
 - Local extension state is stored in `chrome.storage.local`, `localStorage`, or `sessionStorage` on the device. This includes feature toggles, course/catalog caches, CTEC caches, seat/note caches, rate-limit timestamps, and the local staged-rollout gate data.
-- The staged-rollout gate reads the student's CAESAR profile name only to determine rollout eligibility by last-name bucket or local access code. That value is stored locally and is not transmitted to a Pencil service.
+- The staged-rollout gate reads the student's CAESAR profile name only to determine rollout eligibility by last-name bucket or local access code. That value is stored locally and is not transmitted to a pencil.nu service.
 - Paper catalog data is fetched from Paper data endpoints (`api-legacy.dilanxd.com` and `cdn.dil.sh`) and cached locally. Those requests are for catalog/course data, not CAESAR credentials or CAESAR form submissions.
 
 The requested permissions are scoped to the product surface:
@@ -39,7 +39,7 @@ Why this should not be problematic for review:
 - It is source-available and auditable from this repo.
 - It is Manifest V3 and builds to a normal Chrome extension package.
 - It augments pages the student already has permission to view.
-- It keeps Pencil-specific state local to the browser rather than creating a separate student-data store.
+- It keeps pencil.nu-specific state local to the browser rather than creating a separate student-data store.
 - It can be deployed first to a small Google Admin test group or OU before any broad rollout.
 - NUIT can disable or force-install it using standard Chrome enterprise app and extension policy controls.
 
@@ -145,15 +145,15 @@ Core pieces:
 - `src/popup/*`: extension popup UI for feature toggles, local cache controls, and access status.
 - `src/shared/*`: typed message contracts between content scripts, popup, and background worker.
 
-## Transparency: how Pencil works
+## Transparency: how pencil.nu works
 
-At page load, Chrome injects Pencil's content script only into the page hosts listed under `content_scripts` in `src/manifest.base.json`: CAESAR and Paper. Host permissions separately allow the background worker to fetch required Northwestern SSO/Bluera/CTEC pages and Paper catalog/CDN data.
+At page load, Chrome injects pencil.nu's content script only into the page hosts listed under `content_scripts` in `src/manifest.base.json`: CAESAR and Paper. Host permissions separately allow the background worker to fetch required Northwestern SSO/Bluera/CTEC pages and Paper catalog/CDN data.
 
 The content script starts a registry of independent augmentations. Each augmentation decides whether it applies to the current page, finds the relevant DOM nodes, fetches any needed data, and renders a small UI enhancement into the existing CAESAR or Paper page.
 
-For CAESAR pages, Pencil reads the current PeopleSoft form state from the active page and sends normal CAESAR requests with the same authenticated browser session the student is already using. It parses the returned HTML locally and renders class status, seats, notes, enrollment metadata, or CTEC links.
+For CAESAR pages, pencil.nu reads the current PeopleSoft form state from the active page and sends normal CAESAR requests with the same authenticated browser session the student is already using. It parses the returned HTML locally and renders class status, seats, notes, enrollment metadata, or CTEC links.
 
-For Paper pages, Pencil uses Paper catalog data for course search and schedule context. When CTEC data is requested, the extension uses the student's Northwestern session to read the relevant Northwestern CTEC/Bluera pages, parses summaries locally, and stores only local cache entries in the browser.
+For Paper pages, pencil.nu uses Paper catalog data for course search and schedule context. When CTEC data is requested, the extension uses the student's Northwestern session to read the relevant Northwestern CTEC/Bluera pages, parses summaries locally, and stores only local cache entries in the browser.
 
 The background worker does not maintain a server-side data store. It only handles extension tasks that need background privileges: cross-origin fetches allowed by the manifest, opening/closing the Northwestern auth popup, and maintaining the optional CAESAR short-domain redirect rule.
 
@@ -161,4 +161,4 @@ Local caches exist to reduce repeat CAESAR/CTEC/Paper requests and to keep the U
 
 ## License
 
-Pencil is released under the MIT License. See [LICENSE](LICENSE).
+pencil.nu is released under the MIT License. See [LICENSE](LICENSE).

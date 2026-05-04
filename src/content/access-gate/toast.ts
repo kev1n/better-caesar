@@ -145,7 +145,7 @@ function paint(root: ShadowRoot, status: LockedStatus): void {
 
   if (status.kind === "needs-caesar") {
     title.textContent = "Sign in to CAESAR";
-    sub.textContent = "Pencil will activate automatically once you've signed in.";
+    sub.textContent = "pencil.nu will activate automatically once you've signed in.";
     const link = document.createElement("a");
     link.className = "primary";
     link.textContent = "Open CAESAR";
@@ -157,7 +157,7 @@ function paint(root: ShadowRoot, status: LockedStatus): void {
   }
 
   if (status.kind === "killed") {
-    title.textContent = "Pencil is disabled";
+    title.textContent = "pencil.nu is disabled";
     sub.textContent = "";
     renderInlineMarkdown(sub, status.message);
     return;
@@ -171,7 +171,7 @@ function paint(root: ShadowRoot, status: LockedStatus): void {
     hour: "numeric",
     minute: "2-digit"
   });
-  title.textContent = `Pencil launches ${when}`;
+  title.textContent = `pencil.nu launches ${when}`;
   sub.textContent = `${status.bucketLabel} gets access at that time.`;
 
   if (codeFormOpen) {

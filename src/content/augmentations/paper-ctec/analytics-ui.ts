@@ -85,7 +85,7 @@ function renderLauncher(doc: Document, onOpenModal: () => void): HTMLElement {
 
   const title = doc.createElement("div");
   title.className = "bc-paper-ctec-analytics-title";
-  title.textContent = "Pencil CTEC Analytics";
+  title.textContent = "pencil.nu CTEC Analytics";
   head.append(title);
   wrapper.append(head);
 

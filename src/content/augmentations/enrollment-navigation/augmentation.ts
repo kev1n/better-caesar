@@ -120,7 +120,7 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
 
     const title = doc.createElement("div");
     title.className = "better-caesar-term-helper";
-    title.textContent = "Pencil Term Switcher";
+    title.textContent = "pencil.nu Term Switcher";
 
     const select = doc.createElement("select");
     select.className = "better-caesar-term-select";

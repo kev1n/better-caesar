@@ -141,7 +141,7 @@ function renderStatusBody(
     body.className = "bc-paper-ctec-modal-status-text";
     body.textContent = input.awaitingAuth
       ? "Finish signing in on the Northwestern tab. CTEC reports will load automatically once you're back."
-      : "Pencil needs a CAESAR login to load the CTEC reports for this course.";
+      : "pencil.nu needs a CAESAR login to load the CTEC reports for this course.";
     card.append(body);
 
     const action = doc.createElement("button");

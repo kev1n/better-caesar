@@ -35,7 +35,7 @@ export const DEFAULT_THEME: BcTheme = "default";
 // dropdown order, so "Northwestern" appears first as the default choice.
 export const THEME_LABELS: Record<BcTheme, string> = {
   default: "Northwestern",
-  pencil: "Pencil"
+  pencil: "pencil.nu"
 };
 
 let darkObserver: MutationObserver | null = null;
