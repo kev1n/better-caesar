@@ -138,7 +138,7 @@ function paint(root: ShadowRoot, status: LockedStatus): void {
     minute: "2-digit"
   });
   title.textContent = `Better CAESAR launches ${when}`;
-  sub.textContent = `Last names ${status.bucketLabel} get access at that time.`;
+  sub.textContent = `${status.bucketLabel} gets access at that time.`;
 
   if (codeFormOpen) {
     body.append(buildCodeForm(status, root));

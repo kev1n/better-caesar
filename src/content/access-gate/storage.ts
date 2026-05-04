@@ -5,6 +5,7 @@ export type StoredName = {
   lastName: string;
   fullName: string;
   fetchedAt: number;
+  gradYear: number | null;
 };
 
 export async function readStoredName(): Promise<StoredName | null> {
@@ -16,7 +17,8 @@ export async function readStoredName(): Promise<StoredName | null> {
   return {
     lastName: candidate.lastName,
     fullName: typeof candidate.fullName === "string" ? candidate.fullName : candidate.lastName,
-    fetchedAt: typeof candidate.fetchedAt === "number" ? candidate.fetchedAt : 0
+    fetchedAt: typeof candidate.fetchedAt === "number" ? candidate.fetchedAt : 0,
+    gradYear: typeof candidate.gradYear === "number" ? candidate.gradYear : null
   };
 }
 

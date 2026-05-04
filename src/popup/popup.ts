@@ -505,7 +505,7 @@ function buildGateNode(status: GateStatus): HTMLElement {
     card.append(
       makeGateRow(
         `Available ${when}`,
-        `Last names ${status.bucketLabel} unlock at that time. Have a code? Enter it below.`
+        `${status.bucketLabel} unlocks at that time. Have a code? Enter it below.`
       ),
       buildCodeForm(status.lastName)
     );

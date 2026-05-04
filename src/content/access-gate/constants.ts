@@ -1,34 +1,40 @@
-// Three-stage rollout, bucketed by the first letter of the user's normalized
-// last name. Edit the timestamps below to schedule each wave.
+// Three-stage rollout, bucketed by the user's expected graduation year as
+// reported by CAESAR (SAA_EXP_GRD_TRM_FL). Bucket boundaries are fixed in
+// code; the per-bucket release timestamps are fetched from the remote
+// schedule server (see server-client.ts) so they can be edited without
+// shipping a new build.
 //
-// Bucket 0: A–H, Bucket 1: I–P, Bucket 2: Q–Z (roughly equal thirds by US
-// last-name distribution). The boundaries are inclusive upper bounds on the
-// first character (lowercase, ascii letters only).
+// Bucket 0: graduating 2027 or earlier (most senior — unlocks first)
+// Bucket 1: graduating 2028
+// Bucket 2: graduating 2029 or later, or unknown grad year (open release)
 
 export type Bucket = 0 | 1 | 2;
 
-export const BUCKET_BOUNDARIES: readonly [string, string] = ["h", "p"];
+export const BUCKET_LABELS: readonly [string, string, string] = [
+  "Class of 2027 and earlier",
+  "Class of 2028",
+  "Class of 2029 and later"
+];
 
-export const BUCKET_LABELS: readonly [string, string, string] = ["A–H", "I–P", "Q–Z"];
-
-// Release times in epoch ms. Anything <= now() unlocks the bucket.
-// Default: all set to 2099, edit per launch plan.
-export const BUCKET_RELEASE_TIMESTAMPS: readonly [number, number, number] = [
+// Used when the remote schedule is unreachable and nothing is cached. All
+// buckets stay locked until the server responds at least once.
+export const FALLBACK_BUCKET_RELEASE_TIMESTAMPS: readonly [number, number, number] = [
   Date.parse("2099-01-01T00:00:00Z"),
   Date.parse("2099-01-01T00:00:00Z"),
   Date.parse("2099-01-01T00:00:00Z")
 ];
 
+export function bucketForGradYear(year: number | null): Bucket {
+  if (year === null || !Number.isFinite(year)) return 2;
+  if (year <= 2027) return 0;
+  if (year === 2028) return 1;
+  return 2;
+}
+
+// Still used by code.ts to derive the per-user HMAC override code.
 export function normalizeLastName(raw: string): string {
   return raw
     .normalize("NFD")
     .toLowerCase()
     .replace(/[^a-z]/g, "");
-}
-
-export function bucketForLastName(lastName: string): Bucket {
-  const ch = normalizeLastName(lastName).charAt(0);
-  if (!ch || ch <= BUCKET_BOUNDARIES[0]) return 0;
-  if (ch <= BUCKET_BOUNDARIES[1]) return 1;
-  return 2;
 }

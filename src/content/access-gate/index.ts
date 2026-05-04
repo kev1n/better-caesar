@@ -1,11 +1,11 @@
 import {
-  bucketForLastName,
+  bucketForGradYear,
   BUCKET_LABELS,
-  BUCKET_RELEASE_TIMESTAMPS,
   type Bucket
 } from "./constants";
 import { isCodeValidForLastName } from "./code";
 import { fetchAndCacheUserName } from "./name-fetch";
+import { getBucketReleaseTimestamps } from "./server-client";
 import {
   ACCESS_GATE_CODE_KEY,
   ACCESS_GATE_NAME_KEY,
@@ -15,7 +15,14 @@ import {
 
 export type GateStatus =
   | { kind: "unlocked"; reason: "bucket" | "code"; lastName: string }
-  | { kind: "locked-bucket"; releaseAt: number; bucket: Bucket; bucketLabel: string; lastName: string }
+  | {
+      kind: "locked-bucket";
+      releaseAt: number;
+      bucket: Bucket;
+      bucketLabel: string;
+      lastName: string;
+      gradYear: number | null;
+    }
   | { kind: "needs-caesar" };
 
 const NAME_REFETCH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -60,8 +67,9 @@ export async function evaluateGate(): Promise<GateStatus> {
     }
   }
 
-  const bucket = bucketForLastName(stored.lastName);
-  const releaseAt = BUCKET_RELEASE_TIMESTAMPS[bucket];
+  const bucket = bucketForGradYear(stored.gradYear);
+  const schedule = await getBucketReleaseTimestamps();
+  const releaseAt = schedule[bucket];
   if (Date.now() >= releaseAt) {
     return { kind: "unlocked", reason: "bucket", lastName: stored.lastName };
   }
@@ -71,7 +79,8 @@ export async function evaluateGate(): Promise<GateStatus> {
     releaseAt,
     bucket,
     bucketLabel: BUCKET_LABELS[bucket],
-    lastName: stored.lastName
+    lastName: stored.lastName,
+    gradYear: stored.gradYear
   };
 }
 

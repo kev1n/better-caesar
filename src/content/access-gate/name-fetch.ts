@@ -1,4 +1,5 @@
 import { fetchTextResultViaBackground } from "../remote-fetch";
+import { fetchGradYear } from "./grad-term-fetch";
 import { writeStoredName, type StoredName } from "./storage";
 
 const PROFILE_URL =
@@ -15,14 +16,18 @@ export function fetchAndCacheUserName(): Promise<StoredName | null> {
   attemptedThisSession = true;
   inFlight = (async () => {
     try {
-      const response = await fetchTextResultViaBackground(PROFILE_URL);
-      if (response.status < 200 || response.status >= 300) return null;
-      const parsed = parseNameFromHtml(response.text);
+      const [nameResp, gradYear] = await Promise.all([
+        fetchTextResultViaBackground(PROFILE_URL),
+        fetchGradYear()
+      ]);
+      if (nameResp.status < 200 || nameResp.status >= 300) return null;
+      const parsed = parseNameFromHtml(nameResp.text);
       if (!parsed) return null;
       const stored: StoredName = {
         lastName: parsed.lastName,
         fullName: parsed.fullName,
-        fetchedAt: Date.now()
+        fetchedAt: Date.now(),
+        gradYear
       };
       await writeStoredName(stored);
       return stored;
