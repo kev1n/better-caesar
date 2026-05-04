@@ -43,7 +43,14 @@ export function fetchAndCacheUserName(): Promise<StoredName | null> {
         fetchedAt: Date.now()
       };
       await writeStoredName(stored);
-      await chrome.storage.local.remove(NAME_FETCH_FAILED_AT_KEY);
+      // Isolated try: a rejection from `remove` (rare, but possible on
+      // quota/IO errors) must NOT bubble into the outer catch and trip
+      // recordFailedAttempt — we just successfully wrote a name.
+      try {
+        await chrome.storage.local.remove(NAME_FETCH_FAILED_AT_KEY);
+      } catch {
+        // ignore — sentinel will expire on its own.
+      }
       return stored;
     } catch {
       await recordFailedAttempt();
