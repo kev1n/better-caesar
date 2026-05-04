@@ -1,5 +1,11 @@
 import type { ModalCommentTone, ModalDisplayData, ModalMetricKind } from "../modal-data";
 
+// Initial number of comment cards rendered when the comments tab opens, and
+// the increment per "Show more" click. Sized to keep tab-switch latency
+// imperceptible (~50 cards = a few ms of DOM work) while still giving users
+// a meaningful first screen of comments before they decide to expand.
+export const COMMENTS_PAGE_SIZE = 50;
+
 export type ModalCommentSentimentFilter = "all" | ModalCommentTone;
 export type ModalCommentSort = "recent" | "longest" | "shortest";
 export type ModalTab = "overview" | "comments" | "terms";
@@ -30,6 +36,12 @@ export type AnalyticsModalState = {
   // (where N is the user's "recent terms aggregation" setting). The toggle
   // is only meaningful when more terms are loaded than that window.
   heatmapExpanded: boolean;
+  // Number of comment cards rendered in the comments tab. Pagination cap —
+  // courses with hundreds of evaluations would otherwise build thousands of
+  // DOM nodes on every tab switch and block the main thread for ~hundreds
+  // of ms. User clicks "Show more" to grow this; persists across re-renders
+  // so filtering/sorting after expanding doesn't reset the visible window.
+  commentsVisibleCount: number;
 };
 
 export type AnalyticsModalCallbacks = {

@@ -217,6 +217,23 @@ export function modalCommentStyles(): string {
       border-radius: var(--bc-radius-xl);
       border: 1px dashed var(--bc-color-border);
     }
+    .bc-paper-ctec-modal-comments-more {
+      align-self: center;
+      margin-top: 4px;
+      padding: 10px 22px;
+      font-size: var(--bc-font-13);
+      font-weight: 600;
+      color: var(--bc-color-accent);
+      background: var(--bc-color-bg);
+      border: 1px solid var(--bc-color-border-strong);
+      border-radius: var(--bc-radius-pill);
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease;
+    }
+    .bc-paper-ctec-modal-comments-more:hover {
+      background: var(--bc-color-surface-hover);
+      border-color: var(--bc-color-accent);
+    }
     .bc-paper-ctec-modal-comment-card {
       background: var(--bc-color-surface-hover);
       border: 1px solid var(--bc-color-border-strong);

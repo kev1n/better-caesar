@@ -6,6 +6,7 @@ import {
 import type { CtecReportChart } from "../ctec-navigation/types";
 import type { CtecLinkParams } from "../ctec-links/types";
 import { collectComments } from "./modal-comments";
+import { readModalCache, writeModalCache } from "./modal-cache";
 import { aggregateTopics } from "./modal-topics";
 
 export type ModalMetricKind =
@@ -147,7 +148,46 @@ export type ModalTopicEntry = {
   sentiments: Record<ModalCommentTone, number>;
 };
 
+// Memoized wrapper for buildModalDisplayData. The modal's sync() loop calls
+// this on every interaction (tab change, filter, sort, refresh tick), and
+// the comments-tab work — bigram/trigram extraction in collectComments and
+// per-comment sentiment scoring — dominates that cost. The signature
+// captures everything that can shift the result: identity inputs plus, per
+// entry, the url/status/comment-counts that change when a new term loads or
+// a background refresh adds evaluations. Backed by a chrome.storage.local
+// LRU in modal-cache.ts so repeat opens across page reloads stay fast.
+
+function modalCacheKey(params: CtecLinkParams, titleHint: string): string {
+  return `${params.subject}|${params.catalogNumber}|${params.instructor}|${titleHint}`;
+}
+
+function snapshotSignature(snapshot: CtecCourseAnalytics): string {
+  const parts: string[] = [];
+  for (const entry of snapshot.entries) {
+    let commentCount = 0;
+    for (const group of entry.commentGroups) commentCount += group.comments.length;
+    parts.push(
+      `${entry.url ?? ""}#${entry.status}#${entry.commentGroups.length}#${commentCount}`
+    );
+  }
+  return parts.join("|");
+}
+
 export function buildModalDisplayData(
+  snapshot: CtecCourseAnalytics,
+  params: CtecLinkParams,
+  titleHint: string
+): ModalDisplayData | null {
+  const key = modalCacheKey(params, titleHint);
+  const signature = snapshotSignature(snapshot);
+  const hit = readModalCache(key, signature);
+  if (hit) return hit.result;
+  const result = buildModalDisplayDataUncached(snapshot, params, titleHint);
+  writeModalCache(key, signature, result);
+  return result;
+}
+
+function buildModalDisplayDataUncached(
   snapshot: CtecCourseAnalytics,
   params: CtecLinkParams,
   titleHint: string

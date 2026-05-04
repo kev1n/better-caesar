@@ -1,6 +1,7 @@
 import type { ModalCommentTone, ModalDisplayData } from "../modal-data";
 import { preventAndStop, stopPropagation } from "../ui-shared";
 import {
+  COMMENTS_PAGE_SIZE,
   TONE_META,
   TOPIC_TONE_COLORS,
   TOPIC_TONE_LABELS,
@@ -218,6 +219,7 @@ function renderCommentsMain(
   input.addEventListener("click", stopPropagation);
   input.addEventListener("keydown", stopPropagation);
   input.addEventListener("input", () => {
+    state.commentsVisibleCount = COMMENTS_PAGE_SIZE;
     renderCommentList(commentsList, countLabel, data, state, input.value);
   });
   searchWrap.append(searchIcon, input);
@@ -340,14 +342,18 @@ function renderCommentList(
     filtered = [...filtered].sort((a, b) => a.length - b.length);
   }
 
-  const total = data.comments.length;
-  const showingStrong = doc.createElement("strong");
-  showingStrong.textContent = String(filtered.length);
-  countLabel.replaceChildren(
-    doc.createTextNode("Showing "),
-    showingStrong,
-    doc.createTextNode(` of ${total} comments`)
-  );
+  const visibleCount = Math.min(filtered.length, state.commentsVisibleCount);
+
+  const updateCountLabel = (visible: number): void => {
+    const showingStrong = doc.createElement("strong");
+    showingStrong.textContent = String(visible);
+    countLabel.replaceChildren(
+      doc.createTextNode("Showing "),
+      showingStrong,
+      doc.createTextNode(` of ${filtered.length} comments`)
+    );
+  };
+  updateCountLabel(visibleCount);
 
   if (filtered.length === 0) {
     const empty = doc.createElement("div");
@@ -364,10 +370,43 @@ function renderCommentList(
     (s): s is string => !!s.trim()
   );
 
-  for (const comment of filtered) {
+  for (let i = 0; i < visibleCount; i++) {
     container.append(
-      renderCommentCard(doc, comment, highlights, state.commentsActiveTopic)
+      renderCommentCard(doc, filtered[i]!, highlights, state.commentsActiveTopic)
     );
+  }
+
+  // Pagination: courses with hundreds of evals would otherwise build
+  // thousands of nodes per tab switch. The "Show more" button extends
+  // visibleCount in place and appends the next batch directly — no full
+  // sync(), no rebuild of the rail or toolbar.
+  if (visibleCount < filtered.length) {
+    const more = doc.createElement("button");
+    more.type = "button";
+    more.className = "bc-paper-ctec-modal-comments-more";
+    const renderMoreLabel = (rendered: number): void => {
+      const remaining = filtered.length - rendered;
+      const next = Math.min(COMMENTS_PAGE_SIZE, remaining);
+      more.textContent = `Show ${next} more (${remaining} left)`;
+    };
+    renderMoreLabel(visibleCount);
+    more.addEventListener("click", (event) => {
+      preventAndStop(event);
+      const currentRendered = state.commentsVisibleCount;
+      const nextRendered = Math.min(filtered.length, currentRendered + COMMENTS_PAGE_SIZE);
+      state.commentsVisibleCount = nextRendered;
+      const fragment = doc.createDocumentFragment();
+      for (let i = currentRendered; i < nextRendered; i++) {
+        fragment.append(
+          renderCommentCard(doc, filtered[i]!, highlights, state.commentsActiveTopic)
+        );
+      }
+      container.insertBefore(fragment, more);
+      updateCountLabel(nextRendered);
+      if (nextRendered >= filtered.length) more.remove();
+      else renderMoreLabel(nextRendered);
+    });
+    container.append(more);
   }
 }
 

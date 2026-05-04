@@ -19,7 +19,7 @@ import type {
   ModalTab
 } from "./modal-ui";
 import { hideAnalyticsModal, readModalCommentsQuery, renderAnalyticsModal } from "./modal-ui";
-import type { ModalActiveView } from "./modal/types";
+import { COMMENTS_PAGE_SIZE, type ModalActiveView } from "./modal/types";
 import type {
   AnalyticsModalSource,
   PaperCtecAnalyticsState,
@@ -267,6 +267,11 @@ export class ModalController {
         onClose: () => this.closeModal(),
         onTabChange: (tab: ModalTab) => {
           modalState.tab = tab;
+          // Re-entering the comments tab should always start with a fresh
+          // first page, otherwise a previously-expanded session would
+          // re-render hundreds of cards and re-introduce the latency
+          // pagination is here to fix.
+          if (tab === "comments") modalState.commentsVisibleCount = COMMENTS_PAGE_SIZE;
           this.sync(document);
         },
         onMetricChange: (kind: ModalActiveView) => {
@@ -279,18 +284,22 @@ export class ModalController {
         },
         onCommentsSentimentChange: (filter: ModalCommentSentimentFilter) => {
           modalState.commentsSentimentFilter = filter;
+          modalState.commentsVisibleCount = COMMENTS_PAGE_SIZE;
           this.sync(document);
         },
         onCommentsTopicChange: (topic: string | null) => {
           modalState.commentsActiveTopic = topic;
+          modalState.commentsVisibleCount = COMMENTS_PAGE_SIZE;
           this.sync(document);
         },
         onCommentsTermFilterChange: (term: string) => {
           modalState.commentsTermFilter = term;
+          modalState.commentsVisibleCount = COMMENTS_PAGE_SIZE;
           this.sync(document);
         },
         onCommentsSortChange: (sort: ModalCommentSort) => {
           modalState.commentsSortBy = sort;
+          modalState.commentsVisibleCount = COMMENTS_PAGE_SIZE;
           this.sync(document);
         },
         onRefresh: () => this.kickRefresh(source),
@@ -560,7 +569,8 @@ export class ModalController {
       commentsActiveTopic: null,
       commentsTermFilter: "all",
       commentsSortBy: "recent",
-      heatmapExpanded: false
+      heatmapExpanded: false,
+      commentsVisibleCount: COMMENTS_PAGE_SIZE
     };
     this.modalStates.set(key, fresh);
     return fresh;
