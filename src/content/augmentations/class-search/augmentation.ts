@@ -47,7 +47,7 @@ import {
   type SubjectInfo,
   type TermSummary
 } from "./paper-data";
-import { ensureStyles } from "./styles";
+import { STYLE_ID as CLASS_SEARCH_STYLE_ID, ensureStyles } from "./styles";
 import {
   PAPER_DISCIPLINE_LABELS,
   PAPER_DISTRO_LABELS,
@@ -113,6 +113,10 @@ export class ClassSearchAugmentation implements Augmentation {
     void pruneStalePaperCaches();
   }
 
+  cleanup(doc: Document = document): void {
+    this.unmount(doc);
+  }
+
   run(doc: Document = document): void {
     if (!isSearchEntryPage(doc)) {
       this.unmount(doc);
@@ -174,8 +178,7 @@ export class ClassSearchAugmentation implements Augmentation {
         statusEl: doc.createElement("div"),
         filters: {
           termId: initialTerm,
-          query: "",
-          disciplines: new Set()
+          query: ""
         },
         info,
         subjects,
@@ -212,6 +215,7 @@ export class ClassSearchAugmentation implements Augmentation {
     if (root) root.remove();
     const hider = doc.getElementById(HIDE_NATIVE_STYLE_ID);
     if (hider) hider.remove();
+    doc.getElementById(CLASS_SEARCH_STYLE_ID)?.remove();
     this.mounted = null;
   }
 
@@ -275,24 +279,12 @@ export class ClassSearchAugmentation implements Augmentation {
     form.className = "bc-cs-form";
     form.append(this.buildQueryField(state), this.buildTermField(state));
 
-    const toggles = doc.createElement("div");
-    toggles.className = "bc-cs-toggles";
-    for (const code of Object.keys(PAPER_DISCIPLINE_LABELS)) {
-      toggles.appendChild(this.buildDisciplineToggle(state, code));
-    }
-    const clear = doc.createElement("button");
-    clear.type = "button";
-    clear.className = "bc-cs-clear";
-    clear.textContent = "Clear filters";
-    clear.addEventListener("click", () => this.clearFilters(state));
-    toggles.appendChild(clear);
-
     state.statusEl.className = "bc-cs-status";
     state.statusEl.textContent = "";
 
     state.resultsEl.className = "bc-cs-results";
 
-    card.append(form, toggles, state.statusEl);
+    card.append(form, state.statusEl);
 
     root.append(header, card, state.resultsEl);
     return root;
@@ -349,34 +341,6 @@ export class ClassSearchAugmentation implements Augmentation {
     return field;
   }
 
-  private buildDisciplineToggle(state: MountedState, code: string): HTMLLabelElement {
-    const { doc } = state;
-    const wrap = doc.createElement("label");
-    wrap.className = "bc-cs-checkbox";
-    const cb = doc.createElement("input");
-    cb.type = "checkbox";
-    cb.addEventListener("change", () => {
-      if (cb.checked) state.filters.disciplines.add(code);
-      else state.filters.disciplines.delete(code);
-      this.scheduleSearch(state);
-    });
-    const span = doc.createElement("span");
-    span.textContent = `Disc ${code}`;
-    span.title = PAPER_DISCIPLINE_LABELS[code];
-    wrap.append(cb, span);
-    return wrap;
-  }
-
-  private clearFilters(state: MountedState): void {
-    state.filters.query = "";
-    state.filters.disciplines = new Set();
-    const queryInput = state.doc.getElementById("bc-cs-query") as HTMLInputElement | null;
-    if (queryInput) queryInput.value = "";
-    const checkboxes = state.root.querySelectorAll<HTMLInputElement>(".bc-cs-checkbox input");
-    checkboxes.forEach((cb) => (cb.checked = false));
-    this.scheduleSearch(state);
-  }
-
   // ── Search execution ──────────────────────────────────────────────────────
 
   private scheduleSearch(state: MountedState): void {
@@ -415,7 +379,7 @@ export class ClassSearchAugmentation implements Augmentation {
   private runSearch(state: MountedState): void {
     const courses = state.loadedTerms.get(state.filters.termId);
     if (!courses) return;
-    const rows = applyFilters(courses, state.catalogIndex, state.subjects, state.filters);
+    const rows = applyFilters(courses, state.catalogIndex, state.subjects, state.filters, state.career);
     this.renderResults(state, rows);
   }
 
@@ -1506,6 +1470,6 @@ function buildLoadingShell(doc: Document): HTMLElement {
 }
 
 function hasAnyFilter(filters: SearchFilters): boolean {
-  return filters.query.trim().length > 0 || filters.disciplines.size > 0;
+  return filters.query.trim().length > 0;
 }
 
