@@ -124,6 +124,28 @@ export type CartFlowContinuationInput = {
 
 const INSTITUTION_DEFAULT = "NWUNV";
 
+// Hitting this URL silently re-handshakes through NetID SSO when the CAESAR
+// session cookie has expired but the IdP cookie is still alive — the redirect
+// chain mints a fresh PS_TOKEN without any user interaction. Also reused as
+// the popup `loginUrl` when the silent re-handshake fails: opening it in a
+// real tab walks the user through Duo, then bounces them back through the
+// `psc/` post-auth pattern that `background.ts` watches.
+const LANDING_PAGE_URL =
+  "https://caesar.ent.northwestern.edu/psc/csnu/EMPLOYEE/SA/c/NUI_FRAMEWORK.PT_LANDINGPAGE.GBL?";
+
+export class CaesarAuthRequiredError extends Error {
+  readonly loginUrl: string;
+  constructor(loginUrl: string = LANDING_PAGE_URL) {
+    super("CAESAR session expired — sign in to continue.");
+    this.name = "CaesarAuthRequiredError";
+    this.loginUrl = loginUrl;
+  }
+}
+
+export function isCaesarAuthRequiredError(error: unknown): error is CaesarAuthRequiredError {
+  return error instanceof CaesarAuthRequiredError;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Public API
 
@@ -185,13 +207,10 @@ async function searchCaesarCatalogInternal(
   let lastGroups: CaesarCourseGroup[] = [];
 
   for (let i = 0; i < careers.length; i += 1) {
-    // `getEntryFormState()` re-GETs the entry page on every call, so each
-    // loop iteration starts from a fresh ICStateNum — no inter-attempt
-    // reset needed.
+    // `getEntryFormState()` re-GETs the entry page on every call (and
+    // re-handshakes through SSO if the session has expired), so each loop
+    // iteration starts from a fresh ICStateNum.
     const baseParams = await getEntryFormState();
-    if (!baseParams.has("ICSID")) {
-      throw new Error("Missing PeopleSoft session — try refreshing the page.");
-    }
 
     const searchParams = buildSearchPostParams(baseParams, input, careers[i]!);
     const searchHtml = await fetchPeopleSoft(resolveActionUrl(SEARCH_ENDPOINT), searchParams);
@@ -219,7 +238,24 @@ async function searchCaesarCatalogInternal(
 // server back to a known-good state and returns matching hidden inputs,
 // so every operation begins with a clean ICStateNum regardless of what
 // happened in earlier operations or other tabs.
+//
+// If the first GET comes back without ICSID, the PS session is dead. We
+// hit the portal landing page once to give NetID SSO a chance to silently
+// re-handshake (works when the IdP cookie is still alive), then re-fetch
+// the entry page. If that still has no ICSID, throw `CaesarAuthRequiredError`
+// so the caller can open the SSO popup flow.
 async function getEntryFormState(): Promise<URLSearchParams> {
+  const params = await fetchEntryFormParams();
+  if (params.has("ICSID")) return params;
+
+  await fetchPeopleSoftGet(LANDING_PAGE_URL).catch(() => undefined);
+  const refreshed = await fetchEntryFormParams();
+  if (refreshed.has("ICSID")) return refreshed;
+
+  throw new CaesarAuthRequiredError();
+}
+
+async function fetchEntryFormParams(): Promise<URLSearchParams> {
   const entryHtml = await fetchPeopleSoftGet(resolveActionUrl(SEARCH_ENTRY_URL));
   return serializeFormFromDoc(parseAjaxFragment(entryHtml));
 }
@@ -241,12 +277,11 @@ async function addSectionToCartInternal(input: CartFlowInput): Promise<CartFlowR
     let lastError: string | null = null;
 
     for (let i = 0; i < careers.length; i += 1) {
-      // `getEntryFormState()` re-GETs the entry page each call, so server
-      // state is fresh on every iteration without a manual reset.
+      // `getEntryFormState()` re-GETs the entry page each call (and
+      // re-handshakes through SSO when the session is dead), so server
+      // state is fresh on every iteration. Bubble its `CaesarAuthRequiredError`
+      // out of the try/catch so the augmentation can drive the popup.
       const baseParams = await getEntryFormState();
-      if (!baseParams.has("ICSID")) {
-        return { ok: false, error: "Missing PeopleSoft session — try refreshing the page." };
-      }
       const searchPost = buildClassNumberSearchParams(baseParams, {
         termId: input.termId,
         career: careers[i]!,
@@ -271,7 +306,7 @@ async function addSectionToCartInternal(input: CartFlowInput): Promise<CartFlowR
 
     if (!match || !searchHtml) {
       return fail(
-        lastError ?? `Couldn't find class #${classNumber} on CAESAR for this term.`,
+        lastError ?? "Couldn't find this class on CAESAR for this term.",
         { classNumber, searchGroups: groups }
       );
     }
@@ -281,7 +316,7 @@ async function addSectionToCartInternal(input: CartFlowInput): Promise<CartFlowR
     // even though we no longer POST that button — going further would just
     // hit a generic CAESAR error a couple of round-trips later.
     if (!match.section.selectAvailable) {
-      return fail(`Class #${classNumber} is already in your shopping cart.`, {
+      return fail("This class is already in your shopping cart.", {
         classNumber,
         alreadyInCart: true,
         searchGroups: groups
@@ -352,6 +387,9 @@ async function addSectionToCartInternal(input: CartFlowInput): Promise<CartFlowR
       searchGroups: groups
     };
   } catch (error) {
+    // Bubble auth-required so the augmentation can drive the popup login
+    // flow instead of surfacing it as a normal cart-flow error.
+    if (error instanceof CaesarAuthRequiredError) throw error;
     return {
       ok: false,
       error: error instanceof Error ? error.message : String(error)
@@ -879,24 +917,24 @@ function looksLikeError(html: string): boolean {
 // detail). GENMSG/term-status are handled upstream by `looksLikeError`.
 function isCartLandingPage(
   html: string,
-  classNumber: string
+  _classNumber: string
 ): { ok: true } | { ok: false; reason: string } {
   if (/<PAGE id='SSR_SSENRL_PREFS/i.test(html)) {
     return {
       ok: false,
-      reason: `CAESAR is asking for enrollment preferences for #${classNumber}. Use Classic Search to finish.`
+      reason: "CAESAR is asking for enrollment preferences for this section. Use Classic Search to finish."
     };
   }
   if (/<PAGE id='SSR_SSENRL_RC/i.test(html) || /Related\s*Class/i.test(html)) {
     return {
       ok: false,
-      reason: `Section #${classNumber} requires a related component (e.g. discussion). Use Classic Search to pick one.`
+      reason: "This section requires a related component (e.g. discussion). Use Classic Search to pick one."
     };
   }
   if (/<PAGE id='SSR_CLSRCH_DTL/i.test(html)) {
     return {
       ok: false,
-      reason: `CAESAR returned the section detail page instead of confirming the add for #${classNumber}. Use Classic Search to finish.`
+      reason: "CAESAR returned the section detail page instead of confirming the add. Use Classic Search to finish."
     };
   }
   return { ok: true };

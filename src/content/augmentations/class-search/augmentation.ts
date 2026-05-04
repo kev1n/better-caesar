@@ -2,8 +2,10 @@ import {
   initCartCache,
   lookupBySignature,
   lookupClassNumber,
+  readTermCart,
   recordOptimisticAdd,
   subscribe as subscribeCartCache,
+  type CartEntry,
   type CartLookupHit
 } from "../../cart-cache";
 import type { Augmentation } from "../../framework";
@@ -24,6 +26,7 @@ import type { SeatsNotesResult, SeatsNotesSuccess } from "../seats-notes/types";
 import {
   addSectionToCart,
   continueCartAddWithRelated,
+  isCaesarAuthRequiredError,
   matchCaesarGroup,
   matchCaesarSection,
   searchCaesarCatalog,
@@ -32,10 +35,20 @@ import {
   type CaesarSearchResult,
   type RelatedSectionOption
 } from "./caesar-search";
+import type {
+  AuthPopupClosedMessage,
+  OpenAuthPopupMessage,
+  OpenAuthPopupResponse
+} from "../../../shared/messages";
 import {
   bareCatalogNumber,
   formatCourseIdForDisplay
 } from "./catalog-format";
+import {
+  initCatalogCache,
+  readCatalogCache,
+  writeCatalogCache
+} from "./catalog-cache";
 import {
   applyFilters,
   buildCatalogIndex,
@@ -132,6 +145,7 @@ export class ClassSearchAugmentation implements Augmentation {
     void initSeatsNotesStorage().then(() => pruneEmptySeatsCache());
     void pruneStalePaperCaches();
     void initCartCache();
+    void initCatalogCache();
   }
 
   cleanup(doc: Document = document): void {
@@ -233,9 +247,14 @@ export class ClassSearchAugmentation implements Augmentation {
       };
       this.mounted = state;
       // Cart cache pushes here when CAESAR cart-page reconcile lands or
-      // another tab made an optimistic add. Repaint every mounted Add
-      // button so badges flip without the user reloading.
-      state.cartUnsubscribe = subscribeCartCache(() => this.repaintAllCartButtons(state));
+      // another tab made an optimistic add. Repaint Add-button badges and
+      // re-render the empty-state "Your classes" cards if showing.
+      state.cartUnsubscribe = subscribeCartCache(() => {
+        this.repaintAllCartButtons(state);
+        if (!hasAnyFilter(state.filters)) {
+          this.renderMyClassesView(state);
+        }
+      });
 
       placeholder.innerHTML = "";
       placeholder.appendChild(this.buildTabs(state));
@@ -316,11 +335,7 @@ export class ClassSearchAugmentation implements Augmentation {
     const subtitle = doc.createElement("div");
     subtitle.className = "bc-cs-subtitle";
     subtitle.innerHTML = `Catalog from <a href="https://paper.nu" target="_blank" rel="noopener">paper.nu</a> · live status fetched from CAESAR on demand`;
-    const disclaimer = doc.createElement("div");
-    disclaimer.className = "bc-cs-disclaimer";
-    disclaimer.textContent =
-      "Heads up: Sharper Search is still buggy and will be fixed in a later release. If something misbehaves, switch to the Classic CAESAR tab.";
-    header.append(title, subtitle, disclaimer);
+    header.append(title, subtitle);
 
     const card = doc.createElement("div");
     card.className = "bc-cs-card";
@@ -438,16 +453,7 @@ export class ClassSearchAugmentation implements Augmentation {
     state.resultsEl.innerHTML = "";
 
     if (!hasAnyFilter(state.filters)) {
-      const empty = doc.createElement("div");
-      empty.className = "bc-cs-empty";
-      empty.textContent =
-        'Start typing — try "comp_sci 111", "econ 21x", or "machine learning".';
-      state.resultsEl.appendChild(empty);
-      this.setStatus(
-        state,
-        "ok",
-        `Term loaded · ${(state.loadedTerms.get(state.filters.termId)?.length ?? 0).toLocaleString()} courses available`
-      );
+      this.renderMyClassesView(state);
       return;
     }
 
@@ -470,6 +476,145 @@ export class ClassSearchAugmentation implements Augmentation {
       "ok",
       `${rows.length} course${rows.length === 1 ? "" : "s"} · ${totalSections} section${totalSections === 1 ? "" : "s"}`
     );
+  }
+
+  // ── Empty-state "Your classes" view ──────────────────────────────────────
+
+  // Renders compact cards for everything in the user's CAESAR cart +
+  // current enrollment for the active term, surfaced when the search
+  // box is empty so the user lands on a useful overview instead of a
+  // hint string. The cards disappear automatically once a query starts
+  // matching — `renderResults` re-routes to the search results path.
+  private renderMyClassesView(state: MountedState): void {
+    const { doc } = state;
+    state.resultsEl.innerHTML = "";
+
+    const termCart = readTermCart(state.filters.termId);
+    const enrolled = termCart ? Object.values(termCart.enrolled) : [];
+    const inCart = termCart ? Object.values(termCart.cart) : [];
+    const courses = state.loadedTerms.get(state.filters.termId);
+    const totalCourses = courses?.length ?? 0;
+
+    if (enrolled.length === 0 && inCart.length === 0) {
+      const hint = doc.createElement("div");
+      hint.className = "bc-cs-empty";
+      hint.textContent =
+        'Start typing — try "comp_sci 111", "econ 21x", or "machine learning". Classes you add will show up here for quick reference.';
+      state.resultsEl.appendChild(hint);
+      this.setStatus(state, "ok", `Term loaded · ${totalCourses.toLocaleString()} courses available`);
+      return;
+    }
+
+    if (enrolled.length > 0) {
+      state.resultsEl.appendChild(
+        this.buildMyClassesSection(state, "Enrolled", enrolled, "enrolled")
+      );
+    }
+    if (inCart.length > 0) {
+      state.resultsEl.appendChild(
+        this.buildMyClassesSection(state, "In your cart", inCart, "in-cart")
+      );
+    }
+
+    const total = enrolled.length + inCart.length;
+    this.setStatus(
+      state,
+      "ok",
+      `${total} class${total === 1 ? "" : "es"} on file · ${totalCourses.toLocaleString()} courses searchable`
+    );
+  }
+
+  private buildMyClassesSection(
+    state: MountedState,
+    label: string,
+    entries: CartEntry[],
+    status: "in-cart" | "enrolled"
+  ): HTMLElement {
+    const { doc } = state;
+    const wrap = doc.createElement("section");
+    wrap.className = "bc-cs-myclasses";
+
+    const heading = doc.createElement("div");
+    heading.className = "bc-cs-myclasses-heading";
+    const left = doc.createElement("span");
+    left.className = "bc-cs-myclasses-label";
+    left.textContent = label;
+    const count = doc.createElement("span");
+    count.className = "bc-cs-myclasses-count";
+    count.textContent = `${entries.length}`;
+    heading.append(left, count);
+    wrap.appendChild(heading);
+
+    const grid = doc.createElement("div");
+    grid.className = "bc-cs-myclasses-grid";
+    for (const entry of entries) {
+      grid.appendChild(this.buildMyClassesCard(state, entry, status));
+    }
+    wrap.appendChild(grid);
+    return wrap;
+  }
+
+  private buildMyClassesCard(
+    state: MountedState,
+    entry: CartEntry,
+    status: "in-cart" | "enrolled"
+  ): HTMLElement {
+    const { doc } = state;
+    const card = doc.createElement("div");
+    card.className = "bc-cs-myclass-card";
+    card.dataset.status = status;
+
+    const header = doc.createElement("div");
+    header.className = "bc-cs-myclass-head";
+    const id = doc.createElement("span");
+    id.className = "bc-cs-myclass-id";
+    id.textContent = formatCourseIdForDisplay(entry.subject, entry.catalog);
+    const sec = doc.createElement("span");
+    sec.className = "bc-cs-myclass-section";
+    sec.textContent = entry.sectionLabel;
+    header.append(id, sec);
+
+    const meta = doc.createElement("div");
+    meta.className = "bc-cs-myclass-meta";
+    const badge = doc.createElement("span");
+    badge.className = "bc-cs-myclass-badge";
+    badge.dataset.status = status;
+    badge.textContent = status === "enrolled" ? "Enrolled" : "In cart";
+    meta.append(badge);
+
+    // Enrich with paper.nu data when we have it loaded — title at minimum,
+    // plus instructor + meeting pattern if the section resolves cleanly.
+    const courses = state.loadedTerms.get(state.filters.termId);
+    const paper = courses ? findPaperSection(courses, entry) : null;
+    if (paper?.course.title) {
+      const title = doc.createElement("div");
+      title.className = "bc-cs-myclass-title";
+      title.textContent = paper.course.title;
+      card.append(header, title, meta);
+    } else {
+      card.append(header, meta);
+    }
+
+    if (paper?.section) {
+      const detail = doc.createElement("div");
+      detail.className = "bc-cs-myclass-detail";
+      const lines: string[] = [];
+      const patterns = meetingPatternCount(paper.section);
+      const meetings: string[] = [];
+      for (let i = 0; i < patterns; i += 1) {
+        const m = formatMeetingPattern(paper.section, i);
+        if (m) meetings.push(m);
+      }
+      if (meetings.length > 0) lines.push(meetings.join(" · "));
+      const instr = formatInstructors(paper.section);
+      if (instr) lines.push(instr);
+      if (lines.length > 0) {
+        detail.textContent = lines.join(" — ");
+        card.appendChild(detail);
+      }
+    }
+
+    return card;
   }
 
   // ── Course card ──────────────────────────────────────────────────────────
@@ -526,16 +671,22 @@ export class ClassSearchAugmentation implements Augmentation {
         tags.appendChild(t);
       }
     }
-    const liveBtn = doc.createElement("button");
-    liveBtn.type = "button";
-    liveBtn.className = "bc-cs-live-btn";
-    liveBtn.dataset.role = "load-live";
-    liveBtn.textContent = "Load CAESAR data";
-    liveBtn.addEventListener("click", () => {
-      if (!this.consumePsCredit("live")) return;
-      void this.loadCourseLive(state, row, card);
+
+    // Refresh button — hidden until live data is loaded. Lets the user
+    // bypass the 15-min catalog cache when they want fresher seat status.
+    const refreshBtn = doc.createElement("button");
+    refreshBtn.type = "button";
+    refreshBtn.className = "bc-cs-refresh-btn";
+    refreshBtn.dataset.role = "refresh-live";
+    refreshBtn.title = "Refresh seat status from CAESAR";
+    refreshBtn.setAttribute("aria-label", "Refresh seat status from CAESAR");
+    refreshBtn.textContent = "↻";
+    refreshBtn.style.display = "none";
+    refreshBtn.addEventListener("click", () => {
+      if (!this.consumePsCredit("refresh-live")) return;
+      void this.refreshLiveData(state, row, card, refreshBtn);
     });
-    tags.appendChild(liveBtn);
+    tags.appendChild(refreshBtn);
 
     card.appendChild(head);
     card.appendChild(tags);
@@ -544,7 +695,6 @@ export class ClassSearchAugmentation implements Augmentation {
       const desc = doc.createElement("div");
       desc.className = "bc-cs-course-desc";
       desc.textContent = planEntry.description;
-      desc.addEventListener("click", () => desc.classList.toggle("bc-cs-expanded"));
       card.appendChild(desc);
     }
 
@@ -555,10 +705,25 @@ export class ClassSearchAugmentation implements Augmentation {
     }
     card.appendChild(sectionList);
 
-    // If the live data is already cached for this bare catalog, paint it now.
-    const cachedLive = state.liveCache.get(liveCacheKey(state, row));
-    if (cachedLive?.status === "ready" && cachedLive.result) {
-      this.applyLiveDataToCard(state, row, card, cachedLive.result);
+    // Eagerly paint live data on render. Try the in-memory cache first
+    // (warmed by an earlier action this session), then fall back to the
+    // persistent catalog cache (15-min TTL across sessions). Only on a
+    // cold cache do section rows render without status badges, and the
+    // first Details/Add click on the course populates them.
+    const liveKey = liveCacheKey(state, row);
+    const memHit = state.liveCache.get(liveKey);
+    if (memHit?.status === "ready" && memHit.result) {
+      this.applyLiveDataToCard(state, row, card, memHit.result);
+    } else {
+      const diskHit = readCatalogCache(
+        state.filters.termId,
+        row.course.subject,
+        bareCatalogNumber(row.course.catalog)
+      );
+      if (diskHit) {
+        state.liveCache.set(liveKey, { status: "ready", result: diskHit.result });
+        this.applyLiveDataToCard(state, row, card, diskHit.result);
+      }
     }
 
     return card;
@@ -671,12 +836,12 @@ export class ClassSearchAugmentation implements Augmentation {
       button.dataset.state = "enrolled";
       button.disabled = true;
       button.textContent = "Enrolled";
-      button.title = `You're enrolled in #${hit.entry.classNumber}.`;
+      button.title = "You're enrolled in this class.";
     } else {
       button.dataset.state = "in-cart";
       button.disabled = true;
       button.textContent = "In cart";
-      button.title = `Class #${hit.entry.classNumber} is in your shopping cart.`;
+      button.title = "This class is in your shopping cart.";
     }
   }
 
@@ -747,63 +912,116 @@ export class ClassSearchAugmentation implements Augmentation {
       button.dataset.state = "enrolled";
       button.disabled = true;
       button.textContent = "Enrolled";
-      button.title = `You're enrolled in #${hit.entry.classNumber}.`;
+      button.title = "You're enrolled in this class.";
     } else {
       button.dataset.state = "in-cart";
       button.disabled = true;
       button.textContent = "In cart";
-      button.title = `Class #${hit.entry.classNumber} is in your shopping cart.`;
+      button.title = "This class is in your shopping cart.";
     }
   }
 
   // ── Live CAESAR data: per-course search ──────────────────────────────────
 
-  private async loadCourseLive(
+  // Returns the catalog search groups for this course, going through
+  // in-memory → persistent disk cache → CAESAR fetch. The PS credit is
+  // consumed by the parent action (Details / Add to cart / refresh), not
+  // here. Paints live cells on the card whenever a result becomes
+  // available. `force` skips both caches for an explicit user refresh.
+  private async ensureLiveData(
     state: MountedState,
     row: ResultRow,
-    card: HTMLElement
-  ): Promise<void> {
+    card: HTMLElement | null,
+    options: { force?: boolean } = {}
+  ): Promise<CaesarSearchResult | null> {
     const key = liveCacheKey(state, row);
-    const existing = state.liveCache.get(key);
-    if (existing?.status === "loading") return;
 
-    const liveBtn = card.querySelector<HTMLButtonElement>(".bc-cs-live-btn");
-    if (liveBtn) {
-      liveBtn.disabled = true;
-      liveBtn.textContent = "Loading CAESAR…";
-      liveBtn.dataset.state = "loading";
+    if (!options.force) {
+      const memHit = state.liveCache.get(key);
+      if (memHit?.status === "ready" && memHit.result) return memHit.result;
+
+      const diskHit = readCatalogCache(
+        state.filters.termId,
+        row.course.subject,
+        bareCatalogNumber(row.course.catalog)
+      );
+      if (diskHit) {
+        state.liveCache.set(key, { status: "ready", result: diskHit.result });
+        if (card) this.applyLiveDataToCard(state, row, card, diskHit.result);
+        return diskHit.result;
+      }
     }
-    state.liveCache.set(key, { status: "loading" });
 
+    state.liveCache.set(key, { status: "loading" });
     try {
-      const result = await searchCaesarCatalog({
-        termId: state.filters.termId,
-        institution: state.institution,
-        subject: row.course.subject,
-        bareCatalog: bareCatalogNumber(row.course.catalog)
-      });
+      const result = await withCaesarAuthRecovery(() =>
+        searchCaesarCatalog({
+          termId: state.filters.termId,
+          institution: state.institution,
+          subject: row.course.subject,
+          bareCatalog: bareCatalogNumber(row.course.catalog)
+        })
+      );
+      if (!result) {
+        state.liveCache.delete(key);
+        return null;
+      }
       state.liveCache.set(key, { status: "ready", result });
-      if (liveBtn) {
-        liveBtn.disabled = false;
-        liveBtn.dataset.state = "ready";
-        liveBtn.textContent = "Refresh CAESAR data";
-      }
-      this.applyLiveDataToCard(state, row, card, result);
-      const warning = formatPsCreditsWarning();
-      if (warning) {
-        showToast(`Loaded CAESAR data. ${warning}.`, { tone: "warn", durationMs: 5000 });
-      }
+      writeCatalogCache(
+        state.filters.termId,
+        row.course.subject,
+        bareCatalogNumber(row.course.catalog),
+        result
+      );
+      if (card) this.applyLiveDataToCard(state, row, card, result);
+      return result;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       state.liveCache.set(key, { status: "error", error: msg });
-      if (liveBtn) {
-        liveBtn.disabled = false;
-        liveBtn.dataset.state = "error";
-        liveBtn.textContent = "Retry CAESAR";
-        liveBtn.title = msg;
-      }
       showToast(`Couldn't load CAESAR data: ${msg}`, { tone: "error", durationMs: 5000 });
+      return null;
     }
+  }
+
+  // Force-refresh the per-course catalog data, bypassing both caches, and
+  // also invalidate any per-section seat caches the user has expanded so
+  // the detail panel re-fetches with the same click.
+  private async refreshLiveData(
+    state: MountedState,
+    row: ResultRow,
+    card: HTMLElement,
+    button: HTMLButtonElement
+  ): Promise<void> {
+    button.disabled = true;
+    button.dataset.state = "loading";
+    button.classList.add("is-spinning");
+
+    const result = await this.ensureLiveData(state, row, card, { force: true });
+
+    button.disabled = false;
+    button.classList.remove("is-spinning");
+    button.dataset.state = result ? "ready" : "error";
+
+    if (!result) return;
+
+    // Refresh any open detail panels in this card so seat counts also
+    // update — the per-section seats-notes cache is keyed on classNumber
+    // and outlives the catalog cache, so we explicitly invalidate the
+    // sections we know about and re-render their open panels.
+    const matchingGroup = matchCaesarGroup(result.groups, row.course.catalog);
+    if (!matchingGroup) return;
+    const detailRows = card.querySelectorAll<HTMLLIElement>("li.bc-cs-detail-row");
+    for (const detailRow of Array.from(detailRows)) {
+      const sectionLi = detailRow.previousElementSibling;
+      if (!(sectionLi instanceof HTMLLIElement)) continue;
+      const sectionNumber = sectionLi.dataset.sectionNumber ?? "";
+      const component = sectionLi.dataset.component ?? "";
+      const caesar = matchCaesarSection(matchingGroup, sectionNumber, component);
+      if (!caesar) continue;
+      const bareCatalog = bareCatalogNumber(row.course.catalog);
+      void this.fetchAndRenderDetail(state, detailRow, caesar, bareCatalog);
+    }
+    showToast("Refreshed seat status from CAESAR.", { tone: "success", durationMs: 3000 });
   }
 
   private applyLiveDataToCard(
@@ -812,6 +1030,10 @@ export class ClassSearchAugmentation implements Augmentation {
     card: HTMLElement,
     result: CaesarSearchResult
   ): void {
+    // Live data exists for this course → reveal the refresh affordance
+    // (kept hidden until first paint so cold cards aren't cluttered).
+    const refreshBtn = card.querySelector<HTMLButtonElement>(".bc-cs-refresh-btn");
+    if (refreshBtn) refreshBtn.style.display = "";
     const matchingGroup = matchCaesarGroup(result.groups, row.course.catalog);
     const sectionLis = card.querySelectorAll<HTMLLIElement>("li.bc-cs-section");
 
@@ -835,14 +1057,10 @@ export class ClassSearchAugmentation implements Augmentation {
       status.textContent = caesar.status;
       live.appendChild(status);
 
-      const num = state.doc.createElement("span");
-      num.className = "bc-cs-class-num";
-      num.textContent = `#${caesar.classNumber}`;
-      live.appendChild(num);
-
       // Live data resolved this section's class number — re-evaluate the
       // cart-cache state with the canonical key so the badge reflects any
-      // hits that signature-only matching missed.
+      // hits that signature-only matching missed. The class number itself
+      // is internal-only and never surfaced to the user.
       const addBtn = li.querySelector<HTMLButtonElement>(".bc-cs-add");
       if (addBtn) this.applyCartStateBySigKey(state, addBtn);
     });
@@ -874,20 +1092,15 @@ export class ClassSearchAugmentation implements Augmentation {
     // run ungated.
     if (!this.consumePsCredit("details")) return;
 
-    const liveKey = liveCacheKey(state, row);
-    let live = state.liveCache.get(liveKey);
-    if (!live || live.status !== "ready" || !live.result) {
-      // Need a class number first — load CAESAR data, then continue.
-      const card = li.closest<HTMLElement>(".bc-cs-course");
-      if (card) await this.loadCourseLive(state, row, card);
-      live = state.liveCache.get(liveKey);
-      if (!live || live.status !== "ready" || !live.result) {
-        showToast("Could not load CAESAR data for this course.", { tone: "error" });
-        return;
-      }
+    // Resolve the catalog search via cache (memory → disk → fetch).
+    const card = li.closest<HTMLElement>(".bc-cs-course");
+    const liveResult = await this.ensureLiveData(state, row, card);
+    if (!liveResult) {
+      showToast("Could not load CAESAR data for this course.", { tone: "error" });
+      return;
     }
 
-    const matchingGroup = matchCaesarGroup(live.result.groups, row.course.catalog);
+    const matchingGroup = matchCaesarGroup(liveResult.groups, row.course.catalog);
     const caesar = matchingGroup
       ? matchCaesarSection(matchingGroup, section.section, section.component)
       : null;
@@ -990,7 +1203,11 @@ export class ClassSearchAugmentation implements Augmentation {
 
     const header = doc.createElement("div");
     header.className = "bc-cs-detail-header";
-    header.innerHTML = `<strong>Class #${caesar.classNumber}</strong> · ${escapeHtml(caesar.daysTime)} · ${escapeHtml(caesar.room)}`;
+    const headerBits: string[] = [];
+    if (caesar.sectionLabel) headerBits.push(`<strong>${escapeHtml(caesar.sectionLabel)}</strong>`);
+    if (caesar.daysTime) headerBits.push(escapeHtml(caesar.daysTime));
+    if (caesar.room) headerBits.push(escapeHtml(caesar.room));
+    header.innerHTML = headerBits.join(" · ");
     wrap.appendChild(header);
 
     if (!result.ok) {
@@ -1044,19 +1261,12 @@ export class ClassSearchAugmentation implements Augmentation {
     button.textContent = "Loading…";
 
     // We need the 5-digit CAESAR class number for the cart-add chain.
-    // Live data is the source of truth; load it first if it isn't already
-    // in the cache.
-    const liveKey = liveCacheKey(state, row);
-    let live = state.liveCache.get(liveKey);
-    if (!live || live.status !== "ready" || !live.result) {
-      const card = button.closest<HTMLElement>(".bc-cs-course");
-      if (card) await this.loadCourseLive(state, row, card);
-      live = state.liveCache.get(liveKey);
-    }
-
+    // Resolve via cache (memory → disk → fetch).
+    const card = button.closest<HTMLElement>(".bc-cs-course");
+    const liveResult = await this.ensureLiveData(state, row, card);
     let classNumber: string | null = null;
-    if (live?.status === "ready" && live.result) {
-      const group = matchCaesarGroup(live.result.groups, row.course.catalog);
+    if (liveResult) {
+      const group = matchCaesarGroup(liveResult.groups, row.course.catalog);
       if (group) {
         classNumber =
           matchCaesarSection(group, section.section, section.component)?.classNumber ?? null;
@@ -1073,14 +1283,25 @@ export class ClassSearchAugmentation implements Augmentation {
       return;
     }
 
-    button.textContent = `Adding #${classNumber}…`;
+    button.textContent = "Adding…";
 
-    const result = await addSectionToCart({
-      classNumber,
-      termId: state.filters.termId,
-      institution: state.institution,
-      bareCatalog: bareCatalogNumber(row.course.catalog)
-    });
+    const result = await withCaesarAuthRecovery(() =>
+      addSectionToCart({
+        classNumber,
+        termId: state.filters.termId,
+        institution: state.institution,
+        bareCatalog: bareCatalogNumber(row.course.catalog)
+      })
+    );
+
+    if (!result) {
+      // Auth recovery toast already explained why; just reset the button so
+      // the user can re-trigger once they've completed sign-in.
+      button.dataset.state = "idle";
+      button.textContent = "Add to cart";
+      button.disabled = false;
+      return;
+    }
 
     // Side effect: fold the class-number search response into the live
     // cache so the row's status badge paints without a Load CAESAR call.
@@ -1108,7 +1329,7 @@ export class ClassSearchAugmentation implements Augmentation {
       const warning = formatPsCreditsWarning();
       const suffix = warning ? ` ${warning}.` : "";
       showToast(
-        `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} (#${result.classNumber}) to your shopping cart.${suffix}`,
+        `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} to your shopping cart.${suffix}`,
         {
           tone: "success",
           durationMs: 6000,
@@ -1146,7 +1367,7 @@ export class ClassSearchAugmentation implements Augmentation {
       const warning = formatPsCreditsWarning();
       const suffix = warning ? ` ${warning}.` : "";
       showToast(
-        `${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} #${classNumber} is already in your shopping cart.${suffix}`,
+        `${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} is already in your shopping cart.${suffix}`,
         {
           tone: "info",
           durationMs: 5000,
@@ -1270,16 +1491,16 @@ export class ClassSearchAugmentation implements Augmentation {
     item.type = "button";
     item.className = "bc-cs-related-option";
     item.dataset.status = option.status;
+    // Stash row-index for the click-handler lookup so we don't need a
+    // user-visible class number in the option DOM to identify it.
+    item.dataset.rowIndex = String(option.rowIndex);
 
     const left = doc.createElement("div");
     left.className = "bc-cs-related-option-left";
     const sec = doc.createElement("div");
     sec.className = "bc-cs-related-option-section";
     sec.textContent = option.section || "—";
-    const num = doc.createElement("div");
-    num.className = "bc-cs-related-option-num";
-    num.textContent = `#${option.classNumber}`;
-    left.append(sec, num);
+    left.append(sec);
 
     const mid = doc.createElement("div");
     mid.className = "bc-cs-related-option-mid";
@@ -1332,8 +1553,8 @@ export class ClassSearchAugmentation implements Augmentation {
       b.disabled = true;
       if (b.dataset.picked !== "true") b.style.opacity = "0.5";
     });
-    const clicked = Array.from(buttons).find((b) =>
-      b.querySelector(".bc-cs-related-option-num")?.textContent?.includes(option.classNumber)
+    const clicked = Array.from(buttons).find(
+      (b) => b.dataset.rowIndex === String(option.rowIndex)
     );
     if (clicked) {
       clicked.dataset.picked = "true";
@@ -1343,7 +1564,7 @@ export class ClassSearchAugmentation implements Augmentation {
       stamp.textContent = "Adding…";
       clicked.appendChild(stamp);
     }
-    button.textContent = `Adding #${pending.classNumber}…`;
+    button.textContent = "Adding…";
 
     const result = await continueCartAddWithRelated({
       continuationFormState: pending.continuationFormState,
@@ -1363,7 +1584,7 @@ export class ClassSearchAugmentation implements Augmentation {
       const warning = formatPsCreditsWarning();
       const suffix = warning ? ` ${warning}.` : "";
       showToast(
-        `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} (#${result.classNumber}) with section ${option.section} to your shopping cart.${suffix}`,
+        `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} with section ${option.section} to your shopping cart.${suffix}`,
         {
           tone: "success",
           durationMs: 6000,
@@ -1422,6 +1643,41 @@ function liveCacheKey(state: MountedState, row: ResultRow): string {
 function isGradCatalog(bareCatalog: string): boolean {
   const num = parseInt(bareCatalog, 10);
   return Number.isFinite(num) && num >= 400;
+}
+
+// Look up the paper.nu course + section that a cart entry points to so
+// the "Your classes" cards can render title + instructor + meetings.
+// Tolerates paper.nu's catalog ("111") vs CAESAR's ("111-0") drift the
+// same way `matchCaesarGroup` does.
+function findPaperSection(
+  courses: PaperTermCourse[],
+  entry: CartEntry
+): { course: PaperTermCourse; section: PaperSection } | null {
+  const wantSubject = entry.subject;
+  const wantCatalog = entry.catalog.toLowerCase();
+  const wantStripped = wantCatalog.replace(/-0$/, "");
+  const [wantSecNum, wantComp] = entry.sectionLabel.split("-");
+  const normSec = (wantSecNum ?? "").replace(/^0+/, "") || "0";
+  const normComp = (wantComp ?? "").toUpperCase();
+
+  for (const course of courses) {
+    if (course.subject !== wantSubject) continue;
+    const have = course.catalog.toLowerCase();
+    if (
+      have !== wantCatalog &&
+      have !== wantStripped &&
+      have.replace(/-0$/, "") !== wantStripped
+    ) {
+      continue;
+    }
+    for (const section of course.sections) {
+      const sNum = (section.section ?? "").replace(/^0+/, "") || "0";
+      if (sNum !== normSec) continue;
+      if ((section.component ?? "").toUpperCase() !== normComp) continue;
+      return { course, section };
+    }
+  }
+  return null;
 }
 
 // Cart-button registry key. Encodes everything we need to reverse-look up
@@ -1728,5 +1984,86 @@ function buildLoadingShell(doc: Document): HTMLElement {
 
 function hasAnyFilter(filters: SearchFilters): boolean {
   return filters.query.trim().length > 0;
+}
+
+// Drives the SSO popup flow when CAESAR's PS session is dead and the silent
+// re-handshake in `getEntryFormState()` couldn't recover it. Shows a toast,
+// asks the background worker to open the login URL in a new tab, waits for
+// the post-auth navigation pattern to fire, then re-runs `retry`. Returns
+// `null` if the popup couldn't open or the user closed it without signing in.
+let pendingAuthRecovery: Promise<unknown> | null = null;
+
+async function recoverCaesarAuthAndRetry<T>(
+  loginUrl: string,
+  retry: () => Promise<T>
+): Promise<T | null> {
+  // Coalesce concurrent failures (e.g. Load CAESAR + Add to cart both racing
+  // through `getEntryFormState()`) so we open exactly one popup tab. Late
+  // arrivers wait for the same auth handshake but each runs their own retry.
+  if (pendingAuthRecovery) {
+    const ok = await pendingAuthRecovery.then(
+      () => true,
+      () => false
+    );
+    return ok ? await retry() : null;
+  }
+
+  const handshake = (async (): Promise<void> => {
+    showToast("CAESAR session expired — opening sign-in…", {
+      tone: "info",
+      durationMs: 3500
+    });
+
+    const reasonPromise = new Promise<AuthPopupClosedMessage["reason"]>((resolve) => {
+      const listener = (message: unknown): void => {
+        if (
+          message &&
+          typeof message === "object" &&
+          (message as { type?: string }).type === "auth-popup-closed"
+        ) {
+          chrome.runtime.onMessage.removeListener(listener);
+          resolve((message as AuthPopupClosedMessage).reason);
+        }
+      };
+      chrome.runtime.onMessage.addListener(listener);
+    });
+
+    const request: OpenAuthPopupMessage = { type: "open-auth-popup", loginUrl };
+    const response = (await chrome.runtime.sendMessage(request)) as
+      | OpenAuthPopupResponse
+      | undefined;
+    if (!response?.ok) {
+      throw new Error("Couldn't open the CAESAR sign-in tab.");
+    }
+
+    const reason = await reasonPromise;
+    if (reason !== "succeeded") {
+      throw new Error("CAESAR sign-in was canceled.");
+    }
+  })();
+
+  pendingAuthRecovery = handshake;
+  try {
+    await handshake;
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : String(error), {
+      tone: "error",
+      durationMs: 5000
+    });
+    return null;
+  } finally {
+    pendingAuthRecovery = null;
+  }
+
+  return await retry();
+}
+
+async function withCaesarAuthRecovery<T>(action: () => Promise<T>): Promise<T | null> {
+  try {
+    return await action();
+  } catch (error) {
+    if (!isCaesarAuthRequiredError(error)) throw error;
+    return await recoverCaesarAuthAndRetry(error.loginUrl, action);
+  }
 }
 
