@@ -2,6 +2,8 @@ import { startAccessGate } from "./access-gate";
 import { mountServerBanner } from "./access-gate/banner";
 import { mountAccessGateToast } from "./access-gate/toast";
 import { augmentationRegistry } from "./augmentations/registry";
+import { initModalCache } from "./augmentations/paper-ctec/modal-cache";
+import { initCartCache, runOpportunisticReconcile } from "./cart-cache";
 import { bootstrapTheme } from "./design";
 import { AugmentationRunner } from "./framework";
 import { registerLookupMessageHandler } from "./messaging";
@@ -12,7 +14,17 @@ registerLookupMessageHandler();
 void startAccessGate();
 mountAccessGateToast();
 mountServerBanner();
+void initCartCache();
+initModalCache();
 new AugmentationRunner(augmentationRegistry).start();
+
+// Opportunistic cart-cache reconcile. Only fires on CAESAR pages — we need
+// the user's PeopleSoft session cookies to fetch the cart URL, and they
+// only flow with the request when a CAESAR tab is loaded. Internally
+// gates on a 1hr stale check so we don't hit CAESAR on every page load.
+if (/caesar\.ent\.northwestern\.edu/i.test(window.location.host)) {
+  void initCartCache().then(() => runOpportunisticReconcile());
+}
 
 function injectEarlyTermPageMask(): void {
   const url = new URL(window.location.href);

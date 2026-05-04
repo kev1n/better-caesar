@@ -4,6 +4,7 @@ export type IconName =
   | "alert"
   | "book"
   | "cap"
+  | "cart"
   | "chart"
   | "check"
   | "clock"
@@ -114,6 +115,21 @@ export function createIcon(name: IconName, options?: { filled?: boolean }): SVGE
   if (name === "plus") {
     addPath("M12 5v14");
     addPath("M5 12h14");
+    return svg;
+  }
+
+  if (name === "cart") {
+    addPath("M3 3h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 7H6.5");
+    const wheel1 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    wheel1.setAttribute("cx", "10");
+    wheel1.setAttribute("cy", "20");
+    wheel1.setAttribute("r", "1.2");
+    svg.appendChild(wheel1);
+    const wheel2 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    wheel2.setAttribute("cx", "17");
+    wheel2.setAttribute("cy", "20");
+    wheel2.setAttribute("r", "1.2");
+    svg.appendChild(wheel2);
     return svg;
   }
 

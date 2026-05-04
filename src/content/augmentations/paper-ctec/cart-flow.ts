@@ -128,6 +128,59 @@ export async function addChipSectionToCart(
   }
 }
 
+// Resolves a chip's identity (subject + catalog + instructor + topic) to a
+// concrete paper.nu section + termId, without touching CAESAR. Used by the
+// cart-cache integration so chips can render "in cart" / "enrolled" badges
+// on initial mount based purely on local data + the persisted cache.
+//
+// Returns null when paper.nu data hasn't loaded yet, the active term can't
+// be resolved, or no section matches the chip identity.
+export type ResolvedChipSection = {
+  termId: string;
+  subject: string;
+  catalog: string;
+  sectionLabel: string;     // "1-LEC" — matches CAESAR cart cache convention
+};
+
+export async function resolveChipSection(
+  params: CtecLinkParams,
+  titleHint: string
+): Promise<ResolvedChipSection | null> {
+  try {
+    const { termId } = await getActivePaperTermId();
+    if (!termId) return null;
+    const courses = await getTermCourses(termId);
+    const found = findSectionWithCourse(courses, params, titleHint);
+    if (!found) return null;
+    return {
+      termId,
+      subject: params.subject,
+      // CTEC links only carry the bare catalog (`extractSubjectAndCatalog`
+      // captures `\d{3}`), so a chip for CHEM 105-8 has params.catalogNumber
+      // = "105". Use the resolved paper.nu course's catalog instead — that
+      // keeps the suffix (e.g. "105-8") so the cache signature matches the
+      // cart-page hydrator's parse of "CHEM 105-8-05".
+      catalog: found.course.catalog,
+      sectionLabel: `${found.section.section}-${found.section.component}`
+    };
+  } catch {
+    return null;
+  }
+}
+
+function findSectionWithCourse(
+  courses: PaperTermCourse[],
+  params: CtecLinkParams,
+  titleHint: string
+): { course: PaperTermCourse; section: PaperSection } | null {
+  const section = findSection(courses, params, titleHint);
+  if (!section) return null;
+  for (const course of courses) {
+    if (course.sections.includes(section)) return { course, section };
+  }
+  return null;
+}
+
 // Picks the section a chip represents from paper.nu's course data. We have
 // to disambiguate because a course can have many sections; we use the same
 // last-name instructor label the rest of the augmentation uses (so "Smith,

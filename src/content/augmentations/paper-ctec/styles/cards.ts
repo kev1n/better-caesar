@@ -264,10 +264,13 @@ export function cardStyles(): string {
       opacity: 1;
       margin-left: 4px;
     }
-    /* In-flight or finished cart actions stay expanded so the user can
-       still read the status (Added #1234, Retry, Adding…) without
-       hovering. */
-    button.${WIDGET_CLASS}-cart-btn[data-cart-state] .${WIDGET_CLASS}-cart-btn-label {
+    /* Mid-flight and one-shot finish states stay expanded so the user can
+       read the status (Added #1234, Retry, Adding…) without hovering.
+       Persistent badges (in-cart, enrolled) collapse to icon-only and
+       expand on hover, matching the analytics button's pattern. */
+    button.${WIDGET_CLASS}-cart-btn[data-cart-state="success"] .${WIDGET_CLASS}-cart-btn-label,
+    button.${WIDGET_CLASS}-cart-btn[data-cart-state="error"] .${WIDGET_CLASS}-cart-btn-label,
+    button.${WIDGET_CLASS}-cart-btn[data-cart-state="loading"] .${WIDGET_CLASS}-cart-btn-label {
       max-width: 220px;
       opacity: 1;
       margin-left: 4px;
@@ -277,7 +280,9 @@ export function cardStyles(): string {
       border-color: var(--bc-color-cart-border-hover);
       box-shadow: var(--bc-shadow-button-hover);
     }
-    button.${WIDGET_CLASS}-cart-btn[data-cart-state="success"] {
+    button.${WIDGET_CLASS}-cart-btn[data-cart-state="success"],
+    button.${WIDGET_CLASS}-cart-btn[data-cart-state="in-cart"],
+    button.${WIDGET_CLASS}-cart-btn[data-cart-state="enrolled"] {
       background: var(--bc-color-cart-success-bg);
       border-color: var(--bc-color-cart-success-border);
       color: var(--bc-color-cart-success-text);

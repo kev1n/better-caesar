@@ -31,6 +31,8 @@ import {
 } from "../content/settings";
 
 const CTEC_INDEX_KEY = "better-caesar:ctec-index:v1";
+const PAPER_CTEC_MODAL_CACHE_KEY = "bc_paper_ctec_modal_cache";
+const CART_CACHE_KEY = "better-caesar:cart-cache:v1";
 
 type FeatureItem = {
   id: string;
@@ -437,7 +439,7 @@ function initClearCacheButton(): void {
   const btn = document.getElementById("clear-ctec-cache");
   if (!(btn instanceof HTMLButtonElement)) return;
   btn.addEventListener("click", async () => {
-    await chrome.storage.local.remove(CTEC_INDEX_KEY);
+    await chrome.storage.local.remove([CTEC_INDEX_KEY, PAPER_CTEC_MODAL_CACHE_KEY]);
     btn.textContent = "Cleared!";
     btn.disabled = true;
     setTimeout(() => {
@@ -463,10 +465,25 @@ function initClearCatalogCacheButton(): void {
   });
 }
 
+function initClearCartCacheButton(): void {
+  const btn = document.getElementById("clear-cart-cache");
+  if (!(btn instanceof HTMLButtonElement)) return;
+  btn.addEventListener("click", async () => {
+    await chrome.storage.local.remove(CART_CACHE_KEY);
+    btn.textContent = "Cleared!";
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = "Clear cart cache";
+      btn.disabled = false;
+    }, 1500);
+  });
+}
+
 void bootstrapTheme();
 void init();
 initClearCacheButton();
 initClearCatalogCacheButton();
+initClearCartCacheButton();
 void initRecentTermsInput();
 void initThemePicker();
 void renderGate();

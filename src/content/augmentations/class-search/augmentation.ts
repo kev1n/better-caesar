@@ -1,3 +1,11 @@
+import {
+  initCartCache,
+  lookupBySignature,
+  lookupClassNumber,
+  recordOptimisticAdd,
+  subscribe as subscribeCartCache,
+  type CartLookupHit
+} from "../../cart-cache";
 import type { Augmentation } from "../../framework";
 import { isRetryablePeopleSoftTaskError, lookupClass } from "../../peoplesoft";
 import {
@@ -96,6 +104,15 @@ type MountedState = {
   // the same CAESAR search response.
   liveCache: Map<string, CourseLiveCache>;
   activeTab: TabId;
+  // Per-section Add buttons currently mounted on screen. Keyed by
+  // `${termId}|${subject}|${catalog}|${sectionLabel}` (the signature the
+  // cart cache also uses) so a subscribe-driven repaint can find them
+  // without walking the whole DOM. Buttons remove themselves from this
+  // map when their <li> disconnects.
+  cartButtons: Map<string, HTMLButtonElement>;
+  // Unsubscribe from cart-cache change notifications. Called on unmount so
+  // the listener doesn't leak across mount cycles.
+  cartUnsubscribe: (() => void) | null;
   // Last tab `applyTabVisibility` actually applied to the DOM. Without
   // this, every mutation observer tick would re-toggle the native-hider
   // style and panel display.
@@ -111,6 +128,7 @@ export class ClassSearchAugmentation implements Augmentation {
   constructor() {
     void initSeatsNotesStorage().then(() => pruneEmptySeatsCache());
     void pruneStalePaperCaches();
+    void initCartCache();
   }
 
   cleanup(doc: Document = document): void {
@@ -189,9 +207,15 @@ export class ClassSearchAugmentation implements Augmentation {
         searchDebounce: null,
         liveCache: new Map(),
         activeTab: readActiveTab(),
+        cartButtons: new Map(),
+        cartUnsubscribe: null,
         appliedTab: null
       };
       this.mounted = state;
+      // Cart cache pushes here when CAESAR cart-page reconcile lands or
+      // another tab made an optimistic add. Repaint every mounted Add
+      // button so badges flip without the user reloading.
+      state.cartUnsubscribe = subscribeCartCache(() => this.repaintAllCartButtons(state));
 
       placeholder.innerHTML = "";
       placeholder.appendChild(this.buildTabs(state));
@@ -211,6 +235,8 @@ export class ClassSearchAugmentation implements Augmentation {
     if (this.mounted?.searchDebounce !== null && this.mounted?.searchDebounce !== undefined) {
       window.clearTimeout(this.mounted.searchDebounce);
     }
+    this.mounted?.cartUnsubscribe?.();
+    this.mounted?.cartButtons.clear();
     const root = doc.getElementById(ROOT_ID);
     if (root) root.remove();
     const hider = doc.getElementById(HIDE_NATIVE_STYLE_ID);
@@ -582,10 +608,127 @@ export class ClassSearchAugmentation implements Augmentation {
       void this.handleAdd(state, row, section, addBtn);
     });
 
+    const sigKey = sectionSignatureKey(state, row, section);
+    addBtn.dataset.sigKey = sigKey;
+    state.cartButtons.set(sigKey, addBtn);
+    this.applyCartStateToButton(state, row, section, addBtn);
+
     actions.append(detailsBtn, addBtn);
 
     li.append(idCell, compCell, timeCell, instructorCell, roomCell, liveCell, actions);
     return li;
+  }
+
+  // Resolve the cart-cache state for this section and update the button's
+  // label / disabled / dataset.state. Class-number-keyed lookup is preferred
+  // (we can resolve once we've loaded the live CAESAR data); if not yet
+  // known, fall back to the (subject, catalog, sectionLabel) signature.
+  private applyCartStateToButton(
+    state: MountedState,
+    row: ResultRow,
+    section: PaperSection,
+    button: HTMLButtonElement
+  ): void {
+    if (button.dataset.state === "loading") return; // mid-flight, leave alone
+
+    const hit = this.lookupCacheForSection(state, row, section);
+    if (!hit) {
+      // Cache miss — restore idle if we previously painted a cached state.
+      if (button.dataset.state === "in-cart" || button.dataset.state === "enrolled") {
+        button.dataset.state = "";
+        button.disabled = false;
+        button.textContent = "Add to cart";
+        button.title = "";
+      }
+      return;
+    }
+    if (hit.status === "enrolled") {
+      button.dataset.state = "enrolled";
+      button.disabled = true;
+      button.textContent = "Enrolled";
+      button.title = `You're enrolled in #${hit.entry.classNumber}.`;
+    } else {
+      button.dataset.state = "in-cart";
+      button.disabled = true;
+      button.textContent = "In cart";
+      button.title = `Class #${hit.entry.classNumber} is in your shopping cart.`;
+    }
+  }
+
+  private lookupCacheForSection(
+    state: MountedState,
+    row: ResultRow,
+    section: PaperSection
+  ): CartLookupHit | null {
+    // Prefer the resolved CAESAR class number (live data), since it's the
+    // canonical key the cache uses. If we haven't loaded live data yet,
+    // fall back to a paper.nu-derived signature.
+    const live = state.liveCache.get(liveCacheKey(state, row));
+    if (live?.status === "ready" && live.result) {
+      const group = matchCaesarGroup(live.result.groups, row.course.catalog);
+      const caesarSection = group
+        ? matchCaesarSection(group, section.section, section.component)
+        : null;
+      if (caesarSection) {
+        return lookupClassNumber(state.filters.termId, caesarSection.classNumber);
+      }
+    }
+    return lookupBySignature(
+      state.filters.termId,
+      row.course.subject,
+      row.course.catalog,
+      `${section.section}-${section.component}`
+    );
+  }
+
+  private repaintAllCartButtons(state: MountedState): void {
+    // Detached buttons (lists re-rendered between mount and now) get GC'd
+    // here so the registry doesn't leak. We can't reliably recover the
+    // ResultRow/PaperSection for a detached button anyway.
+    for (const [key, button] of state.cartButtons) {
+      if (!button.isConnected) {
+        state.cartButtons.delete(key);
+        continue;
+      }
+      // The button caches no row/section refs, but the cache lookup only
+      // needs them to resolve via live data. Signature-based lookup works
+      // off the dataset.sigKey alone.
+      this.applyCartStateBySigKey(state, button);
+    }
+  }
+
+  private applyCartStateBySigKey(state: MountedState, button: HTMLButtonElement): void {
+    if (button.dataset.state === "loading") return;
+    const sigKey = button.dataset.sigKey ?? "";
+    const parsed = parseSignatureKey(sigKey);
+    if (!parsed) return;
+
+    const hit = lookupBySignature(
+      parsed.termId,
+      parsed.subject,
+      parsed.catalog,
+      parsed.sectionLabel
+    );
+    if (!hit) {
+      if (button.dataset.state === "in-cart" || button.dataset.state === "enrolled") {
+        button.dataset.state = "";
+        button.disabled = false;
+        button.textContent = "Add to cart";
+        button.title = "";
+      }
+      return;
+    }
+    if (hit.status === "enrolled") {
+      button.dataset.state = "enrolled";
+      button.disabled = true;
+      button.textContent = "Enrolled";
+      button.title = `You're enrolled in #${hit.entry.classNumber}.`;
+    } else {
+      button.dataset.state = "in-cart";
+      button.disabled = true;
+      button.textContent = "In cart";
+      button.title = `Class #${hit.entry.classNumber} is in your shopping cart.`;
+    }
   }
 
   // ── Live CAESAR data: per-course search ──────────────────────────────────
@@ -668,6 +811,12 @@ export class ClassSearchAugmentation implements Augmentation {
       num.className = "bc-cs-class-num";
       num.textContent = `#${caesar.classNumber}`;
       live.appendChild(num);
+
+      // Live data resolved this section's class number — re-evaluate the
+      // cart-cache state with the canonical key so the badge reflects any
+      // hits that signature-only matching missed.
+      const addBtn = li.querySelector<HTMLButtonElement>(".bc-cs-add");
+      if (addBtn) this.applyCartStateBySigKey(state, addBtn);
     });
   }
 
@@ -897,9 +1046,16 @@ export class ClassSearchAugmentation implements Augmentation {
     }
 
     if (result.ok) {
-      button.dataset.state = "success";
-      button.textContent = "Added ✓";
+      button.dataset.state = "in-cart";
+      button.textContent = "In cart";
       button.disabled = true;
+      recordOptimisticAdd(state.filters.termId, {
+        classNumber: result.classNumber,
+        subject: row.course.subject,
+        catalog: row.course.catalog,
+        sectionLabel: `${section.section}-${section.component}`,
+        capturedAt: Date.now()
+      });
       showToast(
         `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} (#${result.classNumber}) to your shopping cart.`,
         {
@@ -924,9 +1080,18 @@ export class ClassSearchAugmentation implements Augmentation {
     } else if (result.alreadyInCart) {
       // Friendlier UX: show the button as already-handled and surface a
       // pointer to the cart instead of a generic error.
-      button.dataset.state = "success";
+      button.dataset.state = "in-cart";
       button.textContent = "In cart";
       button.disabled = true;
+      if (result.classNumber) {
+        recordOptimisticAdd(state.filters.termId, {
+          classNumber: result.classNumber,
+          subject: row.course.subject,
+          catalog: row.course.catalog,
+          sectionLabel: `${section.section}-${section.component}`,
+          capturedAt: Date.now()
+        });
+      }
       showToast(
         `${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} #${classNumber} is already in your shopping cart.`,
         {
@@ -1194,6 +1359,35 @@ export class ClassSearchAugmentation implements Augmentation {
 
 function liveCacheKey(state: MountedState, row: ResultRow): string {
   return `${state.filters.termId}|${row.course.subject}|${bareCatalogNumber(row.course.catalog)}`;
+}
+
+// Cart-button registry key. Encodes everything we need to reverse-look up
+// the section in the cart cache without holding a live reference to the
+// ResultRow / PaperSection (those get GC'd as the user scrolls).
+function sectionSignatureKey(
+  state: MountedState,
+  row: ResultRow,
+  section: PaperSection
+): string {
+  return [
+    state.filters.termId,
+    row.course.subject,
+    row.course.catalog,
+    `${section.section}-${section.component}`
+  ].join("\x1f");
+}
+
+function parseSignatureKey(
+  key: string
+): { termId: string; subject: string; catalog: string; sectionLabel: string } | null {
+  const parts = key.split("\x1f");
+  if (parts.length !== 4) return null;
+  return {
+    termId: parts[0]!,
+    subject: parts[1]!,
+    catalog: parts[2]!,
+    sectionLabel: parts[3]!
+  };
 }
 
 // Merge a partial search response (e.g. a single-row class-number search)

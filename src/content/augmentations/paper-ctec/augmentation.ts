@@ -1,5 +1,12 @@
+import {
+  initCartCache,
+  lookupBySignature,
+  recordOptimisticAdd,
+  subscribe as subscribeCartCache
+} from "../../cart-cache";
 import type { Augmentation } from "../../framework";
 import { getRecentAggregationTerms, isFeatureEnabled } from "../../settings";
+import { resolveChipSection, type ResolvedChipSection } from "./cart-flow";
 import {
   buildCtecCreditToastMessage,
   CTEC_ERROR_TOAST_MESSAGE,
@@ -97,12 +104,21 @@ export class PaperCtecAugmentation implements Augmentation {
 
   // Per-card "+ Cart" button state. Persists across the framework's
   // per-mutation re-renders so the user sees mid-flight progress and the
-  // success/error result. Success/already entries auto-reset to idle after
-  // CART_SUCCESS_RESET_MS; errors stay sticky so the user sees what
-  // happened until they retry.
+  // success/error result. Errors stay sticky so the user sees what happened
+  // until they retry; cache-derived in-cart/enrolled states stick until
+  // the cache itself changes.
   private readonly cartStates = new Map<string, CartAnchorState>();
   private readonly cartInFlight = new Set<string>();
   private readonly cartResetTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // Per-chip resolved (termId, subject, catalog, sectionLabel). Memoized so
+  // we only walk paper.nu's term data once per chip key, even though
+  // run() fires on every paper.nu DOM mutation. null = resolved but no
+  // section matched; an unfinished promise = in flight.
+  private readonly chipSections = new Map<
+    string,
+    Promise<ResolvedChipSection | null>
+  >();
+  private cartCacheUnsubscribe: (() => void) | null = null;
 
   // Per-key snapshot of the data needed to open the modal. syncTargets
   // populates this from currently-visible targets so renderForKey /
@@ -121,6 +137,13 @@ export class PaperCtecAugmentation implements Augmentation {
         onInvalidate: (doc) => this.invalidateAndRerun(doc)
       });
     }
+
+    void initCartCache();
+    // Cart-cache changes (CAESAR cart-page reconcile, optimistic add from
+    // another tab, popup clear) need to push fresh state into every chip
+    // we've already resolved. We keep the unsubscribe so cleanup() can
+    // detach.
+    this.cartCacheUnsubscribe = subscribeCartCache(() => this.onCartCacheChanged());
 
     this.modal = new ModalController(
       {
@@ -171,9 +194,12 @@ export class PaperCtecAugmentation implements Augmentation {
     this.selectedTabs.clear();
     this.cartStates.clear();
     this.cartInFlight.clear();
+    this.chipSections.clear();
     for (const timer of this.cartResetTimers.values()) clearTimeout(timer);
     this.cartResetTimers.clear();
     this.targetSources.clear();
+    this.cartCacheUnsubscribe?.();
+    this.cartCacheUnsubscribe = null;
     this.modal.invalidate();
 
     // Per-card teardown: widgets, anchors, hover preview, dense-card flatten.
@@ -262,6 +288,11 @@ export class PaperCtecAugmentation implements Augmentation {
           this.cartStates.get(target.key) ?? { kind: "idle" },
           () => this.kickChipCart(target)
         );
+        // Lazy: resolve once per chip, then if the cart cache has an entry
+        // for this section (we added it in a prior session, or the user
+        // added it directly through CAESAR), surface "in cart" / "enrolled"
+        // immediately instead of leaving the chip idle until they re-add.
+        void this.seedCartStateFromCache(target.key, target.params, target.titleHint);
       }
 
       const getPreviewData = this.previewDataCallbackFor(target.key);
@@ -552,7 +583,7 @@ export class PaperCtecAugmentation implements Augmentation {
           kind: "success",
           classNumber: result.classNumber
         });
-        this.scheduleCartReset(key);
+        this.recordCartAdd(target, result.classNumber, result.sectionLabel, result.termId);
         showToast(
           `Added ${target.params.subject} ${target.params.catalogNumber} ${result.sectionLabel} (#${result.classNumber}) to your CAESAR shopping cart.`,
           {
@@ -566,7 +597,7 @@ export class PaperCtecAugmentation implements Augmentation {
           kind: "already",
           classNumber: result.classNumber
         });
-        this.scheduleCartReset(key);
+        this.recordCartAdd(target, result.classNumber, undefined, undefined);
         showToast(
           `${target.params.subject} ${target.params.catalogNumber} #${result.classNumber} is already in your CAESAR shopping cart.`,
           {
@@ -630,6 +661,124 @@ export class PaperCtecAugmentation implements Augmentation {
     const existing = this.cartResetTimers.get(key);
     if (existing) clearTimeout(existing);
     this.cartResetTimers.delete(key);
+  }
+
+  // Lazy: resolve the chip to (termId, subject, catalog, sectionLabel) once,
+  // then look it up in the cart cache. If the cache has it, paint the chip
+  // as in-cart/enrolled — but never override a local mid-flight or error
+  // state, since those represent the user's most recent intent.
+  private async seedCartStateFromCache(
+    key: string,
+    params: PaperCtecTarget["params"],
+    titleHint: string
+  ): Promise<void> {
+    let pending = this.chipSections.get(key);
+    if (!pending) {
+      pending = resolveChipSection(params, titleHint);
+      this.chipSections.set(key, pending);
+    }
+    const resolved = await pending;
+    if (!resolved) return;
+    this.applyCartCacheToChip(key, resolved);
+  }
+
+  private applyCartCacheToChip(key: string, resolved: ResolvedChipSection): void {
+    const local = this.cartStates.get(key);
+    // Don't trample mid-flight or error states — they reflect the user's
+    // most recent intent. Cache updates can only override idle/cache-sourced
+    // states (success/already/enrolled).
+    if (
+      local &&
+      local.kind !== "success" &&
+      local.kind !== "already" &&
+      local.kind !== "enrolled"
+    ) {
+      return;
+    }
+    const hit = lookupBySignature(
+      resolved.termId,
+      resolved.subject,
+      resolved.catalog,
+      resolved.sectionLabel
+    );
+    if (!hit) {
+      // Cache used to have it but the latest reconcile dropped it (e.g. the
+      // user removed it from CAESAR's cart). Roll back to idle.
+      if (local) {
+        this.cartStates.delete(key);
+        this.repaintChip(key);
+      }
+      return;
+    }
+    const next: CartAnchorState =
+      hit.status === "enrolled"
+        ? { kind: "enrolled", classNumber: hit.entry.classNumber }
+        : { kind: "already", classNumber: hit.entry.classNumber };
+    // Avoid pointless repaints when the state is already what we'd write.
+    if (
+      local &&
+      local.kind === next.kind &&
+      "classNumber" in local &&
+      local.classNumber === next.classNumber
+    ) {
+      return;
+    }
+    this.cartStates.set(key, next);
+    this.repaintChip(key);
+  }
+
+  private repaintChip(key: string): void {
+    const state = this.cartStates.get(key) ?? { kind: "idle" as const };
+    for (const widget of this.findWidgetsByKey(document, key)) {
+      const source = this.targetSources.get(key);
+      if (!source) continue;
+      attachCartAnchor(widget, state, () => this.kickChipCartFromSource(source));
+    }
+  }
+
+  // Cart cache changed (CAESAR cart-page reconcile, sibling tab add, popup
+  // clear). Re-evaluate every chip we've already resolved a section for —
+  // the unresolved ones will pick up the change next time syncTargets runs.
+  private onCartCacheChanged(): void {
+    for (const [key, pending] of this.chipSections) {
+      void pending.then((resolved) => {
+        if (!resolved) return;
+        this.applyCartCacheToChip(key, resolved);
+      });
+    }
+  }
+
+  // Optimistic write into the persistent cart cache so the chip badge
+  // survives reloads and propagates to other tabs / class-search.
+  private recordCartAdd(
+    target: PaperCtecTarget,
+    classNumber: string,
+    sectionLabel: string | undefined,
+    termIdHint: string | undefined
+  ): void {
+    void (async () => {
+      let resolved = sectionLabel && termIdHint
+        ? { termId: termIdHint, subject: target.params.subject, catalog: target.params.catalogNumber, sectionLabel }
+        : null;
+      if (!resolved) {
+        // Fall back to the lazy resolver — we still need termId and a
+        // canonical sectionLabel for the cache entry.
+        resolved = (await this.chipSections.get(target.key)) ?? null;
+        if (!resolved) {
+          const pending = resolveChipSection(target.params, target.titleHint);
+          this.chipSections.set(target.key, pending);
+          resolved = await pending;
+        }
+      }
+      if (!resolved) return;
+      recordOptimisticAdd(resolved.termId, {
+        classNumber,
+        subject: resolved.subject,
+        catalog: resolved.catalog,
+        sectionLabel: resolved.sectionLabel,
+        capturedAt: Date.now()
+      });
+    })();
   }
 
   private setProgress(key: string, message: string): void {

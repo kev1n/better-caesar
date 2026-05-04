@@ -24,6 +24,7 @@ export type CartAnchorState =
   | { kind: "adding"; message: string }
   | { kind: "success"; classNumber: string }
   | { kind: "already"; classNumber: string }
+  | { kind: "enrolled"; classNumber: string }
   | { kind: "error"; message: string };
 
 // Card-state renderers (idle / loading / data) for the per-class summary
@@ -268,6 +269,7 @@ function buildCartSignature(state: CartAnchorState): string {
   if (state.kind === "adding") return `adding|${state.message}`;
   if (state.kind === "success") return `success|${state.classNumber}`;
   if (state.kind === "already") return `already|${state.classNumber}`;
+  if (state.kind === "enrolled") return `enrolled|${state.classNumber}`;
   if (state.kind === "error") return `error|${state.message}`;
   return "idle";
 }
@@ -293,17 +295,23 @@ function makeCartButton(
     disabled = true;
     stateAttr = "loading";
   } else if (state.kind === "success") {
-    icon = "check";
+    icon = "cart";
     label = `Added #${state.classNumber}`;
     title = `Added class #${state.classNumber} to your CAESAR shopping cart.`;
     disabled = true;
     stateAttr = "success";
   } else if (state.kind === "already") {
-    icon = "check";
-    label = `In cart #${state.classNumber}`;
-    title = `Class #${state.classNumber} is already in your CAESAR shopping cart.`;
+    icon = "cart";
+    label = "In cart";
+    title = `Class #${state.classNumber} is in your CAESAR shopping cart.`;
     disabled = true;
-    stateAttr = "success";
+    stateAttr = "in-cart";
+  } else if (state.kind === "enrolled") {
+    icon = "cart";
+    label = "Enrolled";
+    title = `You're enrolled in class #${state.classNumber}.`;
+    disabled = true;
+    stateAttr = "enrolled";
   } else if (state.kind === "error") {
     icon = "alert";
     label = "Retry";
