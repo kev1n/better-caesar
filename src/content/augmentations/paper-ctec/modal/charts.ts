@@ -1,22 +1,14 @@
 import { renderMetricDistribution } from "../dist-render";
-import { renderHoursDensity } from "../hours-density";
+import {
+  renderHoursDensity,
+  type HoursDensitySeries
+} from "../hours-density";
 import {
   type ModalDisplayData,
   type ModalMetricKind,
   type ModalTerm
 } from "../modal-data";
-
-// Compact term label for chart x-axes ("Fall 2024" → "F'24"). Inlined
-// from the deleted chart-shared.ts — trend chart is the only caller now.
-function abbrTerm(term: string): string {
-  if (!term) return "";
-  return term
-    .replace("Fall ", "F'")
-    .replace("Winter ", "W'")
-    .replace("Spring ", "Sp'")
-    .replace("Summer ", "Su'")
-    .replace(" 20", "'");
-}
+import { abbrTerm } from "../term-format";
 
 // Tracks the active trend-chart ResizeObserver across renders so we can
 // disconnect a stale one when the modal re-renders (avoids leaking
@@ -173,10 +165,15 @@ export function renderTrendChart(
 // Distribution chart for the currently-selected term + metric. Hours uses
 // the parsed buckets if available; rating metrics use chart-extract counts
 // or fall back to the raw chart image. Routing lives in dist-render.ts.
+//
+// When `data` is supplied we mirror the workload card's two-pill pattern:
+// the selected term's pill is labeled with the term abbreviation (e.g.
+// "Sp'23 5.4") and a secondary "HISTORICAL AVG" pill stacks above it.
 export function renderDistChart(
   doc: Document,
   term: ModalTerm | null,
-  metric: ModalMetricKind
+  metric: ModalMetricKind,
+  data?: ModalDisplayData
 ): HTMLElement {
   const wrapper = doc.createElement("div");
   wrapper.className = "bc-paper-ctec-modal-dist";
@@ -186,6 +183,24 @@ export function renderDistChart(
     return wrapper;
   }
 
+  const isHours = metric === "hours";
+  const unit = isHours ? "h" : "";
+  const termAbbr = abbrTerm(term.term);
+  const termValue = term.metrics[metric];
+  const primaryLabel = termAbbr
+    ? typeof termValue === "number"
+      ? `${termAbbr} ${termValue.toFixed(1)}${unit}`
+      : termAbbr
+    : undefined;
+
+  const historicalMean =
+    data && data.terms.length >= 2 ? data.metrics[metric].mean : undefined;
+  const showHistorical =
+    typeof historicalMean === "number" && historicalMean > 0;
+  const historicalLabel = showHistorical
+    ? `HISTORICAL AVG ${historicalMean!.toFixed(1)}${unit}`
+    : undefined;
+
   wrapper.append(
     renderMetricDistribution({
       doc,
@@ -193,18 +208,39 @@ export function renderDistChart(
       metric,
       altLabel: `${metric} distribution for ${term.term}`,
       className: "bc-paper-ctec-modal-dist-image",
-      renderHoursBuckets: (t) =>
-        renderHoursDensity(doc, [
-          {
-            label:
-              typeof t.metrics.hours === "number"
-                ? `AVG ${t.metrics.hours.toFixed(1)}h`
-                : "AVG",
-            buckets: t.hoursBuckets,
-            mean: t.metrics.hours,
-            style: "primary"
-          }
-        ])
+      primaryLabel,
+      historicalMean: showHistorical ? historicalMean : undefined,
+      historicalLabel: showHistorical ? historicalLabel : undefined,
+      renderHoursBuckets: (t) => {
+        const series: HoursDensitySeries[] = [];
+        if (
+          showHistorical &&
+          data &&
+          data.aggregateHoursBuckets.length > 0
+        ) {
+          series.push({
+            label: historicalLabel ?? "HISTORICAL AVG",
+            buckets: data.aggregateHoursBuckets,
+            mean: historicalMean,
+            style: "secondary"
+          });
+        }
+        const tAbbr = abbrTerm(t.term);
+        const tValue = t.metrics.hours;
+        const primary =
+          tAbbr && typeof tValue === "number"
+            ? `${tAbbr} ${tValue.toFixed(1)}h`
+            : typeof tValue === "number"
+              ? `AVG ${tValue.toFixed(1)}h`
+              : tAbbr || "AVG";
+        series.push({
+          label: primary,
+          buckets: t.hoursBuckets,
+          mean: tValue,
+          style: "primary"
+        });
+        return renderHoursDensity(doc, series);
+      }
     })
   );
   return wrapper;

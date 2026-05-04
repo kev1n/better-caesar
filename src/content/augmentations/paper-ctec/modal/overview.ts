@@ -19,6 +19,7 @@ import { formatChipRating, isRatingPercentMode } from "../rating-format";
 import { attachTooltip, createRatingStars, preventAndStop } from "../ui-shared";
 import { pickMetricHue } from "../widget-chips";
 import { renderDistChart, renderTrendChart } from "./charts";
+import { abbrTerm } from "../term-format";
 import { pickSelectedTerm, renderCard } from "./common";
 import { renderHeatmap } from "./heatmap";
 import type {
@@ -232,7 +233,7 @@ function renderMetricSection(
       ? `${selectedTerm.term} · ${selectedTerm.responses} responses`
       : ""
   );
-  distCard.body.append(renderDistChart(doc, selectedTerm, metric));
+  distCard.body.append(renderDistChart(doc, selectedTerm, metric, data));
   charts.append(distCard.root);
 
   return charts;
@@ -286,11 +287,12 @@ function renderWorkloadCard(doc: Document, data: ModalDisplayData): HTMLElement 
       style: "secondary"
     });
     const latestMean = latestTerm.metrics.hours;
+    const latestAbbr = abbrTerm(latestTerm.term) || "LATEST";
     hoursSeries.push({
       label:
         typeof latestMean === "number"
-          ? `LATEST ${latestMean.toFixed(1)}h`
-          : "LATEST",
+          ? `${latestAbbr} ${latestMean.toFixed(1)}h`
+          : latestAbbr,
       buckets: latestTerm.hoursBuckets,
       mean: latestMean,
       style: "primary"

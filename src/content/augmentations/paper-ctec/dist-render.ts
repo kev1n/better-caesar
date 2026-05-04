@@ -34,12 +34,30 @@ export type RenderMetricDistributionOptions = {
   // modal's series-aware drawing primitives), so we accept it as an
   // injection rather than re-implement here.
   renderHoursBuckets: (term: ModalTerm) => HTMLElement | null;
+  // Override for the histogram's primary pill label (e.g. "Sp'23 5.4").
+  // Only applies to the chart-histogram path (rating metrics, or hours
+  // when buckets aren't available).
+  primaryLabel?: string;
+  // Optional historical-avg indicator for the chart-histogram path.
+  // Renders as a secondary slate pill stacked above the primary one.
+  historicalMean?: number;
+  historicalLabel?: string;
 };
 
 export function renderMetricDistribution(
   options: RenderMetricDistributionOptions
 ): HTMLElement {
-  const { doc, term, metric, altLabel, className, renderHoursBuckets } = options;
+  const {
+    doc,
+    term,
+    metric,
+    altLabel,
+    className,
+    renderHoursBuckets,
+    primaryLabel,
+    historicalMean,
+    historicalLabel
+  } = options;
 
   if (metric === "hours" && term.hoursBuckets.length > 0) {
     const buckets = renderHoursBuckets(term);
@@ -60,6 +78,12 @@ export function renderMetricDistribution(
       rowLabels: isHours ? HOURS_HISTOGRAM_LABELS : undefined,
       rowValues: isHours ? HOURS_HISTOGRAM_VALUES : RATING_HISTOGRAM_VALUES,
       mean: typeof mean === "number" ? mean : undefined,
+      meanLabel: primaryLabel,
+      secondaryMean:
+        typeof historicalMean === "number" && Number.isFinite(historicalMean)
+          ? historicalMean
+          : undefined,
+      secondaryLabel: historicalLabel,
       xAxisTitle: isHours ? "HOURS PER WEEK" : "RATING",
       preExtractedCounts: chart.counts,
       className

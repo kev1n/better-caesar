@@ -30,6 +30,14 @@ export type RenderHistogramOptions = {
   // Pre-known mean from the CTEC metric. If provided, an AVG pill +
   // dashed line is drawn at the corresponding x-position.
   mean?: number;
+  // Optional override for the primary pill text. Defaults to
+  // `AVG ${mean.toFixed(1)}`. Used to label the pill with the term name
+  // (e.g. "Sp'23 5.4") when the chart represents a specific term.
+  meanLabel?: string;
+  // Optional second indicator drawn in slate as a "historical avg" or
+  // similar context line. Stacks above the primary pill.
+  secondaryMean?: number;
+  secondaryLabel?: string;
   // Numeric anchors for each bar (1..6 for ratings, bucket midpoints for
   // hours). Used to position the mean indicator correctly. Defaults to
   // [1..6] when omitted.
@@ -121,8 +129,13 @@ function renderHistogramSvg(
 
   const W = 600;
   const PILL_H = 14;
+  const PILL_STEP = 16;
   const hasMean = typeof opts.mean === "number" && Number.isFinite(opts.mean);
-  const PT = hasMean ? PILL_H : 14;
+  const hasSecondaryMean =
+    typeof opts.secondaryMean === "number" && Number.isFinite(opts.secondaryMean);
+  const numPills = (hasMean ? 1 : 0) + (hasSecondaryMean ? 1 : 0);
+  const PT =
+    numPills > 0 ? PILL_H + Math.max(0, numPills - 1) * PILL_STEP : 14;
   const innerHTarget = 118;
   const PB = 28;
   const PL = 42;
@@ -156,11 +169,10 @@ function renderHistogramSvg(
       ? PL + barW / 2 + (i * (innerW - barW)) / (numBars - 1)
       : PL + innerW / 2;
 
-  // Mean indicator: interpolate the mean's x-position along the rowValues
-  // anchors. Outside the range clamps to the extreme.
-  const meanX = (() => {
-    if (!hasMean) return null;
-    const m = opts.mean!;
+  // Interpolate a mean value's x-position along the rowValues anchors.
+  // Outside the range clamps to the extreme.
+  const meanXFor = (m: number): number | null => {
+    if (!Number.isFinite(m)) return null;
     if (m <= rowValues[0]!) return xMid(0);
     if (m >= rowValues[rowValues.length - 1]!) return xMid(numBars - 1);
     for (let i = 0; i < rowValues.length - 1; i += 1) {
@@ -172,7 +184,7 @@ function renderHistogramSvg(
       }
     }
     return null;
-  })();
+  };
 
   const svg = doc.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
@@ -303,44 +315,64 @@ function renderHistogramSvg(
     svg.append(dot);
   }
 
-  // Mean indicator: dashed maroon line + AVG pill at top.
-  if (meanX !== null && hasMean) {
+  // Mean indicators. Secondary (slate) stacks on top, primary (maroon)
+  // sits below it — same vertical order as the workload card pills.
+  type Indicator = { value: number; label: string; color: string };
+  const indicators: Indicator[] = [];
+  if (hasSecondaryMean) {
+    indicators.push({
+      value: opts.secondaryMean!,
+      label: opts.secondaryLabel ?? `AVG ${opts.secondaryMean!.toFixed(1)}`,
+      color: "#475569"
+    });
+  }
+  if (hasMean) {
+    indicators.push({
+      value: opts.mean!,
+      label: opts.meanLabel ?? `AVG ${opts.mean!.toFixed(1)}`,
+      color: "#66023c"
+    });
+  }
+  indicators.forEach((ind, slot) => {
+    const meanX = meanXFor(ind.value);
+    if (meanX === null) return;
+    const pillTop = slot * PILL_STEP;
+
     const meanLine = doc.createElementNS(SVG_NS, "line");
     meanLine.setAttribute("x1", String(meanX));
     meanLine.setAttribute("x2", String(meanX));
-    meanLine.setAttribute("y1", String(PILL_H + 1));
+    meanLine.setAttribute("y1", String(pillTop + PILL_H + 1));
     meanLine.setAttribute("y2", String(PT + innerH));
-    meanLine.setAttribute("stroke", "#66023c");
+    meanLine.setAttribute("stroke", ind.color);
     meanLine.setAttribute("stroke-width", "1.5");
     meanLine.setAttribute("stroke-dasharray", "3 3");
     svg.append(meanLine);
 
-    const labelText = `AVG ${opts.mean!.toFixed(1)}`;
-    const pillW = Math.max(60, labelText.length * 5.5 + 12);
+    const pillW = Math.max(60, ind.label.length * 5.5 + 12);
     const pillX = Math.max(
       PL,
       Math.min(PL + innerW - pillW, meanX - pillW / 2)
     );
     const pill = doc.createElementNS(SVG_NS, "rect");
     pill.setAttribute("x", String(pillX));
-    pill.setAttribute("y", "0");
+    pill.setAttribute("y", String(pillTop));
     pill.setAttribute("width", String(pillW));
     pill.setAttribute("height", String(PILL_H));
     pill.setAttribute("rx", "3");
-    pill.setAttribute("fill", "#66023c");
+    pill.setAttribute("fill", ind.color);
     svg.append(pill);
 
     const pillLabel = doc.createElementNS(SVG_NS, "text");
     pillLabel.setAttribute("x", String(pillX + pillW / 2));
-    pillLabel.setAttribute("y", "10");
+    pillLabel.setAttribute("y", String(pillTop + 10));
     pillLabel.setAttribute("text-anchor", "middle");
     pillLabel.setAttribute("font-size", "9");
     pillLabel.setAttribute("font-weight", "700");
     pillLabel.setAttribute("fill", "white");
     pillLabel.setAttribute("letter-spacing", "0.5");
-    pillLabel.textContent = labelText;
+    pillLabel.textContent = ind.label;
     svg.append(pillLabel);
-  }
+  });
 
   // X-axis bucket labels.
   for (let i = 0; i < numBars; i += 1) {

@@ -5,6 +5,7 @@ import {
   type ModalTerm
 } from "./modal-data";
 import { renderHoursDensity, type HoursDensitySeries } from "./hours-density";
+import { abbrTerm } from "./term-format";
 
 const PREVIEW_CLASS = `${WIDGET_CLASS}-preview`;
 const TRIGGER_CLASS = `${WIDGET_CLASS}-preview-trigger`;
@@ -120,27 +121,6 @@ function renderGlobalSplineTrend(
   return wrapper;
 }
 
-function abbrTerm(term: string): string {
-  if (!term) return "";
-  const seasonAbbr: Record<string, string> = {
-    Fall: "F",
-    Winter: "W",
-    Spring: "Sp",
-    Summer: "Su"
-  };
-  let season = "";
-  let year = "";
-  for (const part of term.trim().split(/\s+/)) {
-    if (/^\d{4}$/.test(part)) {
-      year = `'${part.slice(2)}`;
-    } else if (part in seasonAbbr) {
-      season = seasonAbbr[part]!;
-    }
-  }
-  if (!season && !year) return term;
-  return `${season}${year}`;
-}
-
 function buildHoursSeries(data: ModalDisplayData): HoursDensitySeries[] {
   const latestTerm = data.terms[0] ?? null;
   const latestHasBuckets = !!latestTerm && latestTerm.hoursBuckets.length > 0;
@@ -158,11 +138,12 @@ function buildHoursSeries(data: ModalDisplayData): HoursDensitySeries[] {
       style: "secondary"
     });
     const latestMean = latestTerm.metrics.hours;
+    const latestAbbr = abbrTerm(latestTerm.term) || "LATEST";
     series.push({
       label:
         typeof latestMean === "number"
-          ? `LATEST ${latestMean.toFixed(1)}h`
-          : "LATEST",
+          ? `${latestAbbr} ${latestMean.toFixed(1)}h`
+          : latestAbbr,
       buckets: latestTerm.hoursBuckets,
       mean: latestMean,
       style: "primary"
