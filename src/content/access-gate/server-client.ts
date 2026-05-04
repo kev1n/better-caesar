@@ -1,12 +1,14 @@
 import { fetchTextResultViaBackground } from "../remote-fetch";
 import { FALLBACK_BUCKET_RELEASE_TIMESTAMPS } from "./constants";
 
-// TODO: replace with the production schedule URL once the server is deployed,
-// and add the host to `host_permissions` in src/manifest.base.json.
-export const BUCKET_SCHEDULE_URL =
-  "https://better-caesar.example.com/bucket-schedule.json";
+// Substituted at build time from BC_BUCKET_SCHEDULE_URL in .env. The build
+// script also patches the URL's origin into the manifest's host_permissions
+// so the background fetch is allowed.
+export const BUCKET_SCHEDULE_URL = __BC_BUCKET_SCHEDULE_URL__;
 
-const SCHEDULE_REFETCH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+// TESTING: dropped to 30s for fast iteration on the local schedule server.
+// Restore to 30 * 60 * 1000 (30 min) before shipping to keep server load sane.
+const SCHEDULE_REFETCH_INTERVAL_MS = 30 * 1000;
 const SCHEDULE_STORAGE_KEY = "better-caesar:access-gate:bucket-schedule:v1";
 
 // Wire format the schedule server must return:

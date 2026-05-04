@@ -387,3 +387,62 @@ h1 {
   border-color: var(--bc-color-border-strong);
   color: var(--bc-color-text-muted);
 }
+
+.schedule {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--bc-color-border-strong);
+  border-radius: var(--bc-radius-xl);
+  background: var(--bc-color-bg);
+}
+
+.schedule-title {
+  font-size: var(--bc-font-12);
+  font-weight: var(--bc-fw-bold);
+  color: var(--bc-color-text-strong);
+  margin-bottom: 6px;
+}
+
+.schedule-meta {
+  font-size: 11px;
+  color: var(--bc-color-text-muted);
+  margin-bottom: 8px;
+}
+
+.schedule-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.schedule-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: var(--bc-font-12);
+  color: var(--bc-color-text-muted);
+}
+
+.schedule-label {
+  color: var(--bc-color-text-strong);
+}
+
+.schedule-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--bc-color-text-muted);
+}
+
+.schedule-value--ok {
+  color: var(--bc-color-accent);
+  font-weight: var(--bc-fw-bold);
+}
+
+.schedule-empty {
+  font-size: 11px;
+  color: var(--bc-color-text-muted);
+}
