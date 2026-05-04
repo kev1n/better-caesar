@@ -556,7 +556,7 @@ function renderSparkline(
 
   const polyline = doc.createElementNS("http://www.w3.org/2000/svg", "polyline");
   polyline.setAttribute("fill", "none");
-  polyline.setAttribute("stroke", "#66023c");
+  polyline.style.stroke = "var(--bc-color-accent)";
   polyline.setAttribute("stroke-width", "1.5");
   polyline.setAttribute("stroke-linecap", "round");
   polyline.setAttribute("stroke-linejoin", "round");
@@ -572,7 +572,7 @@ function renderSparkline(
     dot.setAttribute("cx", String(xAt(values.length - 1)));
     dot.setAttribute("cy", String(yAt(lastValue)));
     dot.setAttribute("r", "2");
-    dot.setAttribute("fill", "#66023c");
+    dot.style.fill = "var(--bc-color-accent)";
     svg.append(dot);
   }
 

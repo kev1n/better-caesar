@@ -24,6 +24,11 @@ const TERM_PAGE_ID = "SSR_SSENRL_TERM";
 
 const CONTEXT_STORAGE_KEY = "better-caesar:enrollment-context:v1";
 const TARGET_TERM_VALUE_KEY = "better-caesar:target-term-value";
+// Persisted in sessionStorage so the auto-Continue de-dup survives the full
+// page reload that PS triggers when Continue is a classic form submit. Without
+// this, a fresh content-script instance has no memory of the prior click and
+// re-fires it, looping if PS posts back to the same URL.
+const SUBMITTED_URL_KEY = "better-caesar:enrollment-nav:submitted-url";
 
 const TERM_RADIO_SELECTOR =
   "#SSR_DUMMY_RECV1\\$scroll\\$0 input[type='radio'][name^='SSR_DUMMY_RECV1$sels$']";
@@ -46,6 +51,11 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
   // Prevents a re-click loop if PS handles the click without navigating —
   // ICStateNum bumps on the response, so the signature would otherwise
   // differ and we'd click again every mutation tick.
+  // In-memory mirror of the persisted SUBMITTED_URL_KEY. Used as a fallback
+  // when sessionStorage access throws (rare: sandboxed iframe, exhausted
+  // quota, locked-down browser profile). The persisted value is the source
+  // of truth across page reloads; the field only helps within a single
+  // content-script lifetime if storage is unusable.
   private submittedForUrl: string | null = null;
   private termStateCache: {
     fetchedAt: number;
@@ -55,6 +65,8 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
   cleanup(doc: Document = document): void {
     this.waitingForLoad = false;
     this.lastSubmittedSignature = null;
+    this.submittedForUrl = null;
+    clearSubmittedUrl();
     releasePeopleSoftLock(NAV_LOCK_OWNER);
     doc.getElementById(TERM_SWITCHER_ID)?.remove();
     doc.getElementById(SPINNER_OVERLAY_ID)?.remove();
@@ -76,6 +88,7 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
       this.waitingForLoad = false;
       this.lastSubmittedSignature = null;
       this.submittedForUrl = null;
+      clearSubmittedUrl();
       hideTermSpinnerOverlay(doc);
       hideEarlyTermPageMask(doc);
       return;
@@ -107,7 +120,7 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
 
     const title = doc.createElement("div");
     title.className = "better-caesar-term-helper";
-    title.textContent = "Better CAESAR Term Switcher";
+    title.textContent = "Pencil Term Switcher";
 
     const select = doc.createElement("select");
     select.className = "better-caesar-term-select";
@@ -259,7 +272,8 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
     }
 
     const currentUrl = window.location.href;
-    if (this.submittedForUrl === currentUrl) {
+    const persistedSubmittedUrl = readSubmittedUrl();
+    if ((persistedSubmittedUrl ?? this.submittedForUrl) === currentUrl) {
       // Already clicked Continue once for this landing. PS will either
       // navigate (next run sees pageId !== TERM_PAGE_ID and clears the
       // sentinel) or stall — in which case we'd rather leave the user on
@@ -301,6 +315,7 @@ export class EnrollmentNavigationAugmentation implements Augmentation {
 
     this.lastSubmittedSignature = signature;
     this.submittedForUrl = currentUrl;
+    writeSubmittedUrl(currentUrl);
     clearTargetTermSelection();
 
     if (!selectedRadio.checked) {
@@ -591,6 +606,30 @@ function getTargetTermSelection(): string | null {
 function clearTargetTermSelection(): void {
   try {
     window.sessionStorage.removeItem(TARGET_TERM_VALUE_KEY);
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+function readSubmittedUrl(): string | null {
+  try {
+    return window.sessionStorage.getItem(SUBMITTED_URL_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeSubmittedUrl(url: string): void {
+  try {
+    window.sessionStorage.setItem(SUBMITTED_URL_KEY, url);
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+function clearSubmittedUrl(): void {
+  try {
+    window.sessionStorage.removeItem(SUBMITTED_URL_KEY);
   } catch {
     // Ignore storage errors.
   }

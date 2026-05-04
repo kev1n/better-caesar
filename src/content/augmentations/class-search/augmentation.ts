@@ -9,9 +9,12 @@ import {
 import type { Augmentation } from "../../framework";
 import { isRetryablePeopleSoftTaskError, lookupClass } from "../../peoplesoft";
 import {
+  buildPeopleSoftCreditToast,
+  formatPsCreditsWarning,
   initStorage as initSeatsNotesStorage,
   pruneEmptySeatsCache,
   readCachedEntry as readSeatsNotesCache,
+  tryConsumePeopleSoftCredit,
   writeCachedEntry as writeSeatsNotesCache
 } from "../seats-notes/storage";
 import { toSeatsNotesResult, toFailure as seatsNotesFailure } from "../seats-notes/parser";
@@ -135,6 +138,23 @@ export class ClassSearchAugmentation implements Augmentation {
     this.unmount(doc);
   }
 
+  // Shared CAESAR PS rate gate. Each user-initiated PS chain (Load CAESAR,
+  // Details, Add to cart, related-section pick, detail Refresh) consumes
+  // one credit from the seats-notes pool so a single-cap budget covers
+  // every CAESAR PS surface in the extension. `owner` is just for the
+  // background worker's credit-usage log.
+  private consumePsCredit(owner: string): boolean {
+    const credit = tryConsumePeopleSoftCredit(Date.now(), `class-search-${owner}`);
+    if (!credit.ok) {
+      showToast(buildPeopleSoftCreditToast(credit.waitMs), {
+        tone: "warn",
+        durationMs: 6000
+      });
+      return false;
+    }
+    return true;
+  }
+
   run(doc: Document = document): void {
     if (!isSearchEntryPage(doc)) {
       this.unmount(doc);
@@ -253,7 +273,7 @@ export class ClassSearchAugmentation implements Augmentation {
     wrap.id = TABS_ID;
     wrap.className = "bc-cs-tabs";
 
-    const better = this.buildTabButton(state, "better", "Better Search");
+    const better = this.buildTabButton(state, "better", "Sharper Search");
     const classic = this.buildTabButton(state, "classic", "Classic CAESAR");
     wrap.append(better, classic);
     return wrap;
@@ -508,6 +528,7 @@ export class ClassSearchAugmentation implements Augmentation {
     liveBtn.dataset.role = "load-live";
     liveBtn.textContent = "Load CAESAR data";
     liveBtn.addEventListener("click", () => {
+      if (!this.consumePsCredit("live")) return;
       void this.loadCourseLive(state, row, card);
     });
     tags.appendChild(liveBtn);
@@ -765,6 +786,10 @@ export class ClassSearchAugmentation implements Augmentation {
         liveBtn.textContent = "Refresh CAESAR data";
       }
       this.applyLiveDataToCard(state, row, card, result);
+      const warning = formatPsCreditsWarning();
+      if (warning) {
+        showToast(`Loaded CAESAR data. ${warning}.`, { tone: "warn", durationMs: 5000 });
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       state.liveCache.set(key, { status: "error", error: msg });
@@ -841,6 +866,11 @@ export class ClassSearchAugmentation implements Augmentation {
       return;
     }
 
+    // Expansion is the entry point for one or more PS chains (live load +
+    // detail lookup). One credit covers the whole click; the helpers below
+    // run ungated.
+    if (!this.consumePsCredit("details")) return;
+
     const liveKey = liveCacheKey(state, row);
     let live = state.liveCache.get(liveKey);
     if (!live || live.status !== "ready" || !live.result) {
@@ -869,9 +899,10 @@ export class ClassSearchAugmentation implements Augmentation {
 
     const cachedDisk = readSeatsNotesCache(caesar.classNumber);
     if (cachedDisk?.result) {
-      this.renderDetailRow(state, detailRow, caesar, cachedDisk.result, cachedDisk.fetchedAt, () =>
-        this.fetchAndRenderDetail(state, detailRow, caesar)
-      );
+      this.renderDetailRow(state, detailRow, caesar, cachedDisk.result, cachedDisk.fetchedAt, () => {
+        if (!this.consumePsCredit("refresh-detail")) return;
+        void this.fetchAndRenderDetail(state, detailRow, caesar);
+      });
     } else {
       await this.fetchAndRenderDetail(state, detailRow, caesar);
     }
@@ -900,17 +931,24 @@ export class ClassSearchAugmentation implements Augmentation {
       const fetchedAt = Date.now();
       writeSeatsNotesCache(caesar.classNumber, { result, fetchedAt });
       if (detailRow.isConnected) {
-        this.renderDetailRow(state, detailRow, caesar, result, fetchedAt, () =>
-          this.fetchAndRenderDetail(state, detailRow, caesar)
-        );
+        this.renderDetailRow(state, detailRow, caesar, result, fetchedAt, () => {
+          if (!this.consumePsCredit("refresh-detail")) return;
+          void this.fetchAndRenderDetail(state, detailRow, caesar);
+        });
+      }
+      const warning = formatPsCreditsWarning(fetchedAt);
+      if (warning) {
+        const verb = result.ok ? "Loaded" : "Tried";
+        showToast(`${verb} section detail. ${warning}.`, { tone: "warn", durationMs: 5000 });
       }
     } catch (error) {
       if (isRetryablePeopleSoftTaskError(error)) return;
       const failure = seatsNotesFailure(error);
       if (detailRow.isConnected) {
-        this.renderDetailRow(state, detailRow, caesar, failure, Date.now(), () =>
-          this.fetchAndRenderDetail(state, detailRow, caesar)
-        );
+        this.renderDetailRow(state, detailRow, caesar, failure, Date.now(), () => {
+          if (!this.consumePsCredit("refresh-detail")) return;
+          void this.fetchAndRenderDetail(state, detailRow, caesar);
+        });
       }
     }
   }
@@ -990,6 +1028,9 @@ export class ClassSearchAugmentation implements Augmentation {
     button: HTMLButtonElement
   ): Promise<void> {
     if (button.dataset.state === "success") return;
+    // One credit covers the whole click — including any internal live-data
+    // load needed before the cart-add chain can resolve the class number.
+    if (!this.consumePsCredit("add")) return;
     button.disabled = true;
     button.dataset.state = "loading";
     button.textContent = "Loading…";
@@ -1056,8 +1097,10 @@ export class ClassSearchAugmentation implements Augmentation {
         sectionLabel: `${section.section}-${section.component}`,
         capturedAt: Date.now()
       });
+      const warning = formatPsCreditsWarning();
+      const suffix = warning ? ` ${warning}.` : "";
       showToast(
-        `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} (#${result.classNumber}) to your shopping cart.`,
+        `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} (#${result.classNumber}) to your shopping cart.${suffix}`,
         {
           tone: "success",
           durationMs: 6000,
@@ -1092,8 +1135,10 @@ export class ClassSearchAugmentation implements Augmentation {
           capturedAt: Date.now()
         });
       }
+      const warning = formatPsCreditsWarning();
+      const suffix = warning ? ` ${warning}.` : "";
       showToast(
-        `${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} #${classNumber} is already in your shopping cart.`,
+        `${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} #${classNumber} is already in your shopping cart.${suffix}`,
         {
           tone: "info",
           durationMs: 5000,
@@ -1271,6 +1316,7 @@ export class ClassSearchAugmentation implements Augmentation {
     },
     option: RelatedSectionOption
   ): Promise<void> {
+    if (!this.consumePsCredit("related-pick")) return;
     // Disable all option buttons while we run the continuation so the user
     // can't double-fire.
     const buttons = pickerLi.querySelectorAll<HTMLButtonElement>(".bc-cs-related-option");
@@ -1306,8 +1352,10 @@ export class ClassSearchAugmentation implements Augmentation {
       button.dataset.state = "success";
       button.textContent = "Added ✓";
       button.disabled = true;
+      const warning = formatPsCreditsWarning();
+      const suffix = warning ? ` ${warning}.` : "";
       showToast(
-        `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} (#${result.classNumber}) with section ${option.section} to your shopping cart.`,
+        `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} (#${result.classNumber}) with section ${option.section} to your shopping cart.${suffix}`,
         {
           tone: "success",
           durationMs: 6000,

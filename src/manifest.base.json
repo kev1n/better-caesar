@@ -1,11 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "Better CAESAR",
-  "description": "Augments Northwestern CAESAR class search with faster class-level lookups.",
+  "name": "Pencil",
+  "description": "Sharpens Paper.nu and CAESAR with inline CTECs, seat counts, and faster term navigation.",
   "version": "0.1.0",
+  "icons": {
+    "16": "assets/icons/pencil-16.png",
+    "32": "assets/icons/pencil-32.png",
+    "48": "assets/icons/pencil-48.png",
+    "128": "assets/icons/pencil-128.png"
+  },
   "action": {
-    "default_title": "Better CAESAR",
-    "default_popup": "popup/popup.html"
+    "default_title": "Pencil",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/pencil-16.png",
+      "32": "assets/icons/pencil-32.png",
+      "48": "assets/icons/pencil-48.png",
+      "128": "assets/icons/pencil-128.png"
+    }
   },
   "content_scripts": [
     {
@@ -37,5 +49,15 @@
     "https://fed.it.northwestern.edu/*",
     "https://api-legacy.dilanxd.com/*",
     "https://cdn.dil.sh/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/fonts/*.woff2"],
+      "matches": [
+        "https://caesar.ent.northwestern.edu/*",
+        "https://www.paper.nu/*",
+        "https://paper.nu/*"
+      ]
+    }
   ]
 }

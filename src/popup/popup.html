@@ -3,14 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Better CAESAR</title>
+    <title>pencil.nu</title>
     <link rel="stylesheet" href="./popup.css" />
   </head>
   <body>
     <main class="app">
       <header class="app-header">
-        <h1>Better CAESAR</h1>
-        <p class="app-subtitle">Choose which extensions run on Paper and CAESAR.</p>
+        <h1 class="brand">
+          <svg class="brand-pencil" width="18" height="48" viewBox="14 0 14 42" fill="none" aria-hidden="true">
+            <g transform="rotate(90 21 21)" stroke="#2a2a2e" stroke-width="1.2" stroke-linejoin="round">
+              <rect x="2" y="16" width="6" height="10" rx="1.6" fill="#ef8da6" />
+              <rect x="8" y="16" width="5" height="10" fill="#c2c7cb" />
+              <line x1="9.7" y1="16.4" x2="9.7" y2="25.6" stroke="#7d848a" stroke-width="0.55" />
+              <line x1="11.3" y1="16.4" x2="11.3" y2="25.6" stroke="#7d848a" stroke-width="0.55" />
+              <rect x="13" y="16" width="17" height="10" fill="#f5c842" />
+              <polygon points="30,16 35,16 35,26 30,26" fill="#d4a373" />
+              <polygon points="35,16 40,21 35,26" fill="#2a2a2e" stroke="none" />
+              <polygon points="35,16 40,21 35,26" fill="none" stroke="#2a2a2e" stroke-width="1.2" />
+            </g>
+          </svg>
+          <span>pencil.nu</span>
+        </h1>
+        <p class="app-subtitle">— choose what runs on Paper and CAESAR —</p>
       </header>
       <div class="gate" id="gate"></div>
       <div class="feature-sections" id="feature-sections"></div>
@@ -20,6 +34,8 @@
         <button id="clear-ctec-cache" class="action-btn">Clear CTEC cache</button>
         <button id="clear-catalog-cache" class="action-btn">Clear catalog cache</button>
         <button id="clear-cart-cache" class="action-btn">Clear cart cache</button>
+        <button id="reconfirm-grad-year" class="action-btn">Reconfirm grad year</button>
+        <button id="refresh-schedule" class="action-btn">Refresh bucket schedule</button>
       </div>
       <div class="schedule" id="schedule"></div>
     </main>

@@ -10,6 +10,7 @@ import { resolveChipSection, type ResolvedChipSection } from "./cart-flow";
 import {
   buildCtecCreditToastMessage,
   CTEC_ERROR_TOAST_MESSAGE,
+  formatCtecCreditsWarning,
   tryConsumeCtecCredit
 } from "../ctec-links/rate-limit";
 import {
@@ -18,6 +19,11 @@ import {
   getCtecCourseAnalyticsSnapshot,
   hasCachedReportAggregate
 } from "../ctec-links/reports";
+import {
+  buildPeopleSoftCreditToast,
+  formatPsCreditsWarning,
+  tryConsumePeopleSoftCredit
+} from "../seats-notes/storage";
 import { showToast } from "../seats-notes/toast";
 import { AuthFlow } from "./auth-flow";
 import { buildModalDisplayData, type ModalDisplayData } from "./modal-data";
@@ -357,7 +363,7 @@ export class PaperCtecAugmentation implements Augmentation {
     if (this.inFlight.has(target.key)) return;
     if (this.resolved.has(target.key)) return;
 
-    const credit = tryConsumeCtecCredit(Date.now());
+    const credit = tryConsumeCtecCredit(Date.now(), "paper-ctec-chip-fetch");
     if (!credit.ok) {
       showToast(buildCtecCreditToastMessage(credit.waitMs), {
         tone: "warn",
@@ -413,6 +419,11 @@ export class PaperCtecAugmentation implements Augmentation {
       this.renderForKey(target.key, widgetData);
       if (widgetData.state === "error") {
         showToast(CTEC_ERROR_TOAST_MESSAGE, { tone: "warn", durationMs: 9000 });
+      } else {
+        const warning = formatCtecCreditsWarning();
+        if (warning) {
+          showToast(`Loaded CTEC. ${warning}.`, { tone: "warn", durationMs: 5000 });
+        }
       }
       return widgetData;
     } catch (error) {
@@ -567,6 +578,20 @@ export class PaperCtecAugmentation implements Augmentation {
   private kickChipCart(target: PaperCtecTarget): void {
     const key = target.key;
     if (this.cartInFlight.has(key)) return;
+
+    // Chip cart-add fires a CAESAR catalog search + multi-step cart chain.
+    // Pull from the same seats-notes credit pool that gates class-search /
+    // CAESAR cart so a user can't burn through the cap by spamming chip
+    // adds on paper.nu.
+    const credit = tryConsumePeopleSoftCredit(Date.now(), "paper-ctec-chip-cart");
+    if (!credit.ok) {
+      showToast(buildPeopleSoftCreditToast(credit.waitMs), {
+        tone: "warn",
+        durationMs: 6000
+      });
+      return;
+    }
+
     this.cartInFlight.add(key);
     this.clearCartResetTimer(key);
     this.setCartState(key, { kind: "adding", message: "Looking up section…" });
@@ -584,8 +609,10 @@ export class PaperCtecAugmentation implements Augmentation {
           classNumber: result.classNumber
         });
         this.recordCartAdd(target, result.classNumber, result.sectionLabel, result.termId);
+        const warning = formatPsCreditsWarning();
+        const suffix = warning ? ` ${warning}.` : "";
         showToast(
-          `Added ${target.params.subject} ${target.params.catalogNumber} ${result.sectionLabel} (#${result.classNumber}) to your CAESAR shopping cart.`,
+          `Added ${target.params.subject} ${target.params.catalogNumber} ${result.sectionLabel} (#${result.classNumber}) to your CAESAR shopping cart.${suffix}`,
           {
             tone: "success",
             durationMs: 6000,
@@ -598,8 +625,10 @@ export class PaperCtecAugmentation implements Augmentation {
           classNumber: result.classNumber
         });
         this.recordCartAdd(target, result.classNumber, undefined, undefined);
+        const warning = formatPsCreditsWarning();
+        const suffix = warning ? ` ${warning}.` : "";
         showToast(
-          `${target.params.subject} ${target.params.catalogNumber} #${result.classNumber} is already in your CAESAR shopping cart.`,
+          `${target.params.subject} ${target.params.catalogNumber} #${result.classNumber} is already in your CAESAR shopping cart.${suffix}`,
           {
             tone: "info",
             durationMs: 5000,

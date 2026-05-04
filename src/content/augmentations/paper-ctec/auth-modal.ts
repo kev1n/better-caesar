@@ -91,7 +91,7 @@ function renderLoginCard(
   body.className = "bc-paper-ctec-auth-body";
   body.append(
     doc.createTextNode(
-      "Better CAESAR needs a CAESAR login to read CTEC reports on your behalf to display on your paper.nu. "
+      "Pencil needs a CAESAR login to read CTEC reports on your behalf to display on your paper.nu. "
     )
   );
   const bodyEmphasis = doc.createElement("strong");
@@ -106,14 +106,14 @@ function renderLoginCard(
 
   const trust = doc.createElement("p");
   trust.className = "bc-paper-ctec-auth-trust";
-  trust.append(doc.createTextNode("Better CAESAR is open source. If you'd like, you may review the code at "));
+  trust.append(doc.createTextNode("Pencil is open source. If you'd like, you may review the code at "));
 
   const repoLink = doc.createElement("a");
   repoLink.className = "bc-paper-ctec-auth-link";
-  repoLink.href = "https://github.com/kev1n/better-caesar";
+  repoLink.href = "https://github.com/kev1n/pencil";
   repoLink.target = "_blank";
   repoLink.rel = "noopener noreferrer";
-  repoLink.textContent = "github.com/kev1n/better-caesar";
+  repoLink.textContent = "github.com/kev1n/pencil";
   repoLink.addEventListener("click", stopPropagation);
   trust.append(repoLink, doc.createTextNode("."));
   card.append(trust);
@@ -151,7 +151,7 @@ function renderPendingCard(
   const body = doc.createElement("p");
   body.className = "bc-paper-ctec-auth-body";
   body.textContent =
-    "Finish signing in on the Northwestern tab. Better CAESAR will detect when you're back and resume loading CTECs automatically — the login tab will close on its own.";
+    "Finish signing in on the Northwestern tab. Pencil will detect when you're back and resume loading CTECs automatically — the login tab will close on its own.";
   card.append(body);
 
   card.append(makeNote(doc, "Don't see the login tab? Click the button below to reopen it."));

@@ -194,7 +194,7 @@ export function cardStyles(): string {
        cursor, drop back, and re-trigger hover. */
     .${WIDGET_CLASS}-actions-anchor {
       position: absolute;
-      bottom: -10px;
+      bottom: -15px;
       right: 6px;
       display: inline-flex;
       align-items: center;
@@ -391,12 +391,9 @@ export function cardStyles(): string {
       height: auto;
       display: block;
     }
-    .dark .${WIDGET_CLASS}-preview-trend-svg [stroke="#f1ebef"] { stroke: #525252; }
-    .dark .${WIDGET_CLASS}-preview-trend-svg [fill="#9b8290"] { fill: #a3a3a3; }
-    .dark .${WIDGET_CLASS}-preview-trend-svg [fill="#7a596a"] { fill: #a3a3a3; }
-    .dark .${WIDGET_CLASS}-preview-trend-svg [stroke="#66023c"] { stroke: #d8b4fe; }
-    .dark .${WIDGET_CLASS}-preview-trend-svg [fill="#66023c"] { fill: #d8b4fe; }
-    .dark .${WIDGET_CLASS}-preview-trend-svg [fill="white"] { fill: #1f1147; }
+    /* SVG fill/stroke colors are now emitted by JS via style.* with
+       var(--bc-color-*) references, so they switch with the active theme
+       automatically — no per-attribute dark overrides needed here. */
     ${trendZoneDarkRules(`.${WIDGET_CLASS}-preview-trend-svg`)}
     .${WIDGET_CLASS}-preview-empty {
       font-size: var(--bc-font-11);

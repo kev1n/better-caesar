@@ -9,11 +9,13 @@
     "build:chrome": "node scripts/build.mjs --target chrome",
     "build:firefox": "node scripts/build.mjs --target firefox",
     "dev": "node scripts/build.mjs --target chrome --watch",
+    "icons": "node scripts/render-icons.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.292",
     "esbuild": "^0.25.9",
+    "sharp": "^0.34.5",
     "typescript": "^5.9.2"
   }
 }

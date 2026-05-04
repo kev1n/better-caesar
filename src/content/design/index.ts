@@ -19,22 +19,38 @@
 // =============================================================================
 
 import { componentsCss } from "./components";
-import { tokensCss } from "./tokens";
+import { tokensCss, type FontUrlResolver } from "./tokens";
 
 const STYLE_ID = "bc-design-system";
 const THEME_STORAGE_KEY = "better-caesar:theme:v1";
 
-export const BC_THEMES = ["default"] as const;
+export const BC_THEMES = ["default", "pencil"] as const;
 export type BcTheme = typeof BC_THEMES[number];
+// Fresh installs (and existing users who never opened the theme dropdown)
+// land on the original NU-purple "default" theme. The pencil sketchbook
+// theme is opt-in via the popup dropdown.
 export const DEFAULT_THEME: BcTheme = "default";
+
+// Friendly labels for the popup dropdown — order in BC_THEMES dictates
+// dropdown order, so "Northwestern" appears first as the default choice.
+export const THEME_LABELS: Record<BcTheme, string> = {
+  default: "Northwestern",
+  pencil: "Pencil"
+};
 
 let darkObserver: MutationObserver | null = null;
 
-export function injectDesignSystem(): void {
+// Content scripts resolve font URLs through chrome.runtime.getURL so the
+// woff2 files in dist/<target>/assets/fonts/ resolve from any host page.
+function contentScriptFontUrl(filename: string): string {
+  return chrome.runtime.getURL(`assets/fonts/${filename}`);
+}
+
+export function injectDesignSystem(fontUrl?: FontUrlResolver): void {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement("style");
   style.id = STYLE_ID;
-  style.textContent = `${tokensCss()}\n${componentsCss()}`;
+  style.textContent = `${tokensCss(fontUrl ?? contentScriptFontUrl)}\n${componentsCss()}`;
   (document.head ?? document.documentElement).appendChild(style);
 }
 
@@ -67,8 +83,8 @@ function syncDarkMode(root: HTMLElement): void {
   }
 }
 
-export async function bootstrapTheme(): Promise<void> {
-  injectDesignSystem();
+export async function bootstrapTheme(fontUrl?: FontUrlResolver): Promise<void> {
+  injectDesignSystem(fontUrl);
   startDarkModeMirror();
   const stored = await chrome.storage.local.get(THEME_STORAGE_KEY);
   const value = stored[THEME_STORAGE_KEY];

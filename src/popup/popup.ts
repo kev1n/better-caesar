@@ -1,8 +1,13 @@
 import { canonicalizeCodeInput, isCodeValidForLastName } from "../content/access-gate/code";
 import { evaluateGate, type GateStatus } from "../content/access-gate";
-import { BUCKET_LABELS } from "../content/access-gate/constants";
+import { BUCKET_LABELS, bucketForGradYear, type Bucket } from "../content/access-gate/constants";
 import { renderInlineMarkdown } from "../content/access-gate/markdown";
 import {
+  fetchAndCacheUserName,
+  NAME_FETCH_FAILED_AT_KEY
+} from "../content/access-gate/name-fetch";
+import {
+  getRemoteSchedule,
   readCachedRemoteSchedule,
   SCHEDULE_CACHE_STORAGE_KEY,
   type RemoteSchedule
@@ -17,6 +22,7 @@ import {
 import {
   BC_THEMES,
   type BcTheme,
+  THEME_LABELS,
   bootstrapTheme,
   getStoredTheme,
   setStoredTheme
@@ -424,7 +430,7 @@ async function initThemePicker(): Promise<void> {
   for (const theme of BC_THEMES) {
     const option = document.createElement("option");
     option.value = theme;
-    option.textContent = theme;
+    option.textContent = THEME_LABELS[theme];
     select.appendChild(option);
   }
   select.value = await getStoredTheme();
@@ -479,11 +485,52 @@ function initClearCartCacheButton(): void {
   });
 }
 
+function initReconfirmGradYearButton(): void {
+  const btn = document.getElementById("reconfirm-grad-year");
+  if (!(btn instanceof HTMLButtonElement)) return;
+  const restore = "Reconfirm grad year";
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "Checking...";
+    await chrome.storage.local.remove([ACCESS_GATE_NAME_KEY, NAME_FETCH_FAILED_AT_KEY]);
+    const stored = await fetchAndCacheUserName();
+    if (stored) {
+      const yr = stored.gradYear;
+      btn.textContent = yr !== null ? `Detected ${yr}` : "Detected (no grad year)";
+    } else {
+      btn.textContent = "Failed — sign in to CAESAR";
+    }
+    setTimeout(() => {
+      btn.textContent = restore;
+      btn.disabled = false;
+    }, 3000);
+  });
+}
+
+function initRefreshScheduleButton(): void {
+  const btn = document.getElementById("refresh-schedule");
+  if (!(btn instanceof HTMLButtonElement)) return;
+  const restore = "Refresh bucket schedule";
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "Polling...";
+    await chrome.storage.local.remove(SCHEDULE_CACHE_STORAGE_KEY);
+    await getRemoteSchedule();
+    btn.textContent = "Refreshed";
+    setTimeout(() => {
+      btn.textContent = restore;
+      btn.disabled = false;
+    }, 2000);
+  });
+}
+
 void bootstrapTheme();
 void init();
 initClearCacheButton();
 initClearCatalogCacheButton();
 initClearCartCacheButton();
+initReconfirmGradYearButton();
+initRefreshScheduleButton();
 void initRecentTermsInput();
 void initThemePicker();
 void renderGate();
@@ -512,7 +559,7 @@ function buildGateNode(status: GateStatus): HTMLElement {
     card.append(
       makeGateRow(
         "Sign in to CAESAR to enable",
-        "Open caesar.ent.northwestern.edu and sign in. Better CAESAR will detect your account automatically."
+        "Open caesar.ent.northwestern.edu and sign in. Pencil will detect your account automatically."
       )
     );
     return card;
@@ -524,7 +571,7 @@ function buildGateNode(status: GateStatus): HTMLElement {
     wrap.className = "gate-copy";
     const t = document.createElement("div");
     t.className = "gate-title";
-    t.textContent = "Better CAESAR is disabled";
+    t.textContent = "Pencil is disabled";
     const b = document.createElement("div");
     b.className = "gate-body";
     renderInlineMarkdown(b, status.message);
@@ -585,13 +632,18 @@ async function initSchedulePanel(): Promise<void> {
   if (!(root instanceof HTMLElement)) return;
 
   let schedule: RemoteSchedule | null = null;
+  let userBucket: Bucket | null = null;
+  let userGradYear: number | null = null;
 
   const reload = async (): Promise<void> => {
     schedule = await readCachedRemoteSchedule();
+    const stored = await readStoredName();
+    userGradYear = stored?.gradYear ?? null;
+    userBucket = stored ? bucketForGradYear(stored.gradYear) : null;
     paint();
   };
 
-  const paint = (): void => paintSchedulePanel(root, schedule);
+  const paint = (): void => paintSchedulePanel(root, schedule, userBucket, userGradYear);
 
   // Trigger evaluateGate so the schedule cache gets populated/refreshed
   // before we read it — otherwise a fresh popup open could show empty.
@@ -608,13 +660,26 @@ async function initSchedulePanel(): Promise<void> {
   });
 }
 
-function paintSchedulePanel(root: HTMLElement, schedule: RemoteSchedule | null): void {
+function paintSchedulePanel(
+  root: HTMLElement,
+  schedule: RemoteSchedule | null,
+  userBucket: Bucket | null,
+  userGradYear: number | null
+): void {
   root.innerHTML = "";
 
   const title = document.createElement("div");
   title.className = "schedule-title";
   title.textContent = "Bucket schedule";
   root.append(title);
+
+  if (userBucket !== null) {
+    const you = document.createElement("div");
+    you.className = "schedule-you";
+    const yearText = userGradYear !== null ? `class of ${userGradYear}` : "no grad year on file";
+    you.textContent = `You're in ${BUCKET_LABELS[userBucket]} (${yearText}).`;
+    root.append(you);
+  }
 
   if (!schedule) {
     const empty = document.createElement("div");
@@ -634,10 +699,17 @@ function paintSchedulePanel(root: HTMLElement, schedule: RemoteSchedule | null):
   for (let i = 0; i < 3; i += 1) {
     const li = document.createElement("li");
     li.className = "schedule-row";
+    if (i === userBucket) li.classList.add("schedule-row--you");
 
     const label = document.createElement("span");
     label.className = "schedule-label";
     label.textContent = BUCKET_LABELS[i];
+    if (i === userBucket) {
+      const tag = document.createElement("span");
+      tag.className = "schedule-you-tag";
+      tag.textContent = "you";
+      label.append(" ", tag);
+    }
 
     const value = document.createElement("span");
     value.className = "schedule-value";

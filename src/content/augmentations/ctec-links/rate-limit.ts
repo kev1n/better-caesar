@@ -36,8 +36,13 @@ function prune(now: number): void {
 
 // Each batch of up to CTEC_BATCH_SIZE PeopleSoft class-page fetches consumes
 // one credit. Caps total Northwestern traffic from the extension.
+//
+// `owner` is forwarded to the background worker for the credit-usage log
+// (chrome://extensions service-worker devtools), making it easy to see
+// which feature burned a credit when debugging.
 export function tryConsumeCtecCredit(
-  now: number
+  now: number,
+  owner?: string
 ): { ok: true } | { ok: false; waitMs: number } {
   prune(now);
   if (memory.credits.length >= CTEC_CREDIT_LIMIT) {
@@ -46,6 +51,15 @@ export function tryConsumeCtecCredit(
   }
   memory.credits.push(now);
   void chrome.storage.local.set({ [STORAGE_KEY]: memory });
+  void chrome.runtime
+    .sendMessage({
+      type: "credit-used",
+      pool: "ctec",
+      remaining: CTEC_CREDIT_LIMIT - memory.credits.length,
+      cap: CTEC_CREDIT_LIMIT,
+      owner
+    })
+    .catch(() => undefined);
   return { ok: true };
 }
 
@@ -60,3 +74,21 @@ export function buildCtecCreditToastMessage(waitMs: number): string {
 // stuck-state we've seen.
 export const CTEC_ERROR_TOAST_MESSAGE =
   "CTEC load failed. Try opening https://caesar.ent.northwestern.edu/ yourself. If it's stuck on infinite loading, clear your cookies for the site.";
+
+// Trailing fragment for success toasts — mirrors formatPsCreditsWarning in
+// seats-notes/storage.ts. Only returns text once ~70% of the cap is spent
+// so normal use stays silent and toasts only appear as the user approaches
+// the limit. Includes the time until the oldest credit ages out.
+const CTEC_WARNING_THRESHOLD_RATIO = 0.3;
+
+export function formatCtecCreditsWarning(now: number = Date.now()): string | null {
+  prune(now);
+  const used = memory.credits.length;
+  const remaining = Math.max(0, CTEC_CREDIT_LIMIT - used);
+  if (remaining > Math.floor(CTEC_CREDIT_LIMIT * CTEC_WARNING_THRESHOLD_RATIO)) return null;
+  const oldestAt = memory.credits[0];
+  if (!oldestAt) return null;
+  const refreshMs = Math.max(0, oldestAt + CTEC_CREDIT_WINDOW_MS - now);
+  const refreshMin = Math.max(1, Math.ceil(refreshMs / 60_000));
+  return `${remaining} of ${CTEC_CREDIT_LIMIT} left, next opens in ${refreshMin} min`;
+}

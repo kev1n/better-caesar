@@ -47,7 +47,7 @@ export function renderStatusBar(
 
   const brand = doc.createElement("span");
   brand.className = "bc-paper-ctec-status-brand";
-  brand.textContent = "Better CAESAR";
+  brand.textContent = "Pencil";
   mark.append(brand);
 
   const copy = doc.createElement("div");
@@ -140,14 +140,14 @@ function buildStatusCopy(data: PaperCtecStatusBarData): string {
 
 function buildStatusTitle(data: PaperCtecStatusBarData): string {
   if (data.state === "auth-required") {
-    return "Better CAESAR needs one Northwestern login before it can keep reading CTEC reports for this Paper schedule.";
+    return "Pencil needs one Northwestern login before it can keep reading CTEC reports for this Paper schedule.";
   }
 
   if (data.state === "loading") {
-    return "Better CAESAR is reading Northwestern CTEC data and attaching summaries to the current Paper schedule.";
+    return "Pencil is reading Northwestern CTEC data and attaching summaries to the current Paper schedule.";
   }
 
-  return "Better CAESAR finished syncing Northwestern CTEC summaries into the current Paper schedule.";
+  return "Pencil finished syncing Northwestern CTEC summaries into the current Paper schedule.";
 }
 
 function statusIcon(state: PaperCtecStatusBarData["state"]): IconName {

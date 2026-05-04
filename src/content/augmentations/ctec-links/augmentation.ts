@@ -7,6 +7,7 @@ import { extractInstructorFromRow, extractSubjectAndCatalog } from "./helpers";
 import {
   buildCtecCreditToastMessage,
   CTEC_ERROR_TOAST_MESSAGE,
+  formatCtecCreditsWarning,
   tryConsumeCtecCredit
 } from "./rate-limit";
 import type { CtecLinkData, CtecLinkTarget } from "./types";
@@ -104,7 +105,7 @@ export class CtecLinksAugmentation implements Augmentation {
   private kick(target: CtecLinkTarget, key: string): void {
     if (this.inFlight.has(key)) return;
 
-    const credit = tryConsumeCtecCredit(Date.now());
+    const credit = tryConsumeCtecCredit(Date.now(), "ctec-links-cart");
     if (!credit.ok) {
       showToast(buildCtecCreditToastMessage(credit.waitMs), {
         tone: "warn",
@@ -125,6 +126,11 @@ export class CtecLinksAugmentation implements Augmentation {
         }
         if (data.state === "error") {
           showToast(CTEC_ERROR_TOAST_MESSAGE, { tone: "warn", durationMs: 9000 });
+        } else {
+          const warning = formatCtecCreditsWarning();
+          if (warning) {
+            showToast(`Loaded CTEC. ${warning}.`, { tone: "warn", durationMs: 5000 });
+          }
         }
       })
       .catch((err: unknown) => {

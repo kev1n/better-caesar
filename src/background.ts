@@ -2,6 +2,7 @@ import { FEATURES_STORAGE_KEY } from "./content/settings";
 import type {
   AbortFetchMessage,
   AuthPopupClosedMessage,
+  CreditUsedMessage,
   FetchBinaryMessage,
   FetchTextMessage,
   OpenAuthPopupMessage,
@@ -10,6 +11,59 @@ import type {
 
 const FETCH_TIMEOUT_MS = 30_000;
 const fetchControllers = new Map<string, AbortController>();
+
+// Failsafe circuit breaker: if we ever exceed CIRCUIT_BREAKER_MAX requests
+// to NU institutional hosts within CIRCUIT_BREAKER_WINDOW_MS — regardless of
+// which feature is responsible — refuse further fetches and reload the
+// extension. Reloading invalidates content scripts in open tabs, so any
+// runaway loop dies the moment its next sendMessage fails.
+//
+// NOT covered: direct same-origin fetches that bypass the background worker.
+// Specifically, peoplesoft/http.ts (when running on caesar.ent) and the
+// `fetch()` in enrollment-navigation/augmentation.ts call window.fetch
+// directly. They won't increment this counter and won't be stopped by a
+// runtime.reload(). If we ever need a true global limit, route every
+// CAESAR/Bluera request through this worker.
+const CIRCUIT_BREAKER_WINDOW_MS = 60_000;
+const CIRCUIT_BREAKER_MAX = 50;
+const CIRCUIT_BREAKER_HOSTS = new Set([
+  "caesar.ent.northwestern.edu",
+  "northwestern.bluera.com"
+]);
+const requestTimestamps: number[] = [];
+let circuitTripped = false;
+
+function isWatchedUrl(url: string): boolean {
+  try {
+    return CIRCUIT_BREAKER_HOSTS.has(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
+function recordAndCheckCircuitBreaker(url: string): boolean {
+  if (!isWatchedUrl(url)) return true;
+  if (circuitTripped) return false;
+
+  const now = Date.now();
+  const cutoff = now - CIRCUIT_BREAKER_WINDOW_MS;
+  while (requestTimestamps.length > 0 && requestTimestamps[0] < cutoff) {
+    requestTimestamps.shift();
+  }
+  requestTimestamps.push(now);
+
+  if (requestTimestamps.length > CIRCUIT_BREAKER_MAX) {
+    circuitTripped = true;
+    console.error(
+      `[Pencil] Circuit breaker tripped: ${requestTimestamps.length} ` +
+        `requests to NU hosts in the last ${CIRCUIT_BREAKER_WINDOW_MS / 1000}s. ` +
+        `Reloading extension as a failsafe.`
+    );
+    setTimeout(() => chrome.runtime.reload(), 100);
+    return false;
+  }
+  return true;
+}
 
 const CAESAR_REDIRECT_FEATURE_ID = "caesar-domain-redirect";
 const CAESAR_REDIRECT_RULE_ID = 1;
@@ -28,7 +82,7 @@ const trackedPopups = new Map<number, TrackedPopup>();
 const ownerToPopup = new Map<number, number>();
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("Better CAESAR extension installed.");
+  console.log("Pencil extension installed.");
   void syncCaesarRedirectRule();
 });
 
@@ -87,6 +141,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "abort-fetch") {
     const controller = fetchControllers.get((message as AbortFetchMessage).requestId);
     controller?.abort();
+    return false;
+  }
+  if (message.type === "credit-used") {
+    const m = message as CreditUsedMessage;
+    const owner = m.owner ? ` owner=${m.owner}` : "";
+    console.log(
+      `[Pencil] credit used [${m.pool}]: ${m.remaining}/${m.cap} left${owner}`
+    );
     return false;
   }
 });
@@ -166,6 +228,10 @@ async function handleFetchBinary(
   message: FetchBinaryMessage,
   sendResponse: (response: unknown) => void
 ): Promise<void> {
+  if (!recordAndCheckCircuitBreaker(message.url)) {
+    sendResponse({ ok: false, error: "Circuit breaker tripped: too many requests." });
+    return;
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   if (message.requestId) {
@@ -213,6 +279,10 @@ async function handleFetchText(
   message: FetchTextMessage,
   sendResponse: (response: unknown) => void
 ): Promise<void> {
+  if (!recordAndCheckCircuitBreaker(message.url)) {
+    sendResponse({ ok: false, error: "Circuit breaker tripped: too many requests." });
+    return;
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   if (message.requestId) {

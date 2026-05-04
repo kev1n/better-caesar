@@ -25,10 +25,11 @@ export function classSearchStyles(): string {
       flex-wrap: wrap;
     }
     .bc-cs-title {
+      font-family: var(--bc-font-display);
       font-size: var(--bc-font-22);
-      font-weight: var(--bc-fw-bold);
-      letter-spacing: var(--bc-ls-snug);
-      color: var(--bc-color-accent);
+      font-weight: var(--bc-fw-regular);
+      letter-spacing: 0;
+      color: var(--bc-color-text);
       margin: 0;
     }
     .bc-cs-subtitle {
@@ -36,8 +37,8 @@ export function classSearchStyles(): string {
       color: var(--bc-color-text-muted);
       line-height: 1.4;
     }
-    .bc-cs-subtitle a { color: var(--bc-color-accent); text-decoration: none; }
-    .bc-cs-subtitle a:hover { text-decoration: underline; }
+    .bc-cs-subtitle a { color: var(--bc-color-text); text-decoration: underline; text-decoration-color: var(--bc-color-border-strong); }
+    .bc-cs-subtitle a:hover { text-decoration-color: var(--bc-color-text); }
 
     /* ── Tabs ───────────────────────────────────────────────────────────── */
     /* Sit flush with the top edge of the card below: only the active tab
@@ -59,22 +60,22 @@ export function classSearchStyles(): string {
       border-bottom: none;
       border-radius: var(--bc-radius-lg) var(--bc-radius-lg) 0 0;
       padding: 8px 14px;
-      font: inherit;
-      font-size: var(--bc-font-12);
-      font-weight: var(--bc-fw-semibold);
-      letter-spacing: var(--bc-ls-wide);
+      font-family: var(--bc-font-display);
+      font-size: var(--bc-font-15);
+      font-weight: var(--bc-fw-regular);
+      letter-spacing: 0;
       color: var(--bc-color-text-muted);
       cursor: pointer;
       transition: color var(--bc-tx-fast), background-color var(--bc-tx-fast);
     }
     .bc-cs-tab:hover {
-      color: var(--bc-color-accent);
-      background: var(--bc-color-accent-surface-tint);
+      color: var(--bc-color-text);
+      background: var(--bc-color-surface-hover);
     }
     .bc-cs-tab[data-active="true"] {
       background: var(--bc-color-bg);
       border-color: var(--bc-color-border-divider);
-      color: var(--bc-color-accent);
+      color: var(--bc-color-text);
       box-shadow: var(--bc-shadow-card-soft);
     }
     .bc-cs-tab[data-active="true"]:hover {
@@ -244,19 +245,21 @@ export function classSearchStyles(): string {
       padding: 12px 16px;
       align-items: baseline;
       cursor: pointer;
-      background: linear-gradient(180deg, var(--bc-color-accent-surface-tint) 0%, var(--bc-color-bg) 100%);
-      border-bottom: 1px solid var(--bc-color-border-divider);
+      background: var(--bc-color-bg-app);
+      border-bottom: 1px solid var(--bc-color-border-strong);
     }
     .bc-cs-course-id {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-family: var(--bc-font-mono);
       font-size: var(--bc-font-13);
       font-weight: var(--bc-fw-bold);
-      color: var(--bc-color-accent);
+      color: var(--bc-color-text);
       letter-spacing: var(--bc-ls-wide);
     }
     .bc-cs-course-title {
-      font-size: var(--bc-font-14);
-      font-weight: var(--bc-fw-semibold);
+      font-family: var(--bc-font-display);
+      font-size: var(--bc-font-15);
+      font-weight: var(--bc-fw-regular);
+      letter-spacing: 0;
       color: var(--bc-color-text);
       overflow: hidden;
       text-overflow: ellipsis;
@@ -324,20 +327,20 @@ export function classSearchStyles(): string {
       transition: color var(--bc-tx-fast), border-color var(--bc-tx-fast), background-color var(--bc-tx-fast);
     }
     .bc-cs-live-btn:hover {
-      color: var(--bc-color-accent);
-      border-color: var(--bc-color-accent);
-      background: var(--bc-color-accent-surface-tint);
+      color: var(--bc-color-text);
+      border-color: var(--bc-color-border-strong);
+      background: var(--bc-color-surface-hover);
     }
     .bc-cs-live-btn[data-state="loading"] {
-      color: var(--bc-color-accent);
-      border-color: var(--bc-color-accent);
-      background: var(--bc-color-accent-surface-tint);
+      color: var(--bc-color-text);
+      border-color: var(--bc-color-border-strong);
+      background: var(--bc-color-surface-hover);
       cursor: progress;
     }
     .bc-cs-live-btn[data-state="ready"] {
-      color: var(--bc-color-accent);
-      border-color: var(--bc-color-accent);
-      background: var(--bc-color-accent-surface-tile);
+      color: var(--bc-color-text);
+      border-color: var(--bc-color-border-strong);
+      background: var(--bc-color-surface-hover-strong);
     }
     .bc-cs-live-btn[data-state="error"] {
       color: var(--bc-color-danger);
@@ -439,13 +442,14 @@ export function classSearchStyles(): string {
       transition: color var(--bc-tx-fast), border-color var(--bc-tx-fast), background-color var(--bc-tx-fast);
     }
     .bc-cs-details-btn:hover {
-      color: var(--bc-color-accent);
-      border-color: var(--bc-color-accent);
+      color: var(--bc-color-text);
+      border-color: var(--bc-color-border-strong);
+      background: var(--bc-color-surface-hover);
     }
     .bc-cs-details-btn[data-expanded="true"] {
-      background: var(--bc-color-accent-surface-tile);
-      color: var(--bc-color-accent-pressed);
-      border-color: var(--bc-color-accent-border-18);
+      background: var(--bc-color-surface-hover-strong);
+      color: var(--bc-color-text);
+      border-color: var(--bc-color-border-strong);
     }
 
     /* ── Add-to-cart: primary CAESAR CTA ────────────────────────────────── */

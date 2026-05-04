@@ -88,3 +88,14 @@ export type AuthPopupClosedMessage = {
   type: "auth-popup-closed";
   reason: "succeeded" | "user-closed";
 };
+
+// Fire-and-forget telemetry from content scripts: a credit was just burned
+// from one of the rate-limit pools. Logged in the background worker so the
+// service-worker devtools show a persistent, cross-tab record of usage.
+export type CreditUsedMessage = {
+  type: "credit-used";
+  pool: "ps" | "ctec";
+  remaining: number;
+  cap: number;
+  owner?: string;
+};

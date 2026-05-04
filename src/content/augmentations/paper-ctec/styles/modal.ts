@@ -77,11 +77,12 @@ export function modalStyles(): string {
       letter-spacing: var(--bc-ls-wide);
     }
     .bc-paper-ctec-modal-title {
-      font-size: var(--bc-font-26);
-      font-weight: var(--bc-fw-semibold);
+      font-family: var(--bc-font-display);
+      font-size: var(--bc-font-28);
+      font-weight: var(--bc-fw-regular);
       letter-spacing: var(--bc-ls-tight);
       margin: 0;
-      line-height: 1.15;
+      line-height: 1.1;
     }
     .bc-paper-ctec-modal-meta {
       margin-top: 10px;

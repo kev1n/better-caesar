@@ -3,17 +3,69 @@
 // the extension uses is declared here as a CSS custom property. To change
 // the look-and-feel: edit a value below, or add a new theme override block.
 //
-// Two scopes:
-//   :root, [data-bc-theme="default"]  — base + default light values
+// Themes (each theme owns a light + dark variant):
+//   default — original NU purple (kept as a legacy option in the popup)
+//   pencil  — pencil.nu sketchbook palette (eraser pink + Ticonderoga cream)
+//
+// Selectors:
+//   :root                                       — base shape/motion tokens
+//   :root, [data-bc-theme="default"]            — default light values
 //   [data-bc-theme="default"][data-bc-mode="dark"]  — default dark overrides
+//   [data-bc-theme="pencil"]                    — pencil light values
+//   [data-bc-theme="pencil"][data-bc-mode="dark"]   — pencil dark overrides
 //
 // Theme authors only need to override the vars they want to change; anything
 // they leave alone falls back to the default values. The `--bc-*` namespace
 // is reserved for this file — never define one elsewhere.
+//
+// Web fonts ship as woff2 in src/assets/fonts/. The `@font-face` URLs are
+// substituted at injection time via the resolver passed into tokensCss():
+// the popup uses a relative path; content scripts use chrome.runtime.getURL.
 // =============================================================================
 
-export function tokensCss(): string {
-  return [base(), defaultLight(), defaultDark()].join("\n");
+export type FontUrlResolver = (filename: string) => string;
+
+export function tokensCss(fontUrl?: FontUrlResolver): string {
+  return [
+    fontFaces(fontUrl ?? ((f) => `../assets/fonts/${f}`)),
+    base(),
+    defaultLight(),
+    defaultDark(),
+    pencilLight(),
+    pencilDark()
+  ].join("\n");
+}
+
+// -----------------------------------------------------------------------------
+// @font-face declarations — woff2 only, latin subset only. Files live in
+// src/assets/fonts/ and are copied to dist/<target>/assets/fonts/ by build.mjs.
+// -----------------------------------------------------------------------------
+function fontFaces(url: FontUrlResolver): string {
+  const face = (
+    family: string,
+    weight: number,
+    file: string,
+    style = "normal"
+  ): string => `
+@font-face {
+  font-family: "${family}";
+  font-style: ${style};
+  font-weight: ${weight};
+  font-display: swap;
+  src: url("${url(file)}") format("woff2");
+}`;
+  return [
+    face("Special Elite", 400, "special-elite-regular.woff2"),
+    face("Caveat", 400, "caveat-regular.woff2"),
+    face("Caveat", 600, "caveat-600.woff2"),
+    face("Caveat", 700, "caveat-700.woff2"),
+    face("Inter", 400, "inter-regular.woff2"),
+    face("Inter", 500, "inter-500.woff2"),
+    face("Inter", 600, "inter-600.woff2"),
+    face("Inter", 700, "inter-700.woff2"),
+    face("JetBrains Mono", 400, "jetbrains-mono-regular.woff2"),
+    face("JetBrains Mono", 500, "jetbrains-mono-500.woff2")
+  ].join("\n");
 }
 
 // -----------------------------------------------------------------------------
@@ -69,6 +121,13 @@ function base(): string {
      stay near-white regardless of light/dark theme. */
   --bc-color-on-saturated: #ffffff;
 
+  /* Heatmap shader RGB tuples. JS reads these at render time and
+     interpolates an alpha for each cell (so cell intensity scales with
+     value while the hue follows the theme). Two scales: ratings (Inst /
+     Course / Learn / Global) and hours. */
+  --bc-color-heatmap-rating-rgb: 102, 2, 60;
+  --bc-color-heatmap-hours-rgb: 162, 28, 175;
+
   /* Letter-spacing */
   --bc-ls-tight: -0.02em;
   --bc-ls-snug: -0.01em;
@@ -78,6 +137,14 @@ function base(): string {
   --bc-ls-caps: 0.06em;
   --bc-ls-caps-wide: 0.08em;
   --bc-ls-caps-widest: 0.1em;
+
+  /* Font stacks. Display/hand are pencil-theme accents; body/mono are the
+     general workhorses. The system fallbacks let CAESAR / Paper.nu render
+     with native fonts before the woff2 finishes loading. */
+  --bc-font-display: "Special Elite", "Courier Prime", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --bc-font-hand: "Caveat", "Patrick Hand", ui-rounded, "Comic Sans MS", cursive;
+  --bc-font-body: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --bc-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 `;
 }
@@ -316,6 +383,11 @@ function defaultLight(): string {
 
   /* ----- Comment highlight (search match) ----- */
   --bc-color-comment-highlight-light: rgba(250, 204, 21, 0.38);
+
+  /* ----- Comment card surface (analytics modal Comments tab) -----
+     Defaults to surface-hover; pencil-light overrides this to a cooler
+     off-white so the cards stop reading as cream-yellow on warm paper. */
+  --bc-color-comments-card-bg: var(--bc-color-surface-hover);
 
   /* ----- Disabled / muted greys (CAESAR add-to-cart disabled state) ----- */
   --bc-color-disabled-bg: #c7c2d6;
@@ -557,6 +629,10 @@ function defaultDark(): string {
   --bc-color-card-outline: rgba(248, 250, 252, 0.7);
   --bc-color-card-divider-soft: rgba(255, 255, 255, 0.14);
 
+  /* Heatmap RGB tuples — lavender + pink track the dark accent stack. */
+  --bc-color-heatmap-rating-rgb: 216, 180, 254;
+  --bc-color-heatmap-hours-rgb: 252, 165, 207;
+
   /* Cart button states retain semantic meaning in dark mode */
   --bc-color-cart-bg: #404040;
   --bc-color-cart-bg-hover: #525252;
@@ -588,6 +664,557 @@ function defaultDark(): string {
   --bc-color-gate-ok-bg: rgba(16, 78, 53, 0.32);
   --bc-color-gate-ok-border: rgba(110, 231, 183, 0.36);
   --bc-color-gate-ok-text: #d1fadf;
+}
+`;
+}
+
+// -----------------------------------------------------------------------------
+// Pencil theme — light. Mirrors the pencil-landing-page palette
+// (src/styles.css lines 18-31): Ticonderoga #2 cream paper with eraser-pink
+// accent and graphite ink. Activated by `[data-bc-theme="pencil"]` which is
+// the default for fresh installs (see DEFAULT_THEME in index.ts).
+//
+// Source vars on the landing page:
+//   --ink #2a2a2e   --ink-2 #4a4d52   --ink-3 #7d8088
+//   --paper #f6ecc0   --rule #c8c0a4
+//   --accent #e57a90 (eraser pink)   --accent-2 #d05f78
+//   --pencil-yellow #f5c842   --pencil-yellow-soft #fbe89a
+//   --tan #d4a373
+// -----------------------------------------------------------------------------
+function pencilLight(): string {
+  return `
+[data-bc-theme="pencil"] {
+  /* ----- Brand accent (eraser pink) ----- */
+  --bc-color-accent: #d05f78;
+  --bc-color-accent-hover: #b54e63;
+  --bc-color-accent-pressed: #99425a;
+  --bc-color-accent-on: #fffaf3;
+
+  /* Auxiliary accent — a darker goldenrod that doubles as text on cream
+     surfaces and as a button fill (with cream text). Used by side card
+     accents, the analytics-btn, and the auth modal highlights. Cream
+     'accent-soft-on' keeps text readable when this token paints a button
+     background. */
+  --bc-color-accent-soft: #a06a0c;
+  --bc-color-accent-soft-hover: #815509;
+  --bc-color-accent-soft-on: #fffaf3;
+
+  /* Accent fill alpha ladder — pink overlays */
+  --bc-color-accent-fill-04: rgba(208, 95, 120, 0.05);
+  --bc-color-accent-fill-05: rgba(208, 95, 120, 0.06);
+  --bc-color-accent-fill-06: rgba(208, 95, 120, 0.07);
+  --bc-color-accent-fill-08: rgba(208, 95, 120, 0.10);
+  --bc-color-accent-fill-10: rgba(208, 95, 120, 0.12);
+  --bc-color-accent-fill-12: rgba(208, 95, 120, 0.14);
+  --bc-color-accent-fill-15: rgba(208, 95, 120, 0.18);
+  --bc-color-accent-fill-18: rgba(208, 95, 120, 0.22);
+  --bc-color-accent-fill-22: rgba(208, 95, 120, 0.26);
+  --bc-color-accent-fill-24: rgba(208, 95, 120, 0.28);
+  --bc-color-accent-fill-32: rgba(208, 95, 120, 0.36);
+  --bc-color-accent-fill-45: rgba(208, 95, 120, 0.50);
+
+  /* Accent border alpha ladder */
+  --bc-color-accent-border-08: rgba(208, 95, 120, 0.14);
+  --bc-color-accent-border-12: rgba(208, 95, 120, 0.20);
+  --bc-color-accent-border-14: rgba(208, 95, 120, 0.22);
+  --bc-color-accent-border-18: rgba(208, 95, 120, 0.28);
+  --bc-color-accent-border-22: rgba(208, 95, 120, 0.32);
+  --bc-color-accent-border-28: rgba(208, 95, 120, 0.40);
+  --bc-color-accent-border-32: rgba(208, 95, 120, 0.45);
+  --bc-color-accent-border-45: rgba(208, 95, 120, 0.55);
+
+  /* Named accent surface tints — manila/taupe rather than yellow. These
+     paint the comments-tab "active rail" + filter chips and several
+     terms-tab card backgrounds, so anything biased toward yellow reads
+     as a warning rather than a subtle highlight. Stay neutral-warm. */
+  --bc-color-accent-surface-faint: #fffaf3;
+  --bc-color-accent-surface-soft: #ece4d6;
+  --bc-color-accent-surface-tint: #f1eadd;
+  --bc-color-accent-surface-tile: #ece4d6;
+  --bc-color-accent-surface-tile-2: #efe8db;
+  --bc-color-accent-surface-row: #f4ede0;
+  --bc-color-accent-surface-row-border: #d8cdba;
+  --bc-color-accent-mid-border: #b8ad97;
+
+  /* Warn-rose retained for status pills */
+  --bc-color-warn-rose-text: #9f1239;
+  --bc-color-warn-rose-text-deep: #881337;
+  --bc-color-warn-rose-fill-12: rgba(190, 24, 93, 0.12);
+  --bc-color-warn-rose-border-28: rgba(190, 24, 93, 0.28);
+  --bc-color-warn-rose-border-32: rgba(190, 24, 93, 0.32);
+  --bc-color-warn-rose-fill-20: rgba(190, 24, 93, 0.20);
+
+  /* Paper.nu's own purple — external brand, leave untouched */
+  --bc-color-paper: #4e2a84;
+  --bc-color-paper-deep: #3a1f63;
+  --bc-color-paper-soft: #f3eef9;
+
+  /* ----- Surfaces -----
+     'bg' (analytics-modal cards, terms tab cards) drifts to a near-white
+     warm so chart panels don't read as cream-yellow. 'bg-muted' (modal
+     body backdrop) sits one notch warmer-cool. Hover + inset surfaces
+     are warm-taupe rather than yellow. 'bg-app' keeps its full
+     Ticonderoga-cream punch because it only paints the popup body
+     (intentionally identifies the surface as "the pencil"). */
+  --bc-color-bg: #fdfbf6;
+  --bc-color-bg-app: #f6ecc0;
+  --bc-color-bg-muted: #f5f1ea;
+  --bc-color-bg-inset: #f3ebde;
+  --bc-color-surface-hover: #f0e9dc;
+  --bc-color-surface-hover-strong: #e7e0d0;
+  --bc-color-surface-soft: #faf6ef;
+
+  /* Borders — soft pencil-line tones */
+  --bc-color-border: #d9cab4;
+  --bc-color-border-strong: #c8c0a4;
+  --bc-color-border-divider: #e3d6c4;
+
+  /* Translucent surface ladder (cream-tinted) */
+  --bc-color-surface-translucent-86: rgba(255, 250, 243, 0.86);
+  --bc-color-surface-translucent-72: rgba(255, 250, 243, 0.72);
+  --bc-color-surface-translucent-62: rgba(255, 250, 243, 0.62);
+  --bc-color-surface-translucent-56: rgba(255, 250, 243, 0.56);
+  --bc-color-surface-translucent-84: rgba(255, 250, 243, 0.84);
+  --bc-color-surface-translucent-88: rgba(255, 250, 243, 0.88);
+  --bc-color-surface-translucent-92: rgba(255, 250, 243, 0.92);
+  --bc-color-surface-translucent-98: rgba(255, 250, 243, 0.98);
+  --bc-color-surface-warm-grad-top: rgba(255, 250, 243, 0.98);
+
+  /* ----- Text ----- */
+  --bc-color-text: #2a2a2e;
+  --bc-color-text-strong: #1d1d20;
+  --bc-color-text-soft: #4a4d52;
+  --bc-color-text-muted: #7d8088;
+  --bc-color-text-subtle: #a09a86;
+
+  /* Mauve text scale → warm graphite scale on cream */
+  --bc-color-text-mauve: #6b5a55;
+  --bc-color-text-mauve-soft: #5c4d49;
+  --bc-color-text-mauve-warm: #4a3d39;
+  --bc-color-text-mauve-deep: #2a2a2e;
+  --bc-color-text-mauve-panel: #3a3330;
+  --bc-color-text-mauve-pale: #c8c0a4;
+  --bc-color-text-mauve-cool: #8a6f5e;
+  --bc-color-text-mauve-axis: #9b9080;
+  --bc-color-text-mauve-axis-strong: #6b5a55;
+
+  --bc-color-text-body-warm: #4a3d39;
+  --bc-color-text-mauve-cool-alt: #6b5a55;
+
+  --bc-color-text-on-tooltip: #fffaf3;
+  --bc-color-text-on-histogram: #2a2a2e;
+
+  /* ----- Status — warm-tuned for cream substrate ----- */
+  --bc-color-success: #2a7a4a;
+  --bc-color-success-bg: #e3f2d9;
+  --bc-color-success-bg-soft: #effae0;
+  --bc-color-success-border: #b8d59a;
+  --bc-color-success-text: #1f5a36;
+  --bc-color-success-deep: #2a7a4a;
+  --bc-color-success-distro-text: #1f5a36;
+  --bc-color-success-distro-bg: #effae0;
+
+  /* Warn family — used by status pills, warning chips, and "wait list" tags.
+     Pulled back from bright Ticonderoga yellow so it doesn't dominate the
+     comments tab and chart backgrounds; surfaces are now soft cream and
+     text carries the amber semantic. */
+  --bc-color-warn: #b07a18;
+  --bc-color-warn-bg: #f5e8c4;
+  --bc-color-warn-bg-soft: #fbf6e3;
+  --bc-color-warn-bg-page: #fbf6e3;
+  --bc-color-warn-border: #e2d2a4;
+  --bc-color-warn-border-page: #d4a373;
+  --bc-color-warn-text: #7c5a14;
+  --bc-color-warn-text-page: #6b4d11;
+  --bc-color-warn-text-discipline: #8a6512;
+
+  --bc-color-danger: #b54e63;
+  --bc-color-danger-bg: #fbe1e6;
+  --bc-color-danger-bg-soft: #fdeef1;
+  --bc-color-danger-bg-pill: #fbe1e6;
+  --bc-color-danger-border: #f3b9c5;
+  --bc-color-danger-text: #8a3a4a;
+  --bc-color-danger-text-pill: #99425a;
+  --bc-color-danger-deep: #8a3a4a;
+  --bc-color-danger-rose: #9f1239;
+
+  /* Lock/info — warm slate-blue on cream */
+  --bc-color-info-bg: #e8e3f0;
+  --bc-color-info-border: #c4b8d6;
+  --bc-color-info-text: #2d2347;
+  --bc-color-info-text-deep: #3d3060;
+
+  /* Highlight — used as the active comment-theme pill background and the
+     inline marker stripe. Pill bg keeps a faint cream so the active state
+     is *visible* without being eye-burning; the marker stripe (small
+     accent under headline text) keeps the saturated yellow alpha because
+     it's a sliver, not a fill. */
+  --bc-color-highlight: #f5e8c4;
+  --bc-color-highlight-text: #5b4451;
+  --bc-color-highlight-mark: rgba(245, 200, 66, 0.45);
+
+  /* ----- Stars / chart palette ----- */
+  --bc-color-star-base: #d9cab4;
+  --bc-color-star-fill: #d97706;
+  --bc-color-hours-grad-start: #d05f78;
+  --bc-color-hours-grad-end: #b08512;
+  --bc-color-chart-trend-axis: #ead9aa;
+  --bc-color-chart-trend-text: #9b9080;
+  --bc-color-chart-trend-text-strong: #6b5a55;
+  --bc-color-chart-axis-cool: #6b5a55;
+
+  /* ----- Ink (graphite) ----- */
+  --bc-color-ink: #2a2a2e;
+  --bc-color-ink-deep: #1d1d20;
+  --bc-color-ink-text: #2a2a2e;
+  --bc-color-ink-text-on-light: #fffaf3;
+  --bc-color-ink-fill-04: rgba(42, 42, 46, 0.04);
+  --bc-color-ink-fill-06: rgba(42, 42, 46, 0.06);
+  --bc-color-ink-fill-08: rgba(42, 42, 46, 0.08);
+  --bc-color-ink-fill-025: rgba(42, 42, 46, 0.025);
+  --bc-color-ink-border-12: rgba(42, 42, 46, 0.12);
+  --bc-color-ink-instructor-pill-bg: rgba(42, 42, 46, 0.06);
+
+  /* ----- Shadows — warm graphite ink for generic buttons + landing's
+     offset-solid signature. Pink eraser is reserved for the add-CTA so it
+     stays a deliberate punch rather than a default. ----- */
+  --bc-shadow-elev-1: 0 1px 2px rgba(42, 42, 46, 0.08);
+  --bc-shadow-elev-2: 0 2px 8px rgba(42, 42, 46, 0.10);
+  --bc-shadow-card-soft: 0 -1px 2px rgba(42, 42, 46, 0.06);
+  --bc-shadow-button: 0 2px 6px rgba(42, 42, 46, 0.18);
+  --bc-shadow-button-hover: 0 3px 8px rgba(42, 42, 46, 0.22);
+  --bc-shadow-add-cta: 2px 2px 0 #d05f78;
+  --bc-shadow-modal: 0 1px 2px rgba(42, 42, 46, 0.08), 0 30px 60px -10px rgba(42, 42, 46, 0.35), 0 0 0 1px rgba(42, 42, 46, 0.06);
+  --bc-shadow-modal-status: 0 1px 2px rgba(42, 42, 46, 0.06);
+  --bc-shadow-auth-card: 0 28px 60px rgba(42, 42, 46, 0.32);
+  --bc-shadow-side-panel: 0 10px 28px rgba(42, 42, 46, 0.10);
+  --bc-shadow-tooltip: 0 8px 24px rgba(42, 42, 46, 0.22);
+  --bc-shadow-kpi-active-ring: 0 0 0 3px rgba(208, 95, 120, 0.14);
+  --bc-shadow-toggle-knob: 0 1px 3px rgba(42, 42, 46, 0.32);
+  --bc-shadow-input-focus-ring: 0 0 0 3px rgba(208, 95, 120, 0.24);
+  --bc-shadow-input-focus-inner: inset 0 1px 2px rgba(42, 42, 46, 0.06);
+
+  /* Modal overlay scrims */
+  --bc-color-overlay-modal: rgba(42, 42, 46, 0.55);
+  --bc-color-overlay-auth: rgba(42, 42, 46, 0.6);
+  --bc-color-overlay-on-light: rgba(42, 42, 46, 0.10);
+
+  /* Side-card panel gradient */
+  --bc-color-panel-grad-top: rgba(255, 250, 243, 0.98);
+  --bc-color-panel-grad-bottom: rgba(252, 245, 230, 0.98);
+
+  /* Card hover-lift outline */
+  --bc-color-card-outline: rgba(42, 42, 46, 0.7);
+  --bc-color-card-divider-soft: rgba(42, 42, 46, 0.12);
+
+  /* Cart button states — graphite ink with warm semantic colors */
+  --bc-color-cart-bg: #2a2a2e;
+  --bc-color-cart-bg-hover: #1d1d20;
+  --bc-color-cart-border: rgba(42, 42, 46, 0.45);
+  --bc-color-cart-border-hover: rgba(42, 42, 46, 0.7);
+  --bc-color-cart-text: #fffaf3;
+  --bc-color-cart-success-bg: #2a7a4a;
+  --bc-color-cart-success-border: rgba(42, 122, 74, 0.65);
+  --bc-color-cart-success-text: #effae0;
+  --bc-color-cart-error-bg: #b54e63;
+  --bc-color-cart-error-border: rgba(181, 78, 99, 0.7);
+  --bc-color-cart-error-text: #fdeef1;
+  --bc-color-cart-loading-bg: #6b5a55;
+  --bc-color-cart-loading-border: rgba(107, 90, 85, 0.65);
+  --bc-color-cart-loading-text: #f7f1ea;
+
+  /* Comment search highlight — dialed back so a comment with a search
+     match doesn't read as a yellow card. */
+  --bc-color-comment-highlight-light: rgba(245, 200, 66, 0.22);
+
+  /* Comment card surface — explicit cool off-white so comment cards
+     break visually from the cream paper backdrop instead of reading as
+     another yellow surface. */
+  --bc-color-comments-card-bg: #eceae4;
+
+  /* Heatmap RGB tuples — graphite ink for ratings (neutral) and eraser
+     pink for hours (the chart's signature accent). */
+  --bc-color-heatmap-rating-rgb: 42, 42, 46;
+  --bc-color-heatmap-hours-rgb: 208, 95, 120;
+
+  /* Disabled grey */
+  --bc-color-disabled-bg: #d9cab4;
+
+  /* Gate-card / popup status banners */
+  --bc-color-gate-warn-bg: #fdf3c4;
+  --bc-color-gate-warn-border: #d4a373;
+  --bc-color-gate-warn-text: #6b4d11;
+  --bc-color-gate-lock-bg: #e8e3f0;
+  --bc-color-gate-lock-border: #c4b8d6;
+  --bc-color-gate-lock-text: #2d2347;
+  --bc-color-gate-ok-bg: #effae0;
+  --bc-color-gate-ok-border: #b8d59a;
+  --bc-color-gate-ok-text: #1f5a36;
+
+  /* Seats-notes occupancy palette (warm-tuned for cream) */
+  --bc-color-seat-full-bg: #fbe1e6;
+  --bc-color-seat-full-border: #f3b9c5;
+  --bc-color-seat-full-ink: #8a3a4a;
+  --bc-color-seat-waitlist-bg: #fbe89a;
+  --bc-color-seat-waitlist-border: #d4a373;
+  --bc-color-seat-waitlist-ink: #8a4b00;
+  --bc-color-seat-info-bg: #e8e3f0;
+  --bc-color-seat-info-border: #c4b8d6;
+  --bc-color-seat-info-ink: #3d3060;
+  --bc-color-seat-warn-bg: #fdf3c4;
+  --bc-color-seat-warn-border: #d4a373;
+  --bc-color-seat-warn-ink: #6b4d11;
+  --bc-color-seat-tight-bg: #fdf3c4;
+  --bc-color-seat-tight-border: #ead9aa;
+  --bc-color-seat-tight-ink: #7c5a14;
+  --bc-color-seat-room-bg: #effae0;
+  --bc-color-seat-room-border: #b8d59a;
+  --bc-color-seat-room-ink: #1f5a36;
+  --bc-color-seat-open-bg: #effae0;
+  --bc-color-seat-open-border: #b8d59a;
+  --bc-color-seat-open-ink: #1f5a36;
+  --bc-color-seat-warn-row-text: #6b4d11;
+  --bc-color-seat-warn-row-border: #d4a373;
+  --bc-color-seat-error-text: #8a3a4a;
+  --bc-color-seat-muted-text: #6b5a55;
+}
+`;
+}
+
+// -----------------------------------------------------------------------------
+// Pencil theme — dark. Pencil-landing-page has no dark mode, so this is
+// designed from scratch: deep warm graphite paper, cream ink, soft pink
+// accent. Activated by paper.nu's `.dark` class (mirrored onto
+// `[data-bc-mode="dark"]`).
+// -----------------------------------------------------------------------------
+function pencilDark(): string {
+  return `
+[data-bc-theme="pencil"][data-bc-mode="dark"] {
+  /* Brand accent — softer pink so it reads on dark warm graphite */
+  --bc-color-accent: #f5a3b4;
+  --bc-color-accent-hover: #f7b8c5;
+  --bc-color-accent-pressed: #e88fa3;
+  --bc-color-accent-on: #2a1d22;
+
+  /* Auxiliary accent collapses to a single warm track */
+  --bc-color-accent-soft: #f5c842;
+  --bc-color-accent-soft-hover: #ffd864;
+  --bc-color-accent-soft-on: #2a1d22;
+
+  /* Pink fill ladder */
+  --bc-color-accent-fill-04: rgba(245, 163, 180, 0.06);
+  --bc-color-accent-fill-05: rgba(245, 163, 180, 0.07);
+  --bc-color-accent-fill-06: rgba(245, 163, 180, 0.08);
+  --bc-color-accent-fill-08: rgba(245, 163, 180, 0.10);
+  --bc-color-accent-fill-10: rgba(245, 163, 180, 0.12);
+  --bc-color-accent-fill-12: rgba(245, 163, 180, 0.14);
+  --bc-color-accent-fill-15: rgba(245, 163, 180, 0.18);
+  --bc-color-accent-fill-18: rgba(245, 163, 180, 0.20);
+  --bc-color-accent-fill-22: rgba(245, 163, 180, 0.24);
+  --bc-color-accent-fill-24: rgba(245, 163, 180, 0.26);
+  --bc-color-accent-fill-32: rgba(245, 163, 180, 0.32);
+  --bc-color-accent-fill-45: rgba(245, 163, 180, 0.42);
+
+  --bc-color-accent-border-08: rgba(245, 163, 180, 0.14);
+  --bc-color-accent-border-12: rgba(245, 163, 180, 0.16);
+  --bc-color-accent-border-14: rgba(245, 163, 180, 0.18);
+  --bc-color-accent-border-18: rgba(245, 163, 180, 0.22);
+  --bc-color-accent-border-22: rgba(245, 163, 180, 0.26);
+  --bc-color-accent-border-28: rgba(245, 163, 180, 0.32);
+  --bc-color-accent-border-32: rgba(245, 163, 180, 0.40);
+  --bc-color-accent-border-45: rgba(245, 163, 180, 0.50);
+
+  --bc-color-accent-surface-faint: rgba(245, 163, 180, 0.08);
+  --bc-color-accent-surface-soft: rgba(245, 200, 66, 0.16);
+  --bc-color-accent-surface-tint: rgba(245, 163, 180, 0.10);
+  --bc-color-accent-surface-tile: rgba(245, 163, 180, 0.14);
+  --bc-color-accent-surface-tile-2: rgba(245, 163, 180, 0.10);
+  --bc-color-accent-surface-row: rgba(43, 37, 28, 0.55);
+  --bc-color-accent-surface-row-border: rgba(245, 163, 180, 0.16);
+  --bc-color-accent-mid-border: rgba(245, 163, 180, 0.32);
+
+  --bc-color-warn-rose-text: #fecdd3;
+  --bc-color-warn-rose-text-deep: #fecdd3;
+  --bc-color-warn-rose-fill-12: rgba(251, 113, 133, 0.16);
+  --bc-color-warn-rose-border-28: rgba(251, 113, 133, 0.30);
+  --bc-color-warn-rose-border-32: rgba(251, 113, 133, 0.40);
+  --bc-color-warn-rose-fill-20: rgba(251, 113, 133, 0.22);
+
+  /* ----- Surfaces ----- */
+  --bc-color-bg: #2b251c;
+  --bc-color-bg-app: #211c14;
+  --bc-color-bg-muted: #1d1812;
+  --bc-color-bg-inset: #2b251c;
+  --bc-color-surface-hover: #3a3225;
+  --bc-color-surface-hover-strong: #4a3f30;
+  --bc-color-surface-soft: #2b251c;
+
+  --bc-color-border: #4a3f30;
+  --bc-color-border-strong: #5c4f3c;
+  --bc-color-border-divider: #4a3f30;
+
+  --bc-color-surface-translucent-86: rgba(33, 28, 20, 0.86);
+  --bc-color-surface-translucent-72: rgba(33, 28, 20, 0.72);
+  --bc-color-surface-translucent-62: rgba(33, 28, 20, 0.62);
+  --bc-color-surface-translucent-56: rgba(33, 28, 20, 0.56);
+  --bc-color-surface-translucent-84: rgba(33, 28, 20, 0.84);
+  --bc-color-surface-translucent-88: rgba(33, 28, 20, 0.88);
+  --bc-color-surface-translucent-92: rgba(33, 28, 20, 0.92);
+  --bc-color-surface-translucent-98: rgba(33, 28, 20, 0.98);
+  --bc-color-surface-warm-grad-top: rgba(43, 37, 28, 0.98);
+
+  /* ----- Text — cream ink on graphite paper ----- */
+  --bc-color-text: #f6ecc0;
+  --bc-color-text-strong: #fffaf3;
+  --bc-color-text-soft: #e3d6b8;
+  --bc-color-text-muted: #b3a890;
+  --bc-color-text-subtle: #8a8068;
+
+  --bc-color-text-mauve: #d8c8b0;
+  --bc-color-text-mauve-soft: #dcc9b6;
+  --bc-color-text-mauve-warm: #f3e3c8;
+  --bc-color-text-mauve-deep: #fffaf3;
+  --bc-color-text-mauve-panel: #f3e3c8;
+  --bc-color-text-mauve-pale: rgba(246, 236, 192, 0.40);
+  --bc-color-text-mauve-cool: #f5a3b4;
+  --bc-color-text-mauve-axis: #b3a890;
+  --bc-color-text-mauve-axis-strong: #d8c8b0;
+
+  --bc-color-text-body-warm: #f3e3c8;
+  --bc-color-text-mauve-cool-alt: #dcc9b6;
+
+  --bc-color-text-on-tooltip: #fffaf3;
+  --bc-color-text-on-histogram: #fffaf3;
+
+  /* ----- Status (dark warm) ----- */
+  --bc-color-success: #9be3a8;
+  --bc-color-success-bg: rgba(31, 90, 54, 0.40);
+  --bc-color-success-bg-soft: rgba(31, 90, 54, 0.32);
+  --bc-color-success-border: rgba(155, 227, 168, 0.40);
+  --bc-color-success-text: #d5f3da;
+  --bc-color-success-deep: #9be3a8;
+  --bc-color-success-distro-text: #d5f3da;
+  --bc-color-success-distro-bg: rgba(31, 90, 54, 0.40);
+
+  --bc-color-warn: #f5c842;
+  --bc-color-warn-bg: rgba(124, 90, 20, 0.42);
+  --bc-color-warn-bg-soft: rgba(124, 90, 20, 0.32);
+  --bc-color-warn-bg-page: rgba(124, 90, 20, 0.32);
+  --bc-color-warn-border: rgba(245, 200, 66, 0.40);
+  --bc-color-warn-border-page: rgba(245, 200, 66, 0.40);
+  --bc-color-warn-text: #fbe89a;
+  --bc-color-warn-text-page: #fbe89a;
+  --bc-color-warn-text-discipline: #fbe89a;
+
+  --bc-color-danger: #f5a3b4;
+  --bc-color-danger-bg: rgba(138, 58, 74, 0.40);
+  --bc-color-danger-bg-soft: rgba(138, 58, 74, 0.32);
+  --bc-color-danger-bg-pill: rgba(138, 58, 74, 0.40);
+  --bc-color-danger-border: rgba(245, 163, 180, 0.40);
+  --bc-color-danger-text: #fbe1e6;
+  --bc-color-danger-text-pill: #f5a3b4;
+  --bc-color-danger-deep: #f5a3b4;
+  --bc-color-danger-rose: #f5a3b4;
+
+  --bc-color-info-bg: rgba(196, 184, 214, 0.16);
+  --bc-color-info-border: rgba(196, 184, 214, 0.32);
+  --bc-color-info-text: #d6cae8;
+  --bc-color-info-text-deep: #b9a8da;
+
+  --bc-color-highlight: rgba(245, 200, 66, 0.85);
+  --bc-color-highlight-text: #2a1d10;
+  --bc-color-highlight-mark: rgba(245, 200, 66, 0.30);
+
+  --bc-color-star-base: rgba(246, 236, 192, 0.32);
+  --bc-color-star-fill: #f5c842;
+  --bc-color-hours-grad-start: #f5a3b4;
+  --bc-color-hours-grad-end: #f5c842;
+  --bc-color-chart-trend-axis: #5c4f3c;
+  --bc-color-chart-trend-text: #b3a890;
+  --bc-color-chart-trend-text-strong: #d8c8b0;
+  --bc-color-chart-axis-cool: #b3a890;
+
+  --bc-color-ink: #f5a3b4;
+  --bc-color-ink-deep: #f7b8c5;
+  --bc-color-ink-text: #fffaf3;
+  --bc-color-ink-text-on-light: #2a1d22;
+  --bc-color-ink-fill-04: rgba(255, 250, 243, 0.05);
+  --bc-color-ink-fill-06: rgba(255, 250, 243, 0.07);
+  --bc-color-ink-fill-08: rgba(255, 250, 243, 0.10);
+  --bc-color-ink-fill-025: rgba(255, 250, 243, 0.04);
+  --bc-color-ink-border-12: rgba(255, 250, 243, 0.14);
+  --bc-color-ink-instructor-pill-bg: rgba(255, 250, 243, 0.08);
+
+  --bc-shadow-elev-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --bc-shadow-elev-2: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --bc-shadow-card-soft: 0 -1px 2px rgba(0, 0, 0, 0.45);
+  --bc-shadow-button: 2px 2px 0 rgba(245, 163, 180, 0.85);
+  --bc-shadow-button-hover: 3px 3px 0 rgba(245, 163, 180, 0.95);
+  --bc-shadow-add-cta: 2px 2px 0 #f5a3b4;
+  --bc-shadow-modal: 0 1px 2px rgba(0, 0, 0, 0.45), 0 30px 60px -10px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 250, 243, 0.05);
+  --bc-shadow-modal-status: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --bc-shadow-auth-card: 0 28px 60px rgba(0, 0, 0, 0.6);
+  --bc-shadow-side-panel: 0 10px 28px rgba(0, 0, 0, 0.32);
+  --bc-shadow-tooltip: 0 8px 24px rgba(0, 0, 0, 0.50);
+  --bc-shadow-kpi-active-ring: 0 0 0 3px rgba(245, 163, 180, 0.20);
+  --bc-shadow-toggle-knob: 0 1px 3px rgba(0, 0, 0, 0.50);
+  --bc-shadow-input-focus-ring: 0 0 0 3px rgba(245, 163, 180, 0.30);
+  --bc-shadow-input-focus-inner: inset 0 1px 2px rgba(0, 0, 0, 0.32);
+
+  --bc-color-overlay-modal: rgba(0, 0, 0, 0.55);
+  --bc-color-overlay-auth: rgba(0, 0, 0, 0.6);
+  --bc-color-overlay-on-light: rgba(255, 250, 243, 0.08);
+
+  --bc-color-panel-grad-top: rgba(43, 37, 28, 0.98);
+  --bc-color-panel-grad-bottom: rgba(33, 28, 20, 0.98);
+
+  --bc-color-card-outline: rgba(255, 250, 243, 0.7);
+  --bc-color-card-divider-soft: rgba(255, 250, 243, 0.14);
+
+  /* Heatmap RGB tuples — cream + soft pink for the dark warm theme. */
+  --bc-color-heatmap-rating-rgb: 246, 236, 192;
+  --bc-color-heatmap-hours-rgb: 245, 163, 180;
+
+  /* Cells in pencil dark are saturated cream + light pink, so the
+     "on-saturated" text needs to be dark to read; override the white
+     default from base(). */
+  --bc-color-on-saturated: #2a1d22;
+
+  --bc-color-cart-bg: #4a3f30;
+  --bc-color-cart-bg-hover: #5c4f3c;
+  --bc-color-cart-border: #5c4f3c;
+  --bc-color-cart-border-hover: #7d6e58;
+  --bc-color-cart-text: #fffaf3;
+  --bc-color-cart-success-bg: #2a7a4a;
+  --bc-color-cart-success-border: #9be3a8;
+  --bc-color-cart-success-text: #d5f3da;
+  --bc-color-cart-error-bg: #8a3a4a;
+  --bc-color-cart-error-border: #f5a3b4;
+  --bc-color-cart-error-text: #fbe1e6;
+  --bc-color-cart-loading-bg: #5c4f3c;
+  --bc-color-cart-loading-border: #7d6e58;
+  --bc-color-cart-loading-text: #f3e3c8;
+
+  --bc-color-comment-highlight-light: rgba(245, 200, 66, 0.28);
+
+  /* Comment card surface in pencil-dark — warm graphite. Without this
+     override the variable would inherit pencil-light's near-white value
+     (CSS custom properties resolve from the highest-specificity rule
+     that *defines* them, not from a more-specific selector that omits
+     them), which leaves cream text invisible on a near-white card. */
+  --bc-color-comments-card-bg: #3a3225;
+
+  --bc-color-disabled-bg: #5c4f3c;
+
+  --bc-color-gate-warn-bg: rgba(124, 90, 20, 0.38);
+  --bc-color-gate-warn-border: rgba(245, 200, 66, 0.40);
+  --bc-color-gate-warn-text: #fbe89a;
+  --bc-color-gate-lock-bg: rgba(196, 184, 214, 0.16);
+  --bc-color-gate-lock-border: rgba(196, 184, 214, 0.32);
+  --bc-color-gate-lock-text: #d6cae8;
+  --bc-color-gate-ok-bg: rgba(31, 90, 54, 0.38);
+  --bc-color-gate-ok-border: rgba(155, 227, 168, 0.40);
+  --bc-color-gate-ok-text: #d5f3da;
 }
 `;
 }

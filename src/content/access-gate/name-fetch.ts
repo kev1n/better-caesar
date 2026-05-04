@@ -15,7 +15,7 @@ const NAME_SPAN_ID = "NW_PRF_VW_NAME";
 // paper.nu; on CAESAR itself we always attempt because the user's
 // cookies are right there and a successful attempt clears the backoff
 // for the next paper.nu visit.
-const NAME_FETCH_FAILED_AT_KEY = "better-caesar:access-gate:name-fetch-failed-at:v1";
+export const NAME_FETCH_FAILED_AT_KEY = "better-caesar:access-gate:name-fetch-failed-at:v1";
 const FAILED_FETCH_BACKOFF_MS = 24 * 60 * 60 * 1000; // 24h
 
 let inFlight: Promise<StoredName | null> | null = null;

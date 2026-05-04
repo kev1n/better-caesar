@@ -87,13 +87,13 @@ export function renderTrendChart(
       line.setAttribute("x2", String(W - PR));
       line.setAttribute("y1", String(yAt(yv)));
       line.setAttribute("y2", String(yAt(yv)));
-      line.setAttribute("stroke", "#f1ebef");
+      line.style.stroke = "var(--bc-color-chart-trend-axis)";
       svg.append(line);
 
       const tick = doc.createElementNS(SVG_NS, "text");
       tick.setAttribute("x", String(PL - 6));
       tick.setAttribute("y", String(yAt(yv) + 3));
-      tick.setAttribute("fill", "#9b8290");
+      tick.style.fill = "var(--bc-color-chart-trend-text)";
       tick.setAttribute("font-size", "10");
       tick.setAttribute("text-anchor", "end");
       tick.textContent = String(yv);
@@ -104,7 +104,7 @@ export function renderTrendChart(
 
     const polyline = doc.createElementNS(SVG_NS, "polyline");
     polyline.setAttribute("fill", "none");
-    polyline.setAttribute("stroke", "#66023c");
+    polyline.style.stroke = "var(--bc-color-accent)";
     polyline.setAttribute("stroke-width", "2");
     polyline.setAttribute("stroke-linecap", "round");
     polyline.setAttribute("stroke-linejoin", "round");
@@ -116,15 +116,15 @@ export function renderTrendChart(
       circle.setAttribute("cx", String(xAt(i)));
       circle.setAttribute("cy", String(yAt(v)));
       circle.setAttribute("r", "3.5");
-      circle.setAttribute("fill", "white");
-      circle.setAttribute("stroke", "#66023c");
+      circle.style.fill = "var(--bc-color-bg)";
+      circle.style.stroke = "var(--bc-color-accent)";
       circle.setAttribute("stroke-width", "1.6");
       svg.append(circle);
 
       const valueLabel = doc.createElementNS(SVG_NS, "text");
       valueLabel.setAttribute("x", String(xAt(i)));
       valueLabel.setAttribute("y", String(yAt(v) - 8));
-      valueLabel.setAttribute("fill", "#66023c");
+      valueLabel.style.fill = "var(--bc-color-accent)";
       valueLabel.setAttribute("font-size", "11");
       valueLabel.setAttribute("font-weight", "700");
       valueLabel.setAttribute("text-anchor", "middle");
@@ -134,7 +134,7 @@ export function renderTrendChart(
       const termLabel = doc.createElementNS(SVG_NS, "text");
       termLabel.setAttribute("x", String(xAt(i)));
       termLabel.setAttribute("y", String(H - 12));
-      termLabel.setAttribute("fill", "#7a596a");
+      termLabel.style.fill = "var(--bc-color-chart-trend-text-strong)";
       termLabel.setAttribute("font-size", "10");
       termLabel.setAttribute("text-anchor", "middle");
       termLabel.textContent = abbrTerm(data.trendTerms[i]?.term ?? "");

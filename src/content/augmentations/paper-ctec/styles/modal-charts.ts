@@ -298,8 +298,10 @@ export function modalChartStyles(): string {
       flex-wrap: wrap;
     }
     .bc-paper-ctec-modal-card-title {
-      font-size: var(--bc-font-13);
-      font-weight: var(--bc-fw-semibold);
+      font-family: var(--bc-font-display);
+      font-size: var(--bc-font-15);
+      font-weight: var(--bc-fw-regular);
+      letter-spacing: 0;
     }
     .bc-paper-ctec-modal-card-meta {
       display: flex;
@@ -509,43 +511,11 @@ export function modalChartStyles(): string {
       background: var(--bc-paper-ctec-kpi-bg-dark, transparent);
       color: var(--bc-paper-ctec-kpi-fg-dark, var(--bc-color-text));
     }
-    /* Override SVG inline fill/stroke on chart elements via CSS attribute
-       selectors. CSS fill/stroke takes precedence over SVG presentation
-       attributes, so [stroke="#xxx"] { stroke: ... } actually flips them.
-       These selectors target literal hex/rgba values emitted by the JS
-       SVG generation, so they must match the hardcoded source strings —
-       we cannot replace them with design tokens. */
-    .dark .bc-paper-ctec-modal-trend-svg [stroke="#f1ebef"] { stroke: #525252; }
-    .dark .bc-paper-ctec-modal-trend-svg [fill="#9b8290"] { fill: #a3a3a3; }
     ${trendZoneDarkRules(".bc-paper-ctec-modal-trend-svg")}
-    .dark .bc-paper-ctec-modal-trend-svg [stroke="#66023c"] { stroke: #d8b4fe; }
-    .dark .bc-paper-ctec-modal-trend-svg [fill="#66023c"] { fill: #d8b4fe; }
-    .dark .bc-paper-ctec-modal-trend-svg [fill="white"] { fill: #262626; }
-    .dark .bc-paper-ctec-modal-trend-svg [fill="#7a596a"] { fill: #a3a3a3; }
-    .dark .bc-paper-ctec-modal-sparkline [stroke="#66023c"] { stroke: #d8b4fe; }
-    .dark .bc-paper-ctec-modal-sparkline [fill="#66023c"] { fill: #d8b4fe; }
-    .dark .bc-paper-ctec-modal-sparkline [fill="#7a596a"] { fill: #a3a3a3; }
-    .dark .bc-paper-ctec-histogram-svg [stroke="#e6e6ea"] { stroke: #525252; }
-    .dark .bc-paper-ctec-histogram-svg [fill="#6b7280"] { fill: #a3a3a3; }
-    .dark .bc-paper-ctec-histogram-svg [fill="#9ca3af"] { fill: #a3a3a3; }
-    .dark .bc-paper-ctec-histogram-svg [fill="#3a2730"] { fill: #fafafa; }
-    .dark .bc-paper-ctec-histogram-svg [stroke="#66023c"] { stroke: #d8b4fe; }
-    .dark .bc-paper-ctec-histogram-svg [fill="#66023c"] { fill: #d8b4fe; }
-    .dark .bc-paper-ctec-histogram-svg [stroke="#475569"] { stroke: #a3a3a3; }
-    .dark .bc-paper-ctec-histogram-svg [fill="#475569"] { fill: #a3a3a3; }
-    .dark .bc-paper-ctec-histogram-svg [fill="white"] { fill: #1f1147; }
-    .dark .bc-paper-ctec-modal-hours-density-svg [stroke="#e6e6ea"] { stroke: #525252; }
-    .dark .bc-paper-ctec-modal-hours-density-svg [fill="#6b7280"] { fill: #a3a3a3; }
-    .dark .bc-paper-ctec-modal-hours-density-svg [fill="#9ca3af"] { fill: #a3a3a3; }
-    .dark .bc-paper-ctec-modal-hours-density-svg [stroke="#66023c"] { stroke: #d8b4fe; }
-    .dark .bc-paper-ctec-modal-hours-density-svg [fill="#66023c"] { fill: #d8b4fe; }
-    .dark .bc-paper-ctec-modal-hours-density-svg [stroke="#475569"] { stroke: #a3a3a3; }
-    .dark .bc-paper-ctec-modal-hours-density-svg [fill="#475569"] { fill: #a3a3a3; }
-    .dark .bc-paper-ctec-modal-hours-density-svg [fill="white"] { fill: #1f1147; }
-    .dark .bc-paper-ctec-histogram-svg stop[stop-color="rgba(102,2,60,0.45)"] { stop-color: rgba(216, 180, 254, 0.5); }
-    .dark .bc-paper-ctec-histogram-svg stop[stop-color="rgba(102,2,60,0.05)"] { stop-color: rgba(216, 180, 254, 0.05); }
-    .dark .bc-paper-ctec-modal-hours-density-svg stop[stop-color="rgba(102,2,60,0.45)"] { stop-color: rgba(216, 180, 254, 0.5); }
-    .dark .bc-paper-ctec-modal-hours-density-svg stop[stop-color="rgba(102,2,60,0.05)"] { stop-color: rgba(216, 180, 254, 0.05); }
+    /* SVG fill/stroke colors are emitted by JS via style.fill/style.stroke
+       with var(--bc-color-*) references, so they switch automatically with
+       the active theme + dark-mode mirror — no per-attribute overrides
+       needed here. */
     /* Distribution image fallback (raw PNG from Bluera) — inverted so the
        light-on-light chart becomes light-on-dark in the modal. */
     .dark .bc-paper-ctec-modal-dist-image img,

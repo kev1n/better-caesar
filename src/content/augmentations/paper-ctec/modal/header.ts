@@ -168,7 +168,7 @@ function renderDisclaimer(doc: Document): HTMLElement {
   text.append(
     lead,
     doc.createTextNode(
-      " Every trend and “vs recent term” number is just this professor's earlier sections of this exact course. Please don't use this to compare one professor against another — we don't support or condone that."
+      " Every trend and “vs recent term” number is just this professor's earlier sections of this exact course."
     )
   );
   note.append(text);

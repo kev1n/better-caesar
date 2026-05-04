@@ -235,7 +235,7 @@ export function modalCommentStyles(): string {
       border-color: var(--bc-color-accent);
     }
     .bc-paper-ctec-modal-comment-card {
-      background: var(--bc-color-surface-hover);
+      background: var(--bc-color-comments-card-bg);
       border: 1px solid var(--bc-color-border-strong);
       border-left-width: 3px;
       border-radius: var(--bc-radius-xl);

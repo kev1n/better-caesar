@@ -4,11 +4,11 @@ import { CLASS_LINK_SELECTOR } from "./constants";
 import { extractCareerHint, extractClassNumber, queryTargetTables } from "./helpers";
 import { toFailure, toSeatsNotesResult } from "./parser";
 import {
-  RATE_LIMIT_MAX,
-  getRateLimitState,
+  buildPeopleSoftCreditToast,
+  formatPsCreditsWarning,
   initStorage,
   readCachedEntry,
-  recordFetch,
+  tryConsumePeopleSoftCredit,
   writeCachedEntry
 } from "./storage";
 import { showToast } from "./toast";
@@ -113,21 +113,17 @@ export class SeatsNotesAugmentation implements Augmentation {
     if (this.inFlight.has(target.classNumber)) return;
     if (!isRowConnected(target.cells)) return;
 
-    const now = Date.now();
-    const rate = getRateLimitState(now);
-    if (rate.recentCount >= RATE_LIMIT_MAX) {
-      const waitMs = rate.nextAvailableAt ? rate.nextAvailableAt - now : 0;
-      const waitMin = Math.max(1, Math.ceil(waitMs / 60_000));
-      showToast(
-        `Limit reached: ${RATE_LIMIT_MAX} loads per 30 min to reduce CAESAR load. Try again in ${waitMin} min.`,
-        { tone: "warn", durationMs: 6000 }
-      );
+    const credit = tryConsumePeopleSoftCredit(Date.now(), "seats-notes");
+    if (!credit.ok) {
+      showToast(buildPeopleSoftCreditToast(credit.waitMs), {
+        tone: "warn",
+        durationMs: 6000
+      });
       return;
     }
 
     this.inFlight.add(target.classNumber);
     renderLoading(target.cells, target.classNumber);
-    recordFetch(now);
 
     let result: SeatsNotesResult;
     try {
@@ -160,11 +156,11 @@ export class SeatsNotesAugmentation implements Augmentation {
       this.renderLoadedWithRefresh(target, result, fetchedAt);
     }
 
-    const remaining = Math.max(0, RATE_LIMIT_MAX - getRateLimitState(fetchedAt).recentCount);
-    const verb = isRefresh ? "Refreshed" : "Loaded";
-    showToast(
-      `${verb}. ${remaining} of ${RATE_LIMIT_MAX} loads left this 30 min (cap reduces CAESAR load).`
-    );
+    const warning = formatPsCreditsWarning(fetchedAt);
+    if (warning) {
+      const verb = isRefresh ? "Refreshed" : "Loaded";
+      showToast(`${verb}. ${warning}.`, { tone: "warn", durationMs: 5000 });
+    }
   }
 }
 

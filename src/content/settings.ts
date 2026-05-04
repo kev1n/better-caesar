@@ -1,3 +1,7 @@
+// Storage keys keep the `better-caesar:` prefix from the project's original
+// name to preserve every existing install's toggles, caches, and gate state
+// across the rename to Pencil. Renaming the prefix would orphan all stored
+// state. Keep using `better-caesar:` for new keys too.
 export const FEATURES_STORAGE_KEY = "better-caesar:features:v1";
 export const RECENT_AGGREGATION_TERMS_STORAGE_KEY =
   "better-caesar:recent-agg-terms:v1";

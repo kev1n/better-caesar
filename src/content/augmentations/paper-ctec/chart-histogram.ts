@@ -223,10 +223,10 @@ function renderHistogramSvg(
   grad.setAttribute("y2", "1");
   const stopTop = doc.createElementNS(SVG_NS, "stop");
   stopTop.setAttribute("offset", "0%");
-  stopTop.setAttribute("stop-color", "rgba(102,2,60,0.45)");
+  stopTop.style.stopColor = "var(--bc-color-accent-fill-45)";
   const stopBot = doc.createElementNS(SVG_NS, "stop");
   stopBot.setAttribute("offset", "100%");
-  stopBot.setAttribute("stop-color", "rgba(102,2,60,0.05)");
+  stopBot.style.stopColor = "var(--bc-color-accent-fill-05)";
   grad.append(stopTop, stopBot);
   defs.append(grad);
   svg.append(defs);
@@ -238,7 +238,7 @@ function renderHistogramSvg(
     line.setAttribute("x2", String(PL + innerW));
     line.setAttribute("y1", String(yPct(v)));
     line.setAttribute("y2", String(yPct(v)));
-    line.setAttribute("stroke", "#e6e6ea");
+    line.style.stroke = "var(--bc-color-border)";
     line.setAttribute("stroke-width", "1");
     if (v !== 0) {
       line.setAttribute("stroke-dasharray", "2 3");
@@ -251,7 +251,7 @@ function renderHistogramSvg(
     tickLabel.setAttribute("y", String(yPct(v) + 3));
     tickLabel.setAttribute("text-anchor", "end");
     tickLabel.setAttribute("font-size", "9");
-    tickLabel.setAttribute("fill", "#6b7280");
+    tickLabel.style.fill = "var(--bc-color-text-muted)";
     tickLabel.textContent = `${v}%`;
     svg.append(tickLabel);
   }
@@ -262,7 +262,7 @@ function renderHistogramSvg(
   yTitle.setAttribute("y", String(PT + innerH / 2));
   yTitle.setAttribute("text-anchor", "middle");
   yTitle.setAttribute("font-size", "8.5");
-  yTitle.setAttribute("fill", "#9ca3af");
+  yTitle.style.fill = "var(--bc-color-text-subtle)";
   yTitle.setAttribute("letter-spacing", "0.6");
   yTitle.setAttribute("font-weight", "600");
   yTitle.setAttribute("transform", `rotate(-90 10 ${PT + innerH / 2})`);
@@ -280,7 +280,7 @@ function renderHistogramSvg(
       t.setAttribute("y", String(yTop - 6));
       t.setAttribute("text-anchor", "middle");
       t.setAttribute("font-size", "9.5");
-      t.setAttribute("fill", "#3a2730");
+      t.style.fill = "var(--bc-color-text-on-histogram)";
       t.setAttribute("font-weight", "600");
       t.textContent = String(counts[i] ?? 0);
       svg.append(t);
@@ -328,7 +328,7 @@ function renderHistogramSvg(
       const secCurve = doc.createElementNS(SVG_NS, "path");
       secCurve.setAttribute("d", secPath);
       secCurve.setAttribute("fill", "none");
-      secCurve.setAttribute("stroke", "#475569");
+      secCurve.style.stroke = "var(--bc-color-chart-axis-cool)";
       secCurve.setAttribute("stroke-width", "1.4");
       secCurve.setAttribute("stroke-dasharray", "5 3");
       secCurve.setAttribute("stroke-linejoin", "round");
@@ -339,8 +339,8 @@ function renderHistogramSvg(
         dot.setAttribute("cx", String(x));
         dot.setAttribute("cy", String(y));
         dot.setAttribute("r", "1.8");
-        dot.setAttribute("fill", "white");
-        dot.setAttribute("stroke", "#475569");
+        dot.style.fill = "var(--bc-color-bg)";
+        dot.style.stroke = "var(--bc-color-chart-axis-cool)";
         dot.setAttribute("stroke-width", "1.2");
         svg.append(dot);
       }
@@ -351,7 +351,7 @@ function renderHistogramSvg(
   const area = doc.createElementNS(SVG_NS, "path");
   area.setAttribute("d", curvePath);
   area.setAttribute("fill", `url(#${gradId})`);
-  area.setAttribute("stroke", "#66023c");
+  area.style.stroke = "var(--bc-color-accent)";
   area.setAttribute("stroke-width", "1.5");
   area.setAttribute("stroke-linejoin", "round");
   svg.append(area);
@@ -362,8 +362,8 @@ function renderHistogramSvg(
     dot.setAttribute("cx", String(x));
     dot.setAttribute("cy", String(y));
     dot.setAttribute("r", "2.5");
-    dot.setAttribute("fill", "white");
-    dot.setAttribute("stroke", "#66023c");
+    dot.style.fill = "var(--bc-color-bg)";
+    dot.style.stroke = "var(--bc-color-accent)";
     dot.setAttribute("stroke-width", "1.4");
     svg.append(dot);
   }
@@ -376,14 +376,14 @@ function renderHistogramSvg(
     indicators.push({
       value: opts.secondaryMean!,
       label: opts.secondaryLabel ?? `AVG ${opts.secondaryMean!.toFixed(1)}`,
-      color: "#475569"
+      color: "var(--bc-color-chart-axis-cool)"
     });
   }
   if (hasMean) {
     indicators.push({
       value: opts.mean!,
       label: opts.meanLabel ?? `AVG ${opts.mean!.toFixed(1)}`,
-      color: "#66023c"
+      color: "var(--bc-color-accent)"
     });
   }
   indicators.forEach((ind, slot) => {
@@ -396,7 +396,7 @@ function renderHistogramSvg(
     meanLine.setAttribute("x2", String(meanX));
     meanLine.setAttribute("y1", String(pillTop + PILL_H + 1));
     meanLine.setAttribute("y2", String(PT + innerH));
-    meanLine.setAttribute("stroke", ind.color);
+    meanLine.style.stroke = ind.color;
     meanLine.setAttribute("stroke-width", "1.5");
     meanLine.setAttribute("stroke-dasharray", "3 3");
     svg.append(meanLine);
@@ -412,7 +412,7 @@ function renderHistogramSvg(
     pill.setAttribute("width", String(pillW));
     pill.setAttribute("height", String(PILL_H));
     pill.setAttribute("rx", "3");
-    pill.setAttribute("fill", ind.color);
+    pill.style.fill = ind.color;
     svg.append(pill);
 
     const pillLabel = doc.createElementNS(SVG_NS, "text");
@@ -421,7 +421,7 @@ function renderHistogramSvg(
     pillLabel.setAttribute("text-anchor", "middle");
     pillLabel.setAttribute("font-size", "9");
     pillLabel.setAttribute("font-weight", "700");
-    pillLabel.setAttribute("fill", "white");
+    pillLabel.style.fill = "var(--bc-color-accent-on)";
     pillLabel.setAttribute("letter-spacing", "0.5");
     pillLabel.textContent = ind.label;
     svg.append(pillLabel);
@@ -434,7 +434,7 @@ function renderHistogramSvg(
     t.setAttribute("y", String(H - 12));
     t.setAttribute("text-anchor", "middle");
     t.setAttribute("font-size", "9");
-    t.setAttribute("fill", "#6b7280");
+    t.style.fill = "var(--bc-color-text-muted)";
     t.textContent = labels[i] ?? "";
     svg.append(t);
   }
@@ -445,7 +445,7 @@ function renderHistogramSvg(
   xTitle.setAttribute("y", String(H - 1));
   xTitle.setAttribute("text-anchor", "middle");
   xTitle.setAttribute("font-size", "8.5");
-  xTitle.setAttribute("fill", "#9ca3af");
+  xTitle.style.fill = "var(--bc-color-text-subtle)";
   xTitle.setAttribute("letter-spacing", "0.6");
   xTitle.setAttribute("font-weight", "600");
   xTitle.textContent =

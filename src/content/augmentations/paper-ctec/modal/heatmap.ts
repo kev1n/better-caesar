@@ -192,6 +192,16 @@ function renderDataCell(
 // Shading scale spans every rating-style value across the supplied terms
 // — the five rating metrics and the synthetic Global column. Sharing a
 // scale keeps the Global cell visually comparable to its components.
+// Read the active theme's heatmap RGB tuple. Reading at shader build
+// time means the rendered colors match whatever theme is active when the
+// modal opens; switching themes after open requires a re-render (the
+// modal already re-renders on every state change).
+function readRgbTuple(varName: string, fallback: string): string {
+  const root = document.documentElement;
+  const value = getComputedStyle(root).getPropertyValue(varName).trim();
+  return value || fallback;
+}
+
 // Caller passes the *visible* rows so the scale matches the on-screen
 // data range (collapsed or expanded).
 function buildRatingShader(terms: ModalTerm[]): (value: number) => string {
@@ -207,9 +217,13 @@ function buildRatingShader(terms: ModalTerm[]): (value: number) => string {
   const min = ratings.length ? Math.min(...ratings) : 0;
   const max = ratings.length ? Math.max(...ratings) : 0;
   const span = max - min;
+  const rgb = readRgbTuple("--bc-color-heatmap-rating-rgb", "102, 2, 60");
   return (value: number) => {
-    if (span < 0.05) return "rgba(102,2,60,0.6)";
-    return `rgba(102,2,60,${0.45 + ((value - min) / span) * 0.5})`;
+    // Alpha range 0.65 → 1.0 so even the lightest cell stays saturated
+    // enough that the on-saturated text color reads. Previously the
+    // floor was 0.45, which left low-value cells too washed-out.
+    if (span < 0.05) return `rgba(${rgb}, 0.85)`;
+    return `rgba(${rgb}, ${0.65 + ((value - min) / span) * 0.35})`;
   };
 }
 
@@ -222,8 +236,9 @@ function buildHoursShader(terms: ModalTerm[]): (value: number) => string {
   const min = hours.length ? Math.min(...hours) : 0;
   const max = hours.length ? Math.max(...hours) : 0;
   const span = max - min;
+  const rgb = readRgbTuple("--bc-color-heatmap-hours-rgb", "162, 28, 175");
   return (value: number) => {
-    if (span < 0.05) return "rgba(162,28,175,0.6)";
-    return `rgba(162,28,175,${0.45 + ((value - min) / span) * 0.5})`;
+    if (span < 0.05) return `rgba(${rgb}, 0.85)`;
+    return `rgba(${rgb}, ${0.65 + ((value - min) / span) * 0.35})`;
   };
 }

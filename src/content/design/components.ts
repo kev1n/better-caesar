@@ -16,6 +16,8 @@
 //   6. Feedback      — spinner, flash banner, status pill, disclaimer, tooltip
 //   7. Stars & rating
 //   8. Stat tile     — KPI mini card
+//   9. Pencil accents — sketchbook-flavored utilities (paper card, pencil
+//                       button, marker highlight, scribble text, stamp)
 // =============================================================================
 
 export function componentsCss(): string {
@@ -27,7 +29,8 @@ export function componentsCss(): string {
     tabs(),
     feedback(),
     rating(),
-    stats()
+    stats(),
+    pencilAccents()
   ].join("\n");
 }
 
@@ -671,6 +674,95 @@ function stats(): string {
   letter-spacing: var(--bc-ls-widest);
   text-transform: uppercase;
   line-height: 1.4;
+}
+`;
+}
+
+// -----------------------------------------------------------------------------
+// 9. Pencil accents — sketchbook-flavored utilities. Most callers only see
+// these when the active theme is "pencil"; on the legacy default theme they
+// still render but use the NU-purple palette via the same tokens.
+// -----------------------------------------------------------------------------
+function pencilAccents(): string {
+  return `
+/* Paper card — cream surface, dashed warm border, offset solid shadow.
+   Use for popup-internal callouts that should feel like notebook scraps. */
+.bc-card--paper {
+  background: var(--bc-color-bg);
+  border: 2px solid var(--bc-color-text);
+  border-radius: var(--bc-radius-lg);
+  box-shadow: 2px 2px 0 var(--bc-color-text);
+  color: var(--bc-color-text);
+  padding: 16px;
+}
+.bc-card--paper.bc-card--accent-shadow {
+  box-shadow: 2px 2px 0 var(--bc-color-accent);
+}
+/* Slight rotational jitter for popup-only "stack of pages" feel. Avoid
+   applying these inside content-script surfaces — Paper.nu's tight grids
+   look broken with rotated children. */
+.bc-card--rotate-l { transform: rotate(-0.5deg); }
+.bc-card--rotate-r { transform: rotate(0.7deg); }
+
+/* Pencil button — ink fill, pencil-font label, offset solid accent shadow. */
+.bc-btn--pencil {
+  background: var(--bc-color-text);
+  border-color: var(--bc-color-text);
+  color: var(--bc-color-bg);
+  font-family: var(--bc-font-display);
+  font-weight: var(--bc-fw-regular);
+  letter-spacing: 0.02em;
+  box-shadow: 2px 2px 0 var(--bc-color-accent);
+  border-radius: var(--bc-radius-sm);
+  padding: 10px 16px;
+}
+.bc-btn--pencil:hover:not(:disabled) {
+  background: var(--bc-color-text-strong);
+  box-shadow: 3px 3px 0 var(--bc-color-accent);
+  transform: translate(-1px, -1px);
+}
+
+/* Yellow marker highlight under inline text (landing's .marker). */
+.bc-mark {
+  background: linear-gradient(transparent 58%, var(--bc-color-highlight-mark) 58%);
+  padding: 0 4px;
+}
+
+/* Hand-drawn scribble — handwriting font, accent color, tilted. Used for
+   section taglines, small annotations, footer asides. */
+.bc-scribble {
+  font-family: var(--bc-font-hand);
+  color: var(--bc-color-accent);
+  display: inline-block;
+  transform: rotate(-2deg);
+  font-size: var(--bc-font-18);
+  line-height: 1.2;
+}
+
+/* Pencil-font stamp — uppercase boxed label, lightly rotated. */
+.bc-stamp {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--bc-font-display);
+  font-size: var(--bc-font-11);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1.5px solid currentColor;
+  border-radius: var(--bc-radius-sm);
+  transform: rotate(3deg);
+  color: var(--bc-color-text-muted);
+  background: transparent;
+}
+.bc-stamp--live { color: var(--bc-color-success); }
+.bc-stamp--next { color: var(--bc-color-text); }
+.bc-stamp--queued { color: var(--bc-color-text-muted); }
+
+/* Dashed divider — pencil-line dash on warm border tone. */
+.bc-divider--dashed {
+  border: 0;
+  border-top: 2px dashed var(--bc-color-border-strong);
+  margin: 0;
 }
 `;
 }

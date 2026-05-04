@@ -103,7 +103,7 @@ export class AuthFlow {
 
   // Focus event triggered a retry (visibilitychange / window focus).
   retry(doc: Document): void {
-    this.invalidate("Aborted because Better CAESAR is retrying after auth state change.");
+    this.invalidate("Aborted because Pencil is retrying after auth state change.");
 
     if (this.pendingActive) {
       hideStatusBar(doc);

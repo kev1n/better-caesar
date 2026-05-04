@@ -26,7 +26,12 @@ export type GateStatus =
   | { kind: "killed"; killId: string; message: string }
   | { kind: "needs-caesar" };
 
-const NAME_REFETCH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
+// Grad year is treated as a one-shot confirmation: once we successfully
+// parse one, the cached value sticks. If the previous fetch left gradYear
+// null (parser miss, dual-program edge case, etc.), retry hourly so we
+// pick it up quickly without hammering CAESAR for users we've already
+// confirmed.
+const MISSING_GRAD_YEAR_RETRY_MS = 60 * 60 * 1000; // 1 hour
 
 let cachedStatus: GateStatus = { kind: "needs-caesar" };
 let initialEvaluation: Promise<GateStatus> | null = null;
@@ -105,8 +110,10 @@ async function refreshGate(): Promise<GateStatus> {
 // session, so retrying from paper.nu is cheap.
 export async function ensureNameLoaded(): Promise<void> {
   const stored = await readStoredName();
-  const stale = !stored || Date.now() - stored.fetchedAt > NAME_REFETCH_INTERVAL_MS;
-  if (!stale) return;
+  if (stored && stored.gradYear !== null) return;
+  const recentlyTried =
+    !!stored && Date.now() - stored.fetchedAt < MISSING_GRAD_YEAR_RETRY_MS;
+  if (recentlyTried) return;
   await fetchAndCacheUserName();
   await refreshGate();
 }

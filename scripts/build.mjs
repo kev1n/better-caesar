@@ -24,7 +24,9 @@ const scheduleHostPermission = toHostPermission(scheduleUrl);
 console.log(`Schedule URL: ${scheduleUrl}`);
 const staticAssets = [
   { from: "src/popup/popup.html", to: "popup/popup.html" },
-  { from: "src/popup/popup.css", to: "popup/popup.css" }
+  { from: "src/popup/popup.css", to: "popup/popup.css" },
+  { from: "src/assets/fonts", to: "assets/fonts" },
+  { from: "src/assets/icons", to: "assets/icons" }
 ];
 
 const entryPoints = {
@@ -58,7 +60,7 @@ function buildManifestForTarget(baseManifest, target) {
   };
   manifest.browser_specific_settings = {
     gecko: {
-      id: "better-caesar@local.dev",
+      id: "pencil@local.dev",
       strict_min_version: "128.0"
     }
   };
@@ -87,7 +89,7 @@ function bundleConfigForTarget(target) {
 async function copyStaticFiles(outdir) {
   await mkdir(resolve(outdir, "popup"), { recursive: true });
   for (const asset of staticAssets) {
-    await cp(resolve(root, asset.from), resolve(outdir, asset.to));
+    await cp(resolve(root, asset.from), resolve(outdir, asset.to), { recursive: true });
   }
 }
 

@@ -68,13 +68,13 @@ function renderGlobalSplineTrend(
     line.setAttribute("x2", String(W - PR));
     line.setAttribute("y1", String(yAt(yv)));
     line.setAttribute("y2", String(yAt(yv)));
-    line.setAttribute("stroke", "#f1ebef");
+    line.style.stroke = "var(--bc-color-chart-trend-axis)";
     svg.append(line);
 
     const tick = doc.createElementNS(SVG_NS, "text");
     tick.setAttribute("x", String(PL - 4));
     tick.setAttribute("y", String(yAt(yv) + 3));
-    tick.setAttribute("fill", "#9b8290");
+    tick.style.fill = "var(--bc-color-chart-trend-text)";
     tick.setAttribute("font-size", "9");
     tick.setAttribute("text-anchor", "end");
     tick.textContent = String(yv);
@@ -85,7 +85,7 @@ function renderGlobalSplineTrend(
 
   const polyline = doc.createElementNS(SVG_NS, "polyline");
   polyline.setAttribute("fill", "none");
-  polyline.setAttribute("stroke", "#66023c");
+  polyline.style.stroke = "var(--bc-color-accent)";
   polyline.setAttribute("stroke-width", "1.6");
   polyline.setAttribute("stroke-linecap", "round");
   polyline.setAttribute("stroke-linejoin", "round");
@@ -97,15 +97,15 @@ function renderGlobalSplineTrend(
     dot.setAttribute("cx", String(xAt(i)));
     dot.setAttribute("cy", String(yAt(v)));
     dot.setAttribute("r", "2.6");
-    dot.setAttribute("fill", "white");
-    dot.setAttribute("stroke", "#66023c");
+    dot.style.fill = "var(--bc-color-bg)";
+    dot.style.stroke = "var(--bc-color-accent)";
     dot.setAttribute("stroke-width", "1.4");
     svg.append(dot);
 
     const termLabel = doc.createElementNS(SVG_NS, "text");
     termLabel.setAttribute("x", String(xAt(i)));
     termLabel.setAttribute("y", String(H - 10));
-    termLabel.setAttribute("fill", "#7a596a");
+    termLabel.style.fill = "var(--bc-color-chart-trend-text-strong)";
     termLabel.setAttribute("font-size", "9");
     termLabel.setAttribute("text-anchor", "middle");
     termLabel.textContent = abbrTerm(entries[i]?.term.term ?? "");

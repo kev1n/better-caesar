@@ -1,6 +1,7 @@
 import {
   buildCtecCreditToastMessage,
   CTEC_ERROR_TOAST_MESSAGE,
+  formatCtecCreditsWarning,
   tryConsumeCtecCredit
 } from "../ctec-links/rate-limit";
 import {
@@ -325,7 +326,7 @@ export class ModalController {
   kickBatch(context: AnalyticsModalSource, increment = true): void {
     if (this.state.analyticsInFlight.has(context.key)) return;
 
-    const credit = tryConsumeCtecCredit(Date.now());
+    const credit = tryConsumeCtecCredit(Date.now(), "modal-load-more");
     if (!credit.ok) {
       showToast(buildCtecCreditToastMessage(credit.waitMs), {
         tone: "warn",
@@ -376,6 +377,11 @@ export class ModalController {
         this.state.analyticsResolved.set(context.key, state);
         if (state.state === "error") {
           showToast(CTEC_ERROR_TOAST_MESSAGE, { tone: "warn", durationMs: 9000 });
+        } else {
+          const warning = formatCtecCreditsWarning();
+          if (warning) {
+            showToast(`Loaded CTEC. ${warning}.`, { tone: "warn", durationMs: 5000 });
+          }
         }
         return state;
       })
@@ -415,7 +421,7 @@ export class ModalController {
     if (this.analyticsBackgroundRefresh.has(context.key)) return;
     if (this.state.analyticsInFlight.has(context.key)) return;
 
-    const credit = tryConsumeCtecCredit(Date.now());
+    const credit = tryConsumeCtecCredit(Date.now(), "modal-refresh");
     if (!credit.ok) {
       showToast(buildCtecCreditToastMessage(credit.waitMs), {
         tone: "warn",
@@ -472,6 +478,10 @@ export class ModalController {
           const newTotal = updatedSnapshot?.entries.length ?? 0;
           const addedCount = Math.max(0, newTotal - previousTotal);
           this.setRefreshFlash(context.key, { kind: "success", addedCount });
+          const warning = formatCtecCreditsWarning();
+          if (warning) {
+            showToast(`Refreshed CTEC. ${warning}.`, { tone: "warn", durationMs: 5000 });
+          }
           // Refresh the schedule chip's mini-summary too — newly-published
           // terms can shift the aggregated rating/responses count. Pull the
           // updated aggregate straight from cache without going through the

@@ -177,10 +177,10 @@ export function renderHoursDensity(
   grad.setAttribute("y2", "1");
   const stopTop = doc.createElementNS(SVG_NS, "stop");
   stopTop.setAttribute("offset", "0%");
-  stopTop.setAttribute("stop-color", "rgba(102,2,60,0.45)");
+  stopTop.style.stopColor = "var(--bc-color-accent-fill-45)";
   const stopBot = doc.createElementNS(SVG_NS, "stop");
   stopBot.setAttribute("offset", "100%");
-  stopBot.setAttribute("stop-color", "rgba(102,2,60,0.05)");
+  stopBot.style.stopColor = "var(--bc-color-accent-fill-05)";
   grad.append(stopTop, stopBot);
   defs.append(grad);
   svg.append(defs);
@@ -192,7 +192,7 @@ export function renderHoursDensity(
     line.setAttribute("x2", String(PL + innerW));
     line.setAttribute("y1", String(yPct(v)));
     line.setAttribute("y2", String(yPct(v)));
-    line.setAttribute("stroke", "#e6e6ea");
+    line.style.stroke = "var(--bc-color-border)";
     line.setAttribute("stroke-width", "1");
     if (v !== 0) line.setAttribute("stroke-dasharray", "2 3");
     if (v !== 0) line.setAttribute("opacity", "0.6");
@@ -203,7 +203,7 @@ export function renderHoursDensity(
     tickLabel.setAttribute("y", String(yPct(v) + 3));
     tickLabel.setAttribute("text-anchor", "end");
     tickLabel.setAttribute("font-size", "9");
-    tickLabel.setAttribute("fill", "#6b7280");
+    tickLabel.style.fill = "var(--bc-color-text-muted)";
     tickLabel.textContent = `${v}%`;
     svg.append(tickLabel);
   }
@@ -214,7 +214,7 @@ export function renderHoursDensity(
   yTitle.setAttribute("y", String(PT + innerH / 2));
   yTitle.setAttribute("text-anchor", "middle");
   yTitle.setAttribute("font-size", "8.5");
-  yTitle.setAttribute("fill", "#9ca3af");
+  yTitle.style.fill = "var(--bc-color-text-subtle)";
   yTitle.setAttribute("letter-spacing", "0.6");
   yTitle.setAttribute("font-weight", "600");
   yTitle.setAttribute("transform", `rotate(-90 10 ${PT + innerH / 2})`);
@@ -235,12 +235,14 @@ export function renderHoursDensity(
     if (!path) continue;
 
     const isPrimary = s.style === "primary";
-    const stroke = isPrimary ? "#66023c" : "#475569";
+    const strokeVar = isPrimary
+      ? "var(--bc-color-accent)"
+      : "var(--bc-color-chart-axis-cool)";
 
     const curve = doc.createElementNS(SVG_NS, "path");
     curve.setAttribute("d", path);
     curve.setAttribute("fill", isPrimary ? `url(#${gradId})` : "none");
-    curve.setAttribute("stroke", stroke);
+    curve.style.stroke = strokeVar;
     curve.setAttribute("stroke-width", isPrimary ? "1.5" : "1.4");
     if (!isPrimary) curve.setAttribute("stroke-dasharray", "5 3");
     svg.append(curve);
@@ -250,8 +252,8 @@ export function renderHoursDensity(
       dot.setAttribute("cx", String(x));
       dot.setAttribute("cy", String(y));
       dot.setAttribute("r", isPrimary ? "2.5" : "1.8");
-      dot.setAttribute("fill", "white");
-      dot.setAttribute("stroke", stroke);
+      dot.style.fill = "var(--bc-color-bg)";
+      dot.style.stroke = strokeVar;
       dot.setAttribute("stroke-width", isPrimary ? "1.4" : "1.2");
       svg.append(dot);
     }
@@ -271,14 +273,16 @@ export function renderHoursDensity(
     // Pill + mean line take the curve's stroke color so each pill visually
     // belongs to its curve. Primary uses maroon (filled-curve color);
     // secondary uses slate (dashed-line color).
-    const pillColor = isPrimary ? "#66023c" : "#475569";
+    const pillColor = isPrimary
+      ? "var(--bc-color-accent)"
+      : "var(--bc-color-chart-axis-cool)";
 
     const meanLine = doc.createElementNS(SVG_NS, "line");
     meanLine.setAttribute("x1", String(meanX));
     meanLine.setAttribute("x2", String(meanX));
     meanLine.setAttribute("y1", String(pillTop + PILL_H + 1));
     meanLine.setAttribute("y2", String(PT + innerH));
-    meanLine.setAttribute("stroke", pillColor);
+    meanLine.style.stroke = pillColor;
     meanLine.setAttribute("stroke-width", "1.5");
     meanLine.setAttribute("stroke-dasharray", "3 3");
     svg.append(meanLine);
@@ -297,7 +301,7 @@ export function renderHoursDensity(
     pill.setAttribute("width", String(pillW));
     pill.setAttribute("height", String(PILL_H));
     pill.setAttribute("rx", "3");
-    pill.setAttribute("fill", pillColor);
+    pill.style.fill = pillColor;
     svg.append(pill);
 
     const pillLabel = doc.createElementNS(SVG_NS, "text");
@@ -306,7 +310,7 @@ export function renderHoursDensity(
     pillLabel.setAttribute("text-anchor", "middle");
     pillLabel.setAttribute("font-size", "9");
     pillLabel.setAttribute("font-weight", "700");
-    pillLabel.setAttribute("fill", "white");
+    pillLabel.style.fill = "var(--bc-color-accent-on)";
     pillLabel.setAttribute("letter-spacing", "0.5");
     pillLabel.textContent = s.label;
     svg.append(pillLabel);
@@ -320,7 +324,7 @@ export function renderHoursDensity(
     label.setAttribute("y", String(H - 12));
     label.setAttribute("text-anchor", "middle");
     label.setAttribute("font-size", "9");
-    label.setAttribute("fill", "#6b7280");
+    label.style.fill = "var(--bc-color-text-muted)";
     label.textContent = axisLabels[i]!;
     svg.append(label);
   }
@@ -331,7 +335,7 @@ export function renderHoursDensity(
   xTitle.setAttribute("y", String(H - 1));
   xTitle.setAttribute("text-anchor", "middle");
   xTitle.setAttribute("font-size", "8.5");
-  xTitle.setAttribute("fill", "#9ca3af");
+  xTitle.style.fill = "var(--bc-color-text-subtle)";
   xTitle.setAttribute("letter-spacing", "0.6");
   xTitle.setAttribute("font-weight", "600");
   xTitle.textContent = "HOURS PER WEEK";

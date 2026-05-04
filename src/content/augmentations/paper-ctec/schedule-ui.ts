@@ -82,7 +82,7 @@ export function renderLoading(
   }
 
   widget.textContent = "";
-  widget.title = "Better CAESAR is loading Northwestern CTEC data for this class.";
+  widget.title = "Pencil is loading Northwestern CTEC data for this class.";
 
   const summary = widget.ownerDocument.createElement("div");
   summary.className = `${WIDGET_CLASS}-summary`;
@@ -129,7 +129,7 @@ export function renderWidget(
   }
 
   if (data.state === "auth-required") {
-    widget.title = "Click to open the Northwestern login prompt for Better CAESAR.";
+    widget.title = "Click to open the Northwestern login prompt for Pencil.";
     summary.appendChild(makeAuthChip(onAuthChipClick));
     attachAnalyticsAnchor(widget, onOpenAnalytics);
     widget.dataset.bcPaperCtecSignature = signature;
@@ -403,7 +403,7 @@ function makeAuthChip(onClick?: () => void): HTMLElement {
   const chip = document.createElement("button");
   chip.type = "button";
   chip.className = `${WIDGET_CLASS}-chip is-warn ${WIDGET_CLASS}-chip-button`;
-  chip.title = "Open the Northwestern login prompt for Better CAESAR.";
+  chip.title = "Open the Northwestern login prompt for Pencil.";
   chip.append(createIcon("lock"), document.createTextNode("Login needed"));
 
   if (onClick) {

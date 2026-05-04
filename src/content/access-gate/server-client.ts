@@ -18,7 +18,7 @@ const SCHEDULE_STORAGE_KEY = "better-caesar:access-gate:bucket-schedule:v1";
 //       "2026-06-15T17:00:00Z"
 //     ],
 //     "kill": {
-//       "message": "Better CAESAR is paused. See [status](https://example.com/status)."
+//       "message": "Pencil is paused. See [status](https://example.com/status)."
 //     },
 //     "banner": {
 //       "message": "Heads up: CAESAR maintenance Fri 9pm. [Details](https://example.com/post)."
