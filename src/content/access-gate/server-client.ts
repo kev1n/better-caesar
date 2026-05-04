@@ -16,42 +16,91 @@ const SCHEDULE_STORAGE_KEY = "better-caesar:access-gate:bucket-schedule:v1";
 //       "2026-06-01T17:00:00Z",
 //       "2026-06-08T17:00:00Z",
 //       "2026-06-15T17:00:00Z"
-//     ]
+//     ],
+//     "kill": {
+//       "message": "Better CAESAR is paused. See [status](https://example.com/status)."
+//     },
+//     "banner": {
+//       "message": "Heads up: CAESAR maintenance Fri 9pm. [Details](https://example.com/post)."
+//     }
 //   }
 //
-// `releases` is exactly three ISO-8601 timestamps, ordered:
+// `releases` — exactly three ISO-8601 timestamps, ordered:
 //   [0] Class of 2027 and earlier
 //   [1] Class of 2028
 //   [2] Class of 2029 and later (open release)
 // Bucket N unlocks once Date.now() >= Date.parse(releases[N]).
+//
+// `kill` — optional. If present, the extension is fully disabled (every
+// augmentation is suppressed and a toast appears on CAESAR / paper.nu with
+// `message`). The HMAC-code override does NOT bypass the kill switch.
+//
+// `banner` — optional. A passive informational strip that renders at the top
+// of CAESAR and paper.nu pages. Doesn't disable anything; users can dismiss
+// per-message (changing `message` re-shows it).
+//
+// `kill.message` and `banner.message` both support inline [text](url) links
+// with http(s) URLs; everything else renders as plain text. Omit a key (or
+// send null) to clear it.
 //
 // The server should serve this with permissive CORS (the extension fetches
 // via the background worker, so any 200 response is fine) and a short
 // cache-control max-age — the extension also caches client-side for 30 min.
 export type BucketScheduleResponse = {
   releases: [string, string, string];
+  kill?: { message: string } | null;
+  banner?: { message: string } | null;
+};
+
+export type RemoteSchedule = {
+  releases: readonly [number, number, number];
+  kill: { message: string } | null;
+  banner: { message: string } | null;
 };
 
 type CachedSchedule = {
   releaseAt: [number, number, number];
+  kill: { message: string } | null;
+  banner: { message: string } | null;
   fetchedAt: number;
 };
 
-export async function getBucketReleaseTimestamps(): Promise<readonly [number, number, number]> {
+export const SCHEDULE_CACHE_STORAGE_KEY = SCHEDULE_STORAGE_KEY;
+
+const FALLBACK_SCHEDULE: RemoteSchedule = {
+  releases: FALLBACK_BUCKET_RELEASE_TIMESTAMPS,
+  kill: null,
+  banner: null
+};
+
+export async function getRemoteSchedule(): Promise<RemoteSchedule> {
   const cached = await readCachedSchedule();
   if (cached && Date.now() - cached.fetchedAt < SCHEDULE_REFETCH_INTERVAL_MS) {
-    return cached.releaseAt;
+    return { releases: cached.releaseAt, kill: cached.kill, banner: cached.banner };
   }
   const fresh = await fetchSchedule();
   if (fresh) {
-    await writeCachedSchedule({ releaseAt: fresh, fetchedAt: Date.now() });
+    await writeCachedSchedule({
+      releaseAt: [fresh.releases[0], fresh.releases[1], fresh.releases[2]],
+      kill: fresh.kill,
+      banner: fresh.banner,
+      fetchedAt: Date.now()
+    });
     return fresh;
   }
-  if (cached) return cached.releaseAt;
-  return FALLBACK_BUCKET_RELEASE_TIMESTAMPS;
+  if (cached) return { releases: cached.releaseAt, kill: cached.kill, banner: cached.banner };
+  return FALLBACK_SCHEDULE;
 }
 
-async function fetchSchedule(): Promise<[number, number, number] | null> {
+// Synchronous read of whatever's cached. Used by the banner mount to render
+// without re-fetching; live updates come via chrome.storage.onChanged.
+export async function readCachedRemoteSchedule(): Promise<RemoteSchedule | null> {
+  const cached = await readCachedSchedule();
+  if (!cached) return null;
+  return { releases: cached.releaseAt, kill: cached.kill, banner: cached.banner };
+}
+
+async function fetchSchedule(): Promise<RemoteSchedule | null> {
   try {
     const response = await fetchTextResultViaBackground(BUCKET_SCHEDULE_URL);
     if (response.status < 200 || response.status >= 300) return null;
@@ -63,10 +112,21 @@ async function fetchSchedule(): Promise<[number, number, number] | null> {
       if (Number.isNaN(ms)) return null;
       out.push(ms);
     }
-    return [out[0], out[1], out[2]];
+    return {
+      releases: [out[0], out[1], out[2]],
+      kill: parseMessageBlock(parsed.kill),
+      banner: parseMessageBlock(parsed.banner)
+    };
   } catch {
     return null;
   }
+}
+
+function parseMessageBlock(raw: unknown): { message: string } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const message = (raw as { message?: unknown }).message;
+  if (typeof message !== "string" || message.length === 0) return null;
+  return { message };
 }
 
 async function readCachedSchedule(): Promise<CachedSchedule | null> {
@@ -81,6 +141,8 @@ async function readCachedSchedule(): Promise<CachedSchedule | null> {
   ) return null;
   return {
     releaseAt: candidate.releaseAt as [number, number, number],
+    kill: parseMessageBlock(candidate.kill),
+    banner: parseMessageBlock(candidate.banner),
     fetchedAt: typeof candidate.fetchedAt === "number" ? candidate.fetchedAt : 0
   };
 }

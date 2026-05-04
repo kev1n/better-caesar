@@ -1,5 +1,6 @@
 import { canonicalizeCodeInput, isCodeValidForLastName } from "../content/access-gate/code";
 import { evaluateGate, type GateStatus } from "../content/access-gate";
+import { renderInlineMarkdown } from "../content/access-gate/markdown";
 import {
   ACCESS_GATE_CODE_KEY,
   ACCESS_GATE_NAME_KEY,
@@ -490,6 +491,21 @@ function buildGateNode(status: GateStatus): HTMLElement {
         "Open caesar.ent.northwestern.edu and sign in. Better CAESAR will detect your account automatically."
       )
     );
+    return card;
+  }
+
+  if (status.kind === "killed") {
+    card.className = "gate-card gate-card--lock";
+    const wrap = document.createElement("div");
+    wrap.className = "gate-copy";
+    const t = document.createElement("div");
+    t.className = "gate-title";
+    t.textContent = "Better CAESAR is disabled";
+    const b = document.createElement("div");
+    b.className = "gate-body";
+    renderInlineMarkdown(b, status.message);
+    wrap.append(t, b);
+    card.append(wrap);
     return card;
   }
 

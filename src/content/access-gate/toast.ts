@@ -4,6 +4,7 @@ import {
   type GateStatus
 } from "./index";
 import { canonicalizeCodeInput, isCodeValidForLastName } from "./code";
+import { renderInlineMarkdown } from "./markdown";
 import { writeStoredCode } from "./storage";
 
 const HOST_ID = "better-caesar-gate-toast";
@@ -126,6 +127,13 @@ function paint(root: ShadowRoot, status: LockedStatus): void {
     link.target = "_blank";
     link.rel = "noopener";
     body.append(link);
+    return;
+  }
+
+  if (status.kind === "killed") {
+    title.textContent = "Better CAESAR is disabled";
+    sub.textContent = "";
+    renderInlineMarkdown(sub, status.message);
     return;
   }
 
@@ -254,6 +262,12 @@ const TOAST_STYLES = `
     font-size: 12px;
     color: #4b5563;
   }
+  .sub a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  .sub a:hover { color: #111827; }
+  .toast[data-kind="killed"] .title { color: #b91c1c; }
   .primary {
     align-self: flex-start;
     padding: 6px 12px;

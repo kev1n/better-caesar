@@ -5,7 +5,7 @@ import {
 } from "./constants";
 import { isCodeValidForLastName } from "./code";
 import { fetchAndCacheUserName } from "./name-fetch";
-import { getBucketReleaseTimestamps } from "./server-client";
+import { getRemoteSchedule } from "./server-client";
 import {
   ACCESS_GATE_CODE_KEY,
   ACCESS_GATE_NAME_KEY,
@@ -23,6 +23,7 @@ export type GateStatus =
       lastName: string;
       gradYear: number | null;
     }
+  | { kind: "killed"; message: string }
   | { kind: "needs-caesar" };
 
 const NAME_REFETCH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -56,6 +57,14 @@ function emit(status: GateStatus): void {
 }
 
 export async function evaluateGate(): Promise<GateStatus> {
+  // Kill switch checked first — overrides everything, including the HMAC
+  // code path. Fires even when no profile is cached so the toast is visible
+  // to logged-out paper.nu users.
+  const schedule = await getRemoteSchedule();
+  if (schedule.kill) {
+    return { kind: "killed", message: schedule.kill.message };
+  }
+
   const stored = await readStoredName();
   if (!stored) return { kind: "needs-caesar" };
 
@@ -68,8 +77,7 @@ export async function evaluateGate(): Promise<GateStatus> {
   }
 
   const bucket = bucketForGradYear(stored.gradYear);
-  const schedule = await getBucketReleaseTimestamps();
-  const releaseAt = schedule[bucket];
+  const releaseAt = schedule.releases[bucket];
   if (Date.now() >= releaseAt) {
     return { kind: "unlocked", reason: "bucket", lastName: stored.lastName };
   }

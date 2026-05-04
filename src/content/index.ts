@@ -1,4 +1,5 @@
 import { startAccessGate } from "./access-gate";
+import { mountServerBanner } from "./access-gate/banner";
 import { mountAccessGateToast } from "./access-gate/toast";
 import { augmentationRegistry } from "./augmentations/registry";
 import { bootstrapTheme } from "./design";
@@ -10,6 +11,7 @@ injectEarlyTermPageMask();
 registerLookupMessageHandler();
 void startAccessGate();
 mountAccessGateToast();
+mountServerBanner();
 new AugmentationRunner(augmentationRegistry).start();
 
 function injectEarlyTermPageMask(): void {
