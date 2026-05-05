@@ -28,18 +28,23 @@ import {
   matchCaesarGroup,
   matchCaesarSection,
   searchCaesarCatalog,
-  type CaesarCourseGroup,
   type CaesarSection,
   type CaesarSearchResult,
   type RelatedSectionOption
 } from "./caesar-search";
 import { createAuthRecovery, withAuthRecovery, type AuthRecovery } from "./auth-recovery";
 import { createCartButtonRegistry } from "./cart-button-registry";
-import { createLiveDataStore, type LiveDataStore } from "./live-data-store";
 import {
-  bareCatalogNumber,
-  formatCourseIdForDisplay
-} from "./catalog-format";
+  createAddToCartController,
+  type AddToCartContext,
+  type AddToCartController
+} from "./controllers/add-to-cart";
+import {
+  createRelatedPickerController,
+  type RelatedPickerController
+} from "./controllers/related-picker";
+import { createLiveDataStore, type LiveDataStore } from "./live-data-store";
+import { bareCatalogNumber } from "./catalog-format";
 import {
   initCatalogCache,
   readCatalogCache,
@@ -106,6 +111,30 @@ export class ClassSearchAugmentation implements Augmentation {
   private authRecovery: AuthRecovery = createAuthRecovery({
     chromeRuntime: chrome.runtime,
     windowLocation: { assign: (url: string | URL) => window.location.assign(url) }
+  });
+
+  // Picker UI controller. Owns its own DOM (the inline <li> appended below
+  // the section row). The cart-add controller resolves Promise<option | null>
+  // through it so the cart-add wizard can run as one linear async flow.
+  private relatedPicker: RelatedPickerController = createRelatedPickerController({
+    doc: document
+  });
+
+  // Cart-add click handler. Talks to caesar-search/flow.ts under the hood,
+  // drives the button state machine, and recurses through the picker on
+  // needs-related results.
+  private addToCartCtrl: AddToCartController = createAddToCartController({
+    authRecovery: this.authRecovery,
+    consumeCredit: (owner) => this.consumePsCredit(owner),
+    formatPsWarning: () => formatPsCreditsWarning(),
+    showToast,
+    recordOptimisticAdd,
+    addSectionToCart,
+    continueCartAddWithRelated,
+    openRelatedPicker: (button, options, ctx) =>
+      this.openRelatedPickerForAdd(button, options, ctx),
+    closeRelatedPicker: () => this.relatedPicker.close(),
+    cartUrl: CART_URL
   });
 
   constructor() {
@@ -907,6 +936,11 @@ export class ClassSearchAugmentation implements Augmentation {
   }
 
   // ── Add to cart ──────────────────────────────────────────────────────────
+  //
+  // Wizard UI orchestration (button state machine, optimistic cart-cache
+  // writes, toasts, picker recursion) lives in `controllers/add-to-cart.ts` +
+  // `controllers/related-picker.ts`. The augmentation only supplies the
+  // mount-scoped context (term, institution, live-data lookup, repaint).
 
   private async handleAdd(
     state: MountedState,
@@ -914,366 +948,57 @@ export class ClassSearchAugmentation implements Augmentation {
     section: PaperSection,
     button: HTMLButtonElement
   ): Promise<void> {
-    if (button.dataset.state === "success") return;
-    // One credit covers the whole click — including any internal live-data
-    // load needed before the cart-add chain can resolve the class number.
-    if (!this.consumePsCredit("add")) return;
-    button.disabled = true;
-    button.dataset.state = "loading";
-    button.textContent = "Loading…";
-
-    // We need the 5-digit CAESAR class number for the cart-add chain.
-    // Resolve via cache (memory → disk → fetch).
-    const card = button.closest<HTMLElement>(".bc-cs-course");
-    const liveResult = await this.ensureLiveData(state, row, card);
-    let classNumber: string | null = null;
-    if (liveResult) {
-      const group = matchCaesarGroup(liveResult.groups, row.course.catalog);
-      if (group) {
-        classNumber =
-          matchCaesarSection(group, section.section, section.component)?.classNumber ?? null;
-      }
-    }
-
-    if (!classNumber) {
-      button.dataset.state = "error";
-      button.textContent = "Add to cart";
-      button.disabled = false;
-      showToast("Couldn't resolve the CAESAR class number for this section.", {
-        tone: "error"
-      });
-      return;
-    }
-
-    button.textContent = "Adding…";
-
-    const result = await withAuthRecovery(this.authRecovery, isCaesarAuthRequiredError, () =>
-      addSectionToCart({
-        classNumber,
-        termId: state.filters.termId,
-        institution: state.institution,
-        bareCatalog: bareCatalogNumber(row.course.catalog)
-      })
-    );
-
-    if (!result) {
-      // Auth recovery toast already explained why; just reset the button so
-      // the user can re-trigger once they've completed sign-in.
-      button.dataset.state = "idle";
-      button.textContent = "Add to cart";
-      button.disabled = false;
-      return;
-    }
-
-    // Side effect: fold the class-number search response into the live
-    // cache so the row's status badge paints without a Load CAESAR call.
-    const searchGroups = "searchGroups" in result ? result.searchGroups : undefined;
-    if (searchGroups && searchGroups.length > 0) {
-      state.liveData.mergeLiveCache(liveCacheKey(state, row), searchGroups);
-      const card = button.closest<HTMLElement>(".bc-cs-course");
-      const merged = state.liveData.get(liveCacheKey(state, row));
-      if (card && merged?.status === "ready" && merged.result) {
-        this.applyLiveDataToCard(state, row, card, merged.result);
-      }
-    }
-
-    if (result.ok) {
-      button.dataset.state = "in-cart";
-      button.textContent = "In cart";
-      button.disabled = true;
-      recordOptimisticAdd(state.filters.termId, {
-        classNumber: result.classNumber,
-        subject: row.course.subject,
-        catalog: row.course.catalog,
-        sectionLabel: `${section.section}-${section.component}`,
-        capturedAt: Date.now()
-      });
-      const warning = formatPsCreditsWarning();
-      const suffix = warning ? ` ${warning}.` : "";
-      showToast(
-        `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} to your shopping cart.${suffix}`,
-        {
-          tone: "success",
-          durationMs: 6000,
-          action: {
-            label: "View cart",
-            run: () => {
-              window.location.assign(CART_URL);
-            }
-          }
+    const ctx: AddToCartContext = {
+      termId: state.filters.termId,
+      institution: state.institution,
+      row,
+      section,
+      resolveClassNumber: async () => {
+        // We need the 5-digit CAESAR class number for the cart-add chain.
+        // Resolve via cache (memory → disk → fetch).
+        const card = button.closest<HTMLElement>(".bc-cs-course");
+        const liveResult = await this.ensureLiveData(state, row, card);
+        if (!liveResult) return null;
+        const group = matchCaesarGroup(liveResult.groups, row.course.catalog);
+        if (!group) return null;
+        return matchCaesarSection(group, section.section, section.component)?.classNumber ?? null;
+      },
+      mergeAndRepaint: (searchGroups) => {
+        state.liveData.mergeLiveCache(liveCacheKey(state, row), searchGroups);
+        const card = button.closest<HTMLElement>(".bc-cs-course");
+        const merged = state.liveData.get(liveCacheKey(state, row));
+        if (card && merged?.status === "ready" && merged.result) {
+          this.applyLiveDataToCard(state, row, card, merged.result);
         }
-      );
-    } else if ("needsRelatedSection" in result) {
-      // CAESAR is asking the user to pick a discussion/lab/recitation
-      // before the cart-add can finalize. Drop a picker UI under the row
-      // and pause the button until they choose.
-      button.dataset.state = "needs-related";
-      button.textContent = "Pick section…";
-      button.disabled = true;
-      this.openRelatedPicker(state, row, section, button, result);
-    } else if (result.alreadyInCart) {
-      // Friendlier UX: show the button as already-handled and surface a
-      // pointer to the cart instead of a generic error.
-      button.dataset.state = "in-cart";
-      button.textContent = "In cart";
-      button.disabled = true;
-      if (result.classNumber) {
-        recordOptimisticAdd(state.filters.termId, {
-          classNumber: result.classNumber,
-          subject: row.course.subject,
-          catalog: row.course.catalog,
-          sectionLabel: `${section.section}-${section.component}`,
-          capturedAt: Date.now()
-        });
+      },
+      openClassicTab: () => {
+        state.activeTab = "classic";
+        writeActiveTab("classic");
+        applyTabVisibility(state);
       }
-      const warning = formatPsCreditsWarning();
-      const suffix = warning ? ` ${warning}.` : "";
-      showToast(
-        `${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} is already in your shopping cart.${suffix}`,
-        {
-          tone: "info",
-          durationMs: 5000,
-          action: {
-            label: "View cart",
-            run: () => {
-              window.location.assign(CART_URL);
-            }
-          }
-        }
-      );
-    } else {
-      button.dataset.state = "error";
-      button.textContent = "Try again";
-      button.disabled = false;
-      const needsClassicFallback = /extra confirmation|preferences|related component/i.test(
-        result.error ?? ""
-      );
-      showToast(result.error ?? "Couldn't add to cart.", {
-        tone: "error",
-        durationMs: 6000,
-        action: needsClassicFallback
-          ? {
-              label: "Open Classic",
-              run: () => {
-                state.activeTab = "classic";
-                writeActiveTab("classic");
-                applyTabVisibility(state);
-              }
-            }
-          : undefined
-      });
-    }
+    };
+    await this.addToCartCtrl.onClick(button, ctx);
   }
 
   // ── Related-component picker (lab/discussion required) ──────────────────
+  //
+  // Bridge between the cart-add controller and the picker controller. The
+  // controller deps need a Promise-returning function, while the picker owns
+  // its own DOM lifecycle — this thin wrapper resolves the section <li>
+  // anchor from the button and delegates.
 
-  private openRelatedPicker(
-    state: MountedState,
-    row: ResultRow,
-    section: PaperSection,
+  private openRelatedPickerForAdd(
     button: HTMLButtonElement,
-    pending: {
-      classNumber: string;
-      sectionLabel: string;
-      courseTitle: string;
-      relatedOptions: RelatedSectionOption[];
-      continuationFormState: string;
-      searchGroups: CaesarCourseGroup[];
-    }
-  ): void {
-    const { doc } = state;
-    const li = button.closest<HTMLLIElement>("li.bc-cs-section");
-    if (!li) return;
-
-    // Replace any earlier picker for this section so re-clicking Add doesn't
-    // stack pickers.
-    const next = li.nextElementSibling;
-    if (next instanceof HTMLLIElement && next.classList.contains("bc-cs-related-row")) {
-      next.remove();
-    }
-
-    const pickerLi = doc.createElement("li");
-    pickerLi.className = "bc-cs-related-row";
-    li.parentElement?.insertBefore(pickerLi, li.nextSibling);
-
-    const wrap = doc.createElement("div");
-    wrap.className = "bc-cs-related";
-
-    const header = doc.createElement("div");
-    header.className = "bc-cs-related-header";
-    const title = doc.createElement("div");
-    title.className = "bc-cs-related-title";
-    title.textContent = `${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} needs a related section`;
-    const sub = doc.createElement("div");
-    sub.className = "bc-cs-related-sub";
-    sub.textContent = "Pick one to finish adding to your cart.";
-    header.append(title, sub);
-
-    const cancel = doc.createElement("button");
-    cancel.type = "button";
-    cancel.className = "bc-cs-related-cancel";
-    cancel.textContent = "Cancel";
-    cancel.addEventListener("click", () => {
-      pickerLi.remove();
-      button.dataset.state = "";
-      button.textContent = "Add to cart";
-      button.disabled = false;
+    options: RelatedSectionOption[],
+    ctx: AddToCartContext
+  ): Promise<RelatedSectionOption | null> {
+    const sectionLi = button.closest<HTMLLIElement>("li.bc-cs-section");
+    if (!sectionLi) return Promise.resolve(null);
+    return this.relatedPicker.open(options, {
+      row: ctx.row,
+      section: ctx.section,
+      sectionLi
     });
-    header.appendChild(cancel);
-    wrap.appendChild(header);
-
-    const list = doc.createElement("div");
-    list.className = "bc-cs-related-list";
-    for (const option of pending.relatedOptions) {
-      list.appendChild(this.buildRelatedOptionRow(state, row, section, button, pickerLi, pending, option));
-    }
-    wrap.appendChild(list);
-
-    pickerLi.appendChild(wrap);
-  }
-
-  private buildRelatedOptionRow(
-    state: MountedState,
-    row: ResultRow,
-    section: PaperSection,
-    button: HTMLButtonElement,
-    pickerLi: HTMLLIElement,
-    pending: {
-      classNumber: string;
-      sectionLabel: string;
-      courseTitle: string;
-      relatedOptions: RelatedSectionOption[];
-      continuationFormState: string;
-      searchGroups: CaesarCourseGroup[];
-    },
-    option: RelatedSectionOption
-  ): HTMLElement {
-    const { doc } = state;
-    const item = doc.createElement("button");
-    item.type = "button";
-    item.className = "bc-cs-related-option";
-    item.dataset.status = option.status;
-    // Stash row-index for the click-handler lookup so we don't need a
-    // user-visible class number in the option DOM to identify it.
-    item.dataset.rowIndex = String(option.rowIndex);
-
-    const left = doc.createElement("div");
-    left.className = "bc-cs-related-option-left";
-    const sec = doc.createElement("div");
-    sec.className = "bc-cs-related-option-section";
-    sec.textContent = option.section || "—";
-    left.append(sec);
-
-    const mid = doc.createElement("div");
-    mid.className = "bc-cs-related-option-mid";
-    const sched = doc.createElement("div");
-    sched.textContent = option.schedule || "—";
-    const room = doc.createElement("div");
-    room.className = "bc-cs-mute";
-    room.textContent = option.room || "";
-    mid.append(sched, room);
-
-    const right = doc.createElement("div");
-    right.className = "bc-cs-related-option-right";
-    const instr = doc.createElement("div");
-    instr.className = "bc-cs-related-option-instr";
-    instr.textContent = option.instructor || "—";
-    const status = doc.createElement("span");
-    status.className = "bc-cs-status-pill";
-    status.dataset.status = option.status;
-    status.textContent = option.status;
-    right.append(instr, status);
-
-    item.append(left, mid, right);
-    item.addEventListener("click", () => {
-      void this.handleRelatedPick(state, row, section, button, pickerLi, pending, option);
-    });
-    return item;
-  }
-
-  private async handleRelatedPick(
-    state: MountedState,
-    row: ResultRow,
-    section: PaperSection,
-    button: HTMLButtonElement,
-    pickerLi: HTMLLIElement,
-    pending: {
-      classNumber: string;
-      sectionLabel: string;
-      courseTitle: string;
-      relatedOptions: RelatedSectionOption[];
-      continuationFormState: string;
-      searchGroups: CaesarCourseGroup[];
-    },
-    option: RelatedSectionOption
-  ): Promise<void> {
-    if (!this.consumePsCredit("related-pick")) return;
-    // Disable all option buttons while we run the continuation so the user
-    // can't double-fire.
-    const buttons = pickerLi.querySelectorAll<HTMLButtonElement>(".bc-cs-related-option");
-    buttons.forEach((b) => {
-      b.disabled = true;
-      if (b.dataset.picked !== "true") b.style.opacity = "0.5";
-    });
-    const clicked = Array.from(buttons).find(
-      (b) => b.dataset.rowIndex === String(option.rowIndex)
-    );
-    if (clicked) {
-      clicked.dataset.picked = "true";
-      clicked.style.opacity = "1";
-      const stamp = state.doc.createElement("span");
-      stamp.className = "bc-cs-related-option-progress";
-      stamp.textContent = "Adding…";
-      clicked.appendChild(stamp);
-    }
-    button.textContent = "Adding…";
-
-    const result = await continueCartAddWithRelated({
-      continuationFormState: pending.continuationFormState,
-      selectedRowIndex: option.rowIndex,
-      classNumber: pending.classNumber,
-      sectionLabel: pending.sectionLabel,
-      courseTitle: pending.courseTitle,
-      searchGroups: pending.searchGroups
-    });
-
-    pickerLi.remove();
-
-    if (result.ok) {
-      button.dataset.state = "success";
-      button.textContent = "Added ✓";
-      button.disabled = true;
-      const warning = formatPsCreditsWarning();
-      const suffix = warning ? ` ${warning}.` : "";
-      showToast(
-        `Added ${formatCourseIdForDisplay(row.course.subject, row.course.catalog)} ${section.section}-${section.component} with section ${option.section} to your shopping cart.${suffix}`,
-        {
-          tone: "success",
-          durationMs: 6000,
-          action: {
-            label: "View cart",
-            run: () => {
-              window.location.assign(CART_URL);
-            }
-          }
-        }
-      );
-    } else if ("needsRelatedSection" in result) {
-      // CAESAR served another picker after the first pick — rare, but
-      // recurse so the user can finish.
-      button.dataset.state = "needs-related";
-      button.textContent = "Pick section…";
-      button.disabled = true;
-      this.openRelatedPicker(state, row, section, button, result);
-    } else {
-      button.dataset.state = "error";
-      button.textContent = "Try again";
-      button.disabled = false;
-      showToast(result.error ?? "Couldn't add to cart.", {
-        tone: "error",
-        durationMs: 6000
-      });
-    }
   }
 
   // ── UI helpers ────────────────────────────────────────────────────────────
