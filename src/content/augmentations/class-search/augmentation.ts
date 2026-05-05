@@ -43,6 +43,8 @@ import {
   createRelatedPickerController,
   type RelatedPickerController
 } from "./controllers/related-picker";
+import { createSearchOrchestrator } from "./controllers/search-orchestrator";
+import { createTabController } from "./controllers/tab-controller";
 import { createLiveDataStore, type LiveDataStore } from "./live-data-store";
 import { bareCatalogNumber } from "./catalog-format";
 import {
@@ -68,11 +70,9 @@ import {
 } from "./paper-data";
 import {
   isSearchEntryPage,
-  readActiveTab,
   readCareerFromNativeForm,
   readInstitutionFromNativeForm,
-  readTermFromNativeForm,
-  writeActiveTab
+  readTermFromNativeForm
 } from "./page-detection";
 import { STYLE_ID as CLASS_SEARCH_STYLE_ID, ensureStyles } from "./styles";
 import {
@@ -81,6 +81,7 @@ import {
   type SearchFilters,
   type TabId
 } from "./types";
+import type { PaperTermCourse } from "./paper-data";
 import { renderMyClassesView } from "./views/my-classes-view";
 import { applyLiveDataToCard, renderCourseCard } from "./views/course-card";
 import { renderSectionRow } from "./views/section-row";
@@ -92,7 +93,6 @@ import {
 
 const ROOT_ID = "better-caesar-class-search-root";
 const TABS_ID = "better-caesar-class-search-tabs";
-const HIDE_NATIVE_STYLE_ID = "better-caesar-class-search-hide-native";
 
 const INSTITUTION_DEFAULT = "NWUNV";
 
@@ -207,7 +207,7 @@ export class ClassSearchAugmentation implements Augmentation {
 
     if (this.mounted && this.mounted.doc === doc && doc.getElementById(ROOT_ID) && doc.getElementById(TABS_ID)) {
       // Re-apply visibility in case PeopleSoft swapped DOM under us.
-      applyTabVisibility(this.mounted);
+      this.mounted.tabs.applyVisibility(this.mounted.panelEl);
       return;
     }
 
@@ -253,6 +253,18 @@ export class ClassSearchAugmentation implements Augmentation {
       const initialTerm = readTermFromNativeForm(doc) ?? info.latest;
 
       const liveData = this.createMountLiveDataStore(institution);
+      const tabs = createTabController({ doc });
+      const searchOrchestrator = createSearchOrchestrator<PaperTermCourse[]>({
+        getActiveTerm: () => this.mounted?.filters.termId ?? initialTerm,
+        fetchTermCourses: (termId) => getTermCourses(termId),
+        formatTermName: (termId) => info.terms[termId]?.name ?? termId,
+        onSearchReady: (termId, courses) => {
+          if (this.mounted) this.runSearchWithCourses(this.mounted, termId, courses);
+        },
+        onStatus: (status, message) => {
+          if (this.mounted) this.setStatus(this.mounted, status, message);
+        }
+      });
       const state: MountedState = {
         doc,
         root: placeholder,
@@ -268,13 +280,11 @@ export class ClassSearchAugmentation implements Augmentation {
         catalogIndex: buildCatalogIndex(planCourses),
         career,
         institution,
-        loadedTerms: new Map(),
-        searchDebounce: null,
+        searchOrchestrator,
         liveData,
-        activeTab: readActiveTab(),
+        tabs,
         cartButtons: createCartButtonRegistry(),
-        cartUnsubscribe: null,
-        appliedTab: null
+        cartUnsubscribe: null
       };
       this.mounted = state;
       // Cart cache pushes here when CAESAR cart-page reconcile lands or
@@ -293,25 +303,22 @@ export class ClassSearchAugmentation implements Augmentation {
       state.panelEl.appendChild(this.buildShell(state));
       placeholder.appendChild(state.panelEl);
 
-      applyTabVisibility(state);
+      state.tabs.applyVisibility(state.panelEl);
 
-      void this.loadTermAndSearch(state);
+      void state.searchOrchestrator.loadTermData(state.filters.termId);
     } finally {
       this.mountInProgress = false;
     }
   }
 
   private unmount(doc: Document): void {
-    if (this.mounted?.searchDebounce !== null && this.mounted?.searchDebounce !== undefined) {
-      window.clearTimeout(this.mounted.searchDebounce);
-    }
+    this.mounted?.searchOrchestrator.cancelPending();
     this.mounted?.cartUnsubscribe?.();
     this.mounted?.cartButtons.clear();
     this.mounted?.liveData.clear();
+    this.mounted?.tabs.cleanup(doc);
     const root = doc.getElementById(ROOT_ID);
     if (root) root.remove();
-    const hider = doc.getElementById(HIDE_NATIVE_STYLE_ID);
-    if (hider) hider.remove();
     doc.getElementById(CLASS_SEARCH_STYLE_ID)?.remove();
     this.mounted = null;
   }
@@ -337,18 +344,25 @@ export class ClassSearchAugmentation implements Augmentation {
     btn.className = "bc-cs-tab";
     btn.dataset.tab = id;
     btn.textContent = label;
-    btn.dataset.active = state.activeTab === id ? "true" : "false";
+    btn.dataset.active = state.tabs.getActive() === id ? "true" : "false";
     btn.addEventListener("click", () => {
-      if (state.activeTab === id) return;
-      state.activeTab = id;
-      writeActiveTab(id);
-      const tabsEl = doc.getElementById(TABS_ID);
-      tabsEl?.querySelectorAll<HTMLButtonElement>("button.bc-cs-tab").forEach((el) => {
-        el.dataset.active = el.dataset.tab === id ? "true" : "false";
-      });
-      applyTabVisibility(state);
+      if (state.tabs.getActive() === id) return;
+      this.switchTab(state, id);
     });
     return btn;
+  }
+
+  // Single source of truth for tab switching: flips controller state, syncs
+  // the button data-active attributes, then re-applies panel visibility.
+  // Used by both the tab button click handlers and the cart-add controller's
+  // `openClassicTab` callback.
+  private switchTab(state: MountedState, id: TabId): void {
+    state.tabs.setActive(id);
+    const tabsEl = state.doc.getElementById(TABS_ID);
+    tabsEl?.querySelectorAll<HTMLButtonElement>("button.bc-cs-tab").forEach((el) => {
+      el.dataset.active = el.dataset.tab === id ? "true" : "false";
+    });
+    state.tabs.applyVisibility(state.panelEl);
   }
 
   // ── Shell ─────────────────────────────────────────────────────────────────
@@ -403,7 +417,7 @@ export class ClassSearchAugmentation implements Augmentation {
     input.autocomplete = "off";
     input.addEventListener("input", () => {
       state.filters.query = input.value;
-      this.scheduleSearch(state);
+      state.searchOrchestrator.scheduleSearch();
     });
     field.append(label, input);
     return field;
@@ -431,7 +445,7 @@ export class ClassSearchAugmentation implements Augmentation {
 
     select.addEventListener("change", () => {
       state.filters.termId = select.value;
-      void this.loadTermAndSearch(state);
+      void state.searchOrchestrator.loadTermData(state.filters.termId);
     });
 
     field.append(label, select);
@@ -439,43 +453,19 @@ export class ClassSearchAugmentation implements Augmentation {
   }
 
   // ── Search execution ──────────────────────────────────────────────────────
+  //
+  // Debounce + per-term paper-data cache live in
+  // `controllers/search-orchestrator.ts`. The orchestrator's `onSearchReady`
+  // callback routes back here for the actual filter + render step, which is
+  // the only part that needs class-search-specific knowledge (the paper
+  // catalog index, subjects, the `applyFilters` shape).
 
-  private scheduleSearch(state: MountedState): void {
-    if (state.searchDebounce !== null) {
-      window.clearTimeout(state.searchDebounce);
-    }
-    state.searchDebounce = window.setTimeout(() => {
-      state.searchDebounce = null;
-      this.runSearch(state);
-    }, 120);
-  }
-
-  private async loadTermAndSearch(state: MountedState): Promise<void> {
-    const termId = state.filters.termId;
-    const cached = state.loadedTerms.get(termId);
-    if (cached) {
-      this.runSearch(state);
-      return;
-    }
-
-    this.setStatus(state, "loading", `Loading ${state.info.terms[termId]?.name ?? termId} sections…`);
-    try {
-      const courses = await getTermCourses(termId);
-      // User may have switched terms while the fetch was in flight.
-      if (state.filters.termId !== termId) return;
-      state.loadedTerms.set(termId, courses);
-      this.setStatus(state, "ok", "");
-      this.runSearch(state);
-    } catch (error) {
-      if (state.filters.termId !== termId) return;
-      const msg = error instanceof Error ? error.message : String(error);
-      this.setStatus(state, "error", `Couldn't load term data: ${msg}`);
-    }
-  }
-
-  private runSearch(state: MountedState): void {
-    const courses = state.loadedTerms.get(state.filters.termId);
-    if (!courses) return;
+  private runSearchWithCourses(
+    state: MountedState,
+    termId: string,
+    courses: PaperTermCourse[]
+  ): void {
+    if (state.filters.termId !== termId) return;
     const rows = applyFilters(courses, state.catalogIndex, state.subjects, state.filters, state.career);
     this.renderResults(state, rows);
   }
@@ -524,7 +514,7 @@ export class ClassSearchAugmentation implements Augmentation {
     const termCart = readTermCart(state.filters.termId);
     const enrolled = termCart ? Object.values(termCart.enrolled) : [];
     const inCart = termCart ? Object.values(termCart.cart) : [];
-    const courses = state.loadedTerms.get(state.filters.termId);
+    const courses = state.searchOrchestrator.getTerm(state.filters.termId);
     const totalCourses = courses?.length ?? 0;
 
     if (enrolled.length === 0 && inCart.length === 0) {
@@ -971,11 +961,7 @@ export class ClassSearchAugmentation implements Augmentation {
           this.applyLiveDataToCard(state, row, card, merged.result);
         }
       },
-      openClassicTab: () => {
-        state.activeTab = "classic";
-        writeActiveTab("classic");
-        applyTabVisibility(state);
-      }
+      openClassicTab: () => this.switchTab(state, "classic")
     };
     await this.addToCartCtrl.onClick(button, ctx);
   }
@@ -1061,33 +1047,6 @@ function ensureRoot(doc: Document): HTMLDivElement {
   const parent = anchor.parentElement ?? doc.body;
   parent.insertBefore(root, anchor);
   return root;
-}
-
-function applyTabVisibility(state: MountedState): void {
-  if (state.appliedTab === state.activeTab) return;
-  state.appliedTab = state.activeTab;
-  if (state.activeTab === "better") {
-    ensureNativeHider(state.doc);
-    state.panelEl.style.display = "";
-  } else {
-    removeNativeHider(state.doc);
-    state.panelEl.style.display = "none";
-  }
-}
-
-function ensureNativeHider(doc: Document): void {
-  if (doc.getElementById(HIDE_NATIVE_STYLE_ID)) return;
-  const style = doc.createElement("style");
-  style.id = HIDE_NATIVE_STYLE_ID;
-  style.textContent = `
-    #win0divPAGECONTAINER { display: none !important; }
-    #win0divPAGEBAR, #win0divPSPANELTABS { display: none !important; }
-  `;
-  (doc.head ?? doc.documentElement).appendChild(style);
-}
-
-function removeNativeHider(doc: Document): void {
-  doc.getElementById(HIDE_NATIVE_STYLE_ID)?.remove();
 }
 
 function renderFatalError(root: HTMLElement, doc: Document, message: string): void {

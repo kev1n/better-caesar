@@ -1,5 +1,7 @@
 import type { CaesarSearchResult } from "./caesar-search";
 import type { CartButtonRegistry } from "./cart-button-registry";
+import type { SearchOrchestrator } from "./controllers/search-orchestrator";
+import type { TabController } from "./controllers/tab-controller";
 import type { LiveDataStore } from "./live-data-store";
 import type {
   DataMapInfo,
@@ -74,12 +76,16 @@ export type MountedState = {
   catalogIndex: Map<string, PaperCourse>;
   career: string;
   institution: string;
-  loadedTerms: Map<string, PaperTermCourse[]>;
-  searchDebounce: number | null;
+  // Search debounce + per-term paper-data cache. Owned by
+  // `controllers/search-orchestrator.ts`; the augmentation routes input
+  // events / term-select changes into it.
+  searchOrchestrator: SearchOrchestrator<PaperTermCourse[]>;
   // Per-course CAESAR live data cache (memory → disk → fetch). Owned by
   // `live-data-store.ts`; the augmentation drives painting / toast on top.
   liveData: LiveDataStore;
-  activeTab: TabId;
+  // Better/Classic tab state + native-hider lifecycle. Owned by
+  // `controllers/tab-controller.ts`.
+  tabs: TabController;
   // Per-section Add buttons currently mounted on screen. Owned by
   // `cart-button-registry.ts`; keyed by the cart-cache signature so a
   // subscribe-driven repaint can find them without walking the whole DOM.
@@ -87,8 +93,4 @@ export type MountedState = {
   // Unsubscribe from cart-cache change notifications. Called on unmount so
   // the listener doesn't leak across mount cycles.
   cartUnsubscribe: (() => void) | null;
-  // Last tab `applyTabVisibility` actually applied to the DOM. Without
-  // this, every mutation observer tick would re-toggle the native-hider
-  // style and panel display.
-  appliedTab: TabId | null;
 };
