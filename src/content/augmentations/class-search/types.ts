@@ -1,4 +1,6 @@
 import type { CaesarSearchResult } from "./caesar-search";
+import type { CartButtonRegistry } from "./cart-button-registry";
+import type { LiveDataStore } from "./live-data-store";
 import type {
   DataMapInfo,
   PaperCourse,
@@ -74,14 +76,14 @@ export type MountedState = {
   institution: string;
   loadedTerms: Map<string, PaperTermCourse[]>;
   searchDebounce: number | null;
-  liveCache: Map<string, CourseLiveCache>;
+  // Per-course CAESAR live data cache (memory → disk → fetch). Owned by
+  // `live-data-store.ts`; the augmentation drives painting / toast on top.
+  liveData: LiveDataStore;
   activeTab: TabId;
-  // Per-section Add buttons currently mounted on screen. Keyed by
-  // `${termId}|${subject}|${catalog}|${sectionLabel}` (the signature the
-  // cart cache also uses) so a subscribe-driven repaint can find them
-  // without walking the whole DOM. Buttons remove themselves from this
-  // map when their <li> disconnects.
-  cartButtons: Map<string, HTMLButtonElement>;
+  // Per-section Add buttons currently mounted on screen. Owned by
+  // `cart-button-registry.ts`; keyed by the cart-cache signature so a
+  // subscribe-driven repaint can find them without walking the whole DOM.
+  cartButtons: CartButtonRegistry;
   // Unsubscribe from cart-cache change notifications. Called on unmount so
   // the listener doesn't leak across mount cycles.
   cartUnsubscribe: (() => void) | null;

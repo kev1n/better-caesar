@@ -35,11 +35,9 @@ import {
   type CaesarSearchResult,
   type RelatedSectionOption
 } from "./caesar-search";
-import type {
-  AuthPopupClosedMessage,
-  OpenAuthPopupMessage,
-  OpenAuthPopupResponse
-} from "../../../shared/messages";
+import { createAuthRecovery, withAuthRecovery, type AuthRecovery } from "./auth-recovery";
+import { createCartButtonRegistry } from "./cart-button-registry";
+import { createLiveDataStore, type LiveDataStore } from "./live-data-store";
 import {
   bareCatalogNumber,
   formatCourseIdForDisplay
@@ -102,6 +100,14 @@ export class ClassSearchAugmentation implements Augmentation {
 
   private mounted: MountedState | null = null;
   private mountInProgress = false;
+  // Mutex + handshake for the SSO popup re-auth flow. Lives at the
+  // augmentation level (not per-mount) so a Load CAESAR + Add-to-cart
+  // racing through `getEntryFormState()` from different DOM mount cycles
+  // still coalesce onto a single popup.
+  private authRecovery: AuthRecovery = createAuthRecovery({
+    chromeRuntime: chrome.runtime,
+    windowLocation: { assign: (url: string | URL) => window.location.assign(url) }
+  });
 
   constructor() {
     void initSeatsNotesStorage().then(() => pruneEmptySeatsCache());
@@ -112,6 +118,40 @@ export class ClassSearchAugmentation implements Augmentation {
 
   cleanup(doc: Document = document): void {
     this.unmount(doc);
+    this.authRecovery.dispose();
+  }
+
+  // Build a LiveDataStore wired to the catalog disk cache and the CAESAR
+  // fetch path. The store keys on `${termId}|${subject}|${bareCatalog}` —
+  // the fetch dep splits the key back into search params, so the store
+  // itself stays generic.
+  private createMountLiveDataStore(institution: string): LiveDataStore {
+    return createLiveDataStore({
+      diskRead: (key) => {
+        const parts = parseLiveCacheKey(key);
+        if (!parts) return null;
+        const hit = readCatalogCache(parts.termId, parts.subject, parts.bareCatalog);
+        return hit ? { status: "ready", result: hit.result } : null;
+      },
+      diskWrite: (key, cache) => {
+        if (cache.status !== "ready" || !cache.result) return;
+        const parts = parseLiveCacheKey(key);
+        if (!parts) return;
+        writeCatalogCache(parts.termId, parts.subject, parts.bareCatalog, cache.result);
+      },
+      fetch: async (key) => {
+        const parts = parseLiveCacheKey(key);
+        if (!parts) return null;
+        return await withAuthRecovery(this.authRecovery, isCaesarAuthRequiredError, () =>
+          searchCaesarCatalog({
+            termId: parts.termId,
+            institution,
+            subject: parts.subject,
+            bareCatalog: parts.bareCatalog
+          })
+        );
+      }
+    });
   }
 
   // Shared CAESAR PS rate gate. Each user-initiated PS chain (Load CAESAR,
@@ -184,6 +224,7 @@ export class ClassSearchAugmentation implements Augmentation {
       const institution = readInstitutionFromNativeForm(doc) ?? INSTITUTION_DEFAULT;
       const initialTerm = readTermFromNativeForm(doc) ?? info.latest;
 
+      const liveData = this.createMountLiveDataStore(institution);
       const state: MountedState = {
         doc,
         root: placeholder,
@@ -201,9 +242,9 @@ export class ClassSearchAugmentation implements Augmentation {
         institution,
         loadedTerms: new Map(),
         searchDebounce: null,
-        liveCache: new Map(),
+        liveData,
         activeTab: readActiveTab(),
-        cartButtons: new Map(),
+        cartButtons: createCartButtonRegistry(),
         cartUnsubscribe: null,
         appliedTab: null
       };
@@ -238,6 +279,7 @@ export class ClassSearchAugmentation implements Augmentation {
     }
     this.mounted?.cartUnsubscribe?.();
     this.mounted?.cartButtons.clear();
+    this.mounted?.liveData.clear();
     const root = doc.getElementById(ROOT_ID);
     if (root) root.remove();
     const hider = doc.getElementById(HIDE_NATIVE_STYLE_ID);
@@ -673,7 +715,7 @@ export class ClassSearchAugmentation implements Augmentation {
     // cold cache do section rows render without status badges, and the
     // first Details/Add click on the course populates them.
     const liveKey = liveCacheKey(state, row);
-    const memHit = state.liveCache.get(liveKey);
+    const memHit = state.liveData.get(liveKey);
     if (memHit?.status === "ready" && memHit.result) {
       this.applyLiveDataToCard(state, row, card, memHit.result);
     } else {
@@ -683,7 +725,7 @@ export class ClassSearchAugmentation implements Augmentation {
         bareCatalogNumber(row.course.catalog)
       );
       if (diskHit) {
-        state.liveCache.set(liveKey, { status: "ready", result: diskHit.result });
+        state.liveData.mergeLiveCache(liveKey, diskHit.result.groups);
         this.applyLiveDataToCard(state, row, card, diskHit.result);
       }
     }
@@ -760,9 +802,14 @@ export class ClassSearchAugmentation implements Augmentation {
       void this.handleAdd(state, row, section, addBtn);
     });
 
-    const sigKey = sectionSignatureKey(state, row, section);
+    const sigKey = state.cartButtons.encodeSigKey({
+      termId: state.filters.termId,
+      subject: row.course.subject,
+      catalog: row.course.catalog,
+      sectionLabel: `${section.section}-${section.component}`
+    });
     addBtn.dataset.sigKey = sigKey;
-    state.cartButtons.set(sigKey, addBtn);
+    state.cartButtons.register(sigKey, addBtn);
     this.applyCartStateToButton(state, row, section, addBtn);
 
     actions.append(detailsBtn, addBtn);
@@ -771,40 +818,18 @@ export class ClassSearchAugmentation implements Augmentation {
     return li;
   }
 
-  // Resolve the cart-cache state for this section and update the button's
-  // label / disabled / dataset.state. Class-number-keyed lookup is preferred
-  // (we can resolve once we've loaded the live CAESAR data); if not yet
-  // known, fall back to the (subject, catalog, sectionLabel) signature.
+  // Resolve the cart-cache state for this section and apply it via the
+  // registry. Class-number-keyed lookup is preferred (we can resolve once
+  // we've loaded the live CAESAR data); if not yet known, fall back to the
+  // (subject, catalog, sectionLabel) signature.
   private applyCartStateToButton(
     state: MountedState,
     row: ResultRow,
     section: PaperSection,
     button: HTMLButtonElement
   ): void {
-    if (button.dataset.state === "loading") return; // mid-flight, leave alone
-
     const hit = this.lookupCacheForSection(state, row, section);
-    if (!hit) {
-      // Cache miss — restore idle if we previously painted a cached state.
-      if (button.dataset.state === "in-cart" || button.dataset.state === "enrolled") {
-        button.dataset.state = "";
-        button.disabled = false;
-        button.textContent = "Add to cart";
-        button.title = "";
-      }
-      return;
-    }
-    if (hit.status === "enrolled") {
-      button.dataset.state = "enrolled";
-      button.disabled = true;
-      button.textContent = "Enrolled";
-      button.title = "You're enrolled in this class.";
-    } else {
-      button.dataset.state = "in-cart";
-      button.disabled = true;
-      button.textContent = "In cart";
-      button.title = "This class is in your shopping cart.";
-    }
+    state.cartButtons.applyCartStateToButton(button, hit ? hit.status : null);
   }
 
   private lookupCacheForSection(
@@ -815,7 +840,7 @@ export class ClassSearchAugmentation implements Augmentation {
     // Prefer the resolved CAESAR class number (live data), since it's the
     // canonical key the cache uses. If we haven't loaded live data yet,
     // fall back to a paper.nu-derived signature.
-    const live = state.liveCache.get(liveCacheKey(state, row));
+    const live = state.liveData.get(liveCacheKey(state, row));
     if (live?.status === "ready" && live.result) {
       const group = matchCaesarGroup(live.result.groups, row.course.catalog);
       const caesarSection = group
@@ -834,62 +859,39 @@ export class ClassSearchAugmentation implements Augmentation {
   }
 
   private repaintAllCartButtons(state: MountedState): void {
-    // Detached buttons (lists re-rendered between mount and now) get GC'd
-    // here so the registry doesn't leak. We can't reliably recover the
-    // ResultRow/PaperSection for a detached button anyway.
-    for (const [key, button] of state.cartButtons) {
-      if (!button.isConnected) {
-        state.cartButtons.delete(key);
-        continue;
-      }
-      // The button caches no row/section refs, but the cache lookup only
-      // needs them to resolve via live data. Signature-based lookup works
-      // off the dataset.sigKey alone.
-      this.applyCartStateBySigKey(state, button);
-    }
+    state.cartButtons.repaintAll((sigKey) => {
+      const parsed = state.cartButtons.parseSigKey(sigKey);
+      if (!parsed) return null;
+      const hit = lookupBySignature(
+        parsed.termId,
+        parsed.subject,
+        parsed.catalog,
+        parsed.sectionLabel
+      );
+      return hit ? hit.status : null;
+    });
   }
 
   private applyCartStateBySigKey(state: MountedState, button: HTMLButtonElement): void {
-    if (button.dataset.state === "loading") return;
     const sigKey = button.dataset.sigKey ?? "";
-    const parsed = parseSignatureKey(sigKey);
+    const parsed = state.cartButtons.parseSigKey(sigKey);
     if (!parsed) return;
-
     const hit = lookupBySignature(
       parsed.termId,
       parsed.subject,
       parsed.catalog,
       parsed.sectionLabel
     );
-    if (!hit) {
-      if (button.dataset.state === "in-cart" || button.dataset.state === "enrolled") {
-        button.dataset.state = "";
-        button.disabled = false;
-        button.textContent = "Add to cart";
-        button.title = "";
-      }
-      return;
-    }
-    if (hit.status === "enrolled") {
-      button.dataset.state = "enrolled";
-      button.disabled = true;
-      button.textContent = "Enrolled";
-      button.title = "You're enrolled in this class.";
-    } else {
-      button.dataset.state = "in-cart";
-      button.disabled = true;
-      button.textContent = "In cart";
-      button.title = "This class is in your shopping cart.";
-    }
+    state.cartButtons.applyCartStateToButton(button, hit ? hit.status : null);
   }
 
   // ── Live CAESAR data: per-course search ──────────────────────────────────
 
-  // Returns the catalog search groups for this course, going through
-  // in-memory → persistent disk cache → CAESAR fetch. The PS credit is
+  // Returns the catalog search groups for this course. The store handles
+  // memory → disk → CAESAR fetch and in-flight dedupe; this wrapper paints
+  // live cells on the card and toasts on hard errors. The PS credit is
   // consumed by the parent action (Details / Add to cart / refresh), not
-  // here. Paints live cells on the card whenever a result becomes
-  // available. `force` skips both caches for an explicit user refresh.
+  // here. `force` skips both caches for an explicit user refresh.
   private async ensureLiveData(
     state: MountedState,
     row: ResultRow,
@@ -897,49 +899,13 @@ export class ClassSearchAugmentation implements Augmentation {
     options: { force?: boolean } = {}
   ): Promise<CaesarSearchResult | null> {
     const key = liveCacheKey(state, row);
-
-    if (!options.force) {
-      const memHit = state.liveCache.get(key);
-      if (memHit?.status === "ready" && memHit.result) return memHit.result;
-
-      const diskHit = readCatalogCache(
-        state.filters.termId,
-        row.course.subject,
-        bareCatalogNumber(row.course.catalog)
-      );
-      if (diskHit) {
-        state.liveCache.set(key, { status: "ready", result: diskHit.result });
-        if (card) this.applyLiveDataToCard(state, row, card, diskHit.result);
-        return diskHit.result;
-      }
-    }
-
-    state.liveCache.set(key, { status: "loading" });
     try {
-      const result = await withCaesarAuthRecovery(() =>
-        searchCaesarCatalog({
-          termId: state.filters.termId,
-          institution: state.institution,
-          subject: row.course.subject,
-          bareCatalog: bareCatalogNumber(row.course.catalog)
-        })
-      );
-      if (!result) {
-        state.liveCache.delete(key);
-        return null;
-      }
-      state.liveCache.set(key, { status: "ready", result });
-      writeCatalogCache(
-        state.filters.termId,
-        row.course.subject,
-        bareCatalogNumber(row.course.catalog),
-        result
-      );
-      if (card) this.applyLiveDataToCard(state, row, card, result);
-      return result;
+      const cache = await state.liveData.ensureLiveData(key, options);
+      if (cache.status !== "ready" || !cache.result) return null;
+      if (card) this.applyLiveDataToCard(state, row, card, cache.result);
+      return cache.result;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      state.liveCache.set(key, { status: "error", error: msg });
       showToast(`Couldn't load CAESAR data: ${msg}`, { tone: "error", durationMs: 5000 });
       return null;
     }
@@ -1247,7 +1213,7 @@ export class ClassSearchAugmentation implements Augmentation {
 
     button.textContent = "Adding…";
 
-    const result = await withCaesarAuthRecovery(() =>
+    const result = await withAuthRecovery(this.authRecovery, isCaesarAuthRequiredError, () =>
       addSectionToCart({
         classNumber,
         termId: state.filters.termId,
@@ -1269,9 +1235,9 @@ export class ClassSearchAugmentation implements Augmentation {
     // cache so the row's status badge paints without a Load CAESAR call.
     const searchGroups = "searchGroups" in result ? result.searchGroups : undefined;
     if (searchGroups && searchGroups.length > 0) {
-      mergeLiveCache(state, row, searchGroups);
+      state.liveData.mergeLiveCache(liveCacheKey(state, row), searchGroups);
       const card = button.closest<HTMLElement>(".bc-cs-course");
-      const merged = state.liveCache.get(liveCacheKey(state, row));
+      const merged = state.liveData.get(liveCacheKey(state, row));
       if (card && merged?.status === "ready" && merged.result) {
         this.applyLiveDataToCard(state, row, card, merged.result);
       }
@@ -1642,80 +1608,19 @@ function findPaperSection(
   return null;
 }
 
-// Cart-button registry key. Encodes everything we need to reverse-look up
-// the section in the cart cache without holding a live reference to the
-// ResultRow / PaperSection (those get GC'd as the user scrolls).
-function sectionSignatureKey(
-  state: MountedState,
-  row: ResultRow,
-  section: PaperSection
-): string {
-  return [
-    state.filters.termId,
-    row.course.subject,
-    row.course.catalog,
-    `${section.section}-${section.component}`
-  ].join("\x1f");
-}
-
-function parseSignatureKey(
+// Decodes a `${termId}|${subject}|${bareCatalog}` live-cache key — the
+// inverse of `liveCacheKey`. Used by the LiveDataStore deps so the store
+// itself can stay generic.
+function parseLiveCacheKey(
   key: string
-): { termId: string; subject: string; catalog: string; sectionLabel: string } | null {
-  const parts = key.split("\x1f");
-  if (parts.length !== 4) return null;
+): { termId: string; subject: string; bareCatalog: string } | null {
+  const parts = key.split("|");
+  if (parts.length !== 3) return null;
   return {
     termId: parts[0]!,
     subject: parts[1]!,
-    catalog: parts[2]!,
-    sectionLabel: parts[3]!
+    bareCatalog: parts[2]!
   };
-}
-
-// Merge a partial search response (e.g. a single-row class-number search)
-// into the live cache. Replaces matching sections by classNumber so a
-// wider subject search's data isn't clobbered.
-function mergeLiveCache(
-  state: MountedState,
-  row: ResultRow,
-  incomingGroups: CaesarCourseGroup[]
-): void {
-  const key = liveCacheKey(state, row);
-  const incomingMatch = matchCaesarGroup(incomingGroups, row.course.catalog);
-  if (!incomingMatch) return;
-
-  const existing = state.liveCache.get(key);
-  if (!existing || existing.status !== "ready" || !existing.result) {
-    state.liveCache.set(key, {
-      status: "ready",
-      result: { groups: incomingGroups }
-    });
-    return;
-  }
-
-  const existingGroups = existing.result.groups;
-  const existingMatch = matchCaesarGroup(existingGroups, row.course.catalog);
-  if (!existingMatch) {
-    state.liveCache.set(key, {
-      status: "ready",
-      result: { groups: [...existingGroups, ...incomingGroups] }
-    });
-    return;
-  }
-
-  // Merge section-by-section, keyed on classNumber (every CAESAR section
-  // has a unique 5-digit number within a term).
-  const mergedSections = [...existingMatch.sections];
-  for (const incomingSection of incomingMatch.sections) {
-    const idx = mergedSections.findIndex(
-      (s) => s.classNumber === incomingSection.classNumber
-    );
-    if (idx >= 0) mergedSections[idx] = incomingSection;
-    else mergedSections.push(incomingSection);
-  }
-
-  const mergedGroup: CaesarCourseGroup = { ...existingMatch, sections: mergedSections };
-  const mergedGroups = existingGroups.map((g) => (g === existingMatch ? mergedGroup : g));
-  state.liveCache.set(key, { status: "ready", result: { groups: mergedGroups } });
 }
 
 function buildDetailFooter(
@@ -1894,86 +1799,5 @@ function buildLoadingShell(doc: Document): HTMLElement {
 
 function hasAnyFilter(filters: SearchFilters): boolean {
   return filters.query.trim().length > 0;
-}
-
-// Drives the SSO popup flow when CAESAR's PS session is dead and the silent
-// re-handshake in `getEntryFormState()` couldn't recover it. Shows a toast,
-// asks the background worker to open the login URL in a new tab, waits for
-// the post-auth navigation pattern to fire, then re-runs `retry`. Returns
-// `null` if the popup couldn't open or the user closed it without signing in.
-let pendingAuthRecovery: Promise<unknown> | null = null;
-
-async function recoverCaesarAuthAndRetry<T>(
-  loginUrl: string,
-  retry: () => Promise<T>
-): Promise<T | null> {
-  // Coalesce concurrent failures (e.g. Load CAESAR + Add to cart both racing
-  // through `getEntryFormState()`) so we open exactly one popup tab. Late
-  // arrivers wait for the same auth handshake but each runs their own retry.
-  if (pendingAuthRecovery) {
-    const ok = await pendingAuthRecovery.then(
-      () => true,
-      () => false
-    );
-    return ok ? await retry() : null;
-  }
-
-  const handshake = (async (): Promise<void> => {
-    showToast("CAESAR session expired — opening sign-in…", {
-      tone: "info",
-      durationMs: 3500
-    });
-
-    const reasonPromise = new Promise<AuthPopupClosedMessage["reason"]>((resolve) => {
-      const listener = (message: unknown): void => {
-        if (
-          message &&
-          typeof message === "object" &&
-          (message as { type?: string }).type === "auth-popup-closed"
-        ) {
-          chrome.runtime.onMessage.removeListener(listener);
-          resolve((message as AuthPopupClosedMessage).reason);
-        }
-      };
-      chrome.runtime.onMessage.addListener(listener);
-    });
-
-    const request: OpenAuthPopupMessage = { type: "open-auth-popup", loginUrl };
-    const response = (await chrome.runtime.sendMessage(request)) as
-      | OpenAuthPopupResponse
-      | undefined;
-    if (!response?.ok) {
-      throw new Error("Couldn't open the CAESAR sign-in tab.");
-    }
-
-    const reason = await reasonPromise;
-    if (reason !== "succeeded") {
-      throw new Error("CAESAR sign-in was canceled.");
-    }
-  })();
-
-  pendingAuthRecovery = handshake;
-  try {
-    await handshake;
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error), {
-      tone: "error",
-      durationMs: 5000
-    });
-    return null;
-  } finally {
-    pendingAuthRecovery = null;
-  }
-
-  return await retry();
-}
-
-async function withCaesarAuthRecovery<T>(action: () => Promise<T>): Promise<T | null> {
-  try {
-    return await action();
-  } catch (error) {
-    if (!isCaesarAuthRequiredError(error)) throw error;
-    return await recoverCaesarAuthAndRetry(error.loginUrl, action);
-  }
 }
 
