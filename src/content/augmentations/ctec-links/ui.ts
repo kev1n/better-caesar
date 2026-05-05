@@ -1,13 +1,7 @@
-import { ensureStyle } from "../../framework";
-
-import { CTEC_CELL_CLASS, CTEC_HEADER_CLASS, STYLE_ID } from "./constants";
+import { CTEC_CELL_CLASS, CTEC_HEADER_CLASS } from "./constants";
 import type { CtecLinkData } from "./types";
 
-export function injectStyles(): void {
-  ensureStyle(
-    document,
-    STYLE_ID,
-    `
+export const CTEC_LINKS_STYLES = `
 	    .${CTEC_CELL_CLASS} {
 	      padding: 4px 8px;
 	      min-width: 180px;
@@ -93,9 +87,7 @@ export function injectStyles(): void {
       letter-spacing: 0.3px;
     }
     .bc-ctec-fetch:hover { background: var(--bc-color-accent); color: var(--bc-color-accent-on); }
-  `
-  );
-}
+  `;
 
 export function renderFetchButton(container: HTMLElement, onFetch: () => void): void {
   container.innerHTML = "";
@@ -107,7 +99,7 @@ export function renderFetchButton(container: HTMLElement, onFetch: () => void): 
   container.appendChild(btn);
 }
 
-export function renderLoading(container: HTMLElement, message = "Loading CTEC\u2026"): void {
+export function renderLoading(container: HTMLElement, message = "Loading CTEC…"): void {
   const existing = container.querySelector<HTMLElement>(".bc-ctec-loading-msg");
   if (existing) {
     existing.textContent = message;
@@ -118,27 +110,6 @@ export function renderLoading(container: HTMLElement, message = "Loading CTEC\u2
   div.className = "bc-ctec-widget bc-ctec-muted bc-ctec-loading-msg";
   div.textContent = message;
   container.appendChild(div);
-}
-
-export function isCtecCellReady(container: HTMLElement): boolean {
-  return container.dataset.ctecReady === "1";
-}
-
-export function removeAllInjectedDom(doc: Document = document): void {
-  const selectors = [
-    `.${CTEC_CELL_CLASS}`,
-    `.${CTEC_HEADER_CLASS}`,
-    `#${STYLE_ID}`
-  ];
-  for (const selector of selectors) {
-    for (const el of Array.from(doc.querySelectorAll(selector))) {
-      el.remove();
-    }
-  }
-}
-
-export function markCtecCellReady(container: HTMLElement): void {
-  container.dataset.ctecReady = "1";
 }
 
 export function renderCtecLinksWidget(
@@ -169,8 +140,8 @@ export function renderCtecLinksWidget(
 	          a.href = entry.url;
 	          a.target = "_blank";
 	          a.rel = "noopener noreferrer";
-          let label = `\u2197 ${entry.term}`;
-          if (multiInstructor) label += ` \u2014 ${lastName(entry.instructor)}`;
+          let label = `↗ ${entry.term}`;
+          if (multiInstructor) label += ` — ${lastName(entry.instructor)}`;
 	          const title = courseShortTitle(entry.description);
 	          if (title) label += ` (${title})`;
 	          a.textContent = label;
@@ -209,7 +180,7 @@ export function renderCtecLinksWidget(
         warn.className = "bc-ctec-warn";
         warn.style.marginTop = "3px";
         warn.style.fontSize = "10px";
-        warn.textContent = "Results may be incomplete \u2014 ";
+        warn.textContent = "Results may be incomplete — ";
         const reloadLink = document.createElement("button");
         reloadLink.type = "button";
         reloadLink.className = "bc-ctec-expand";
@@ -240,7 +211,7 @@ export function renderCtecLinksWidget(
     case "auth-required": {
       const msg = document.createElement("div");
       msg.className = "bc-ctec-warn";
-      msg.textContent = "Auth required \u2014 ";
+      msg.textContent = "Auth required — ";
       const link = document.createElement("a");
       link.className = "bc-ctec-auth-link";
       link.href = data.loginUrl;
@@ -274,36 +245,6 @@ function makeRetryButton(onRetry: () => void): HTMLButtonElement {
   return btn;
 }
 
-export function ensureCtecHeader(table: HTMLTableElement): void {
-  const headerRow = table.querySelector("tr");
-  if (!headerRow) return;
-  if (headerRow.querySelector(`.${CTEC_HEADER_CLASS}`)) return;
-  const th = document.createElement("th");
-  th.scope = "col";
-  th.className = `PSLEVEL1GRIDCOLUMNHDR ${CTEC_HEADER_CLASS}`;
-  th.textContent = "CTEC";
-  headerRow.appendChild(th);
-}
-
-export function ensureCtecCell(row: HTMLTableRowElement): HTMLElement {
-  const existing = row.querySelector<HTMLTableCellElement>(`.${CTEC_CELL_CLASS}`);
-  if (existing) return existing;
-  const td = document.createElement("td");
-  // Inherit the row's existing cell class so PeopleSoft alternating-row styles apply.
-  const rowCellClass = row.querySelector("td,th")?.className ?? "";
-  td.className = rowCellClass ? `${rowCellClass} ${CTEC_CELL_CLASS}` : CTEC_CELL_CLASS;
-  row.appendChild(td);
-  return td;
-}
-
-export function isCtecCellDone(container: HTMLElement): boolean {
-  return container.dataset.ctecDone === "1";
-}
-
-export function markCtecCellDone(container: HTMLElement): void {
-  container.dataset.ctecDone = "1";
-}
-
 // Returns the last word of a name — used for compact multi-instructor labels.
 // "Bridget McMullan" → "McMullan"
 function lastName(name: string): string {
@@ -320,5 +261,5 @@ function courseShortTitle(description: string): string {
   // Prefer the part after the last colon (subtitle), if one exists
   const colonIdx = stripped.lastIndexOf(":");
   const title = colonIdx >= 0 ? stripped.slice(colonIdx + 1).trim() : stripped;
-  return title.length > 40 ? title.slice(0, 38) + "\u2026" : title;
+  return title.length > 40 ? title.slice(0, 38) + "…" : title;
 }

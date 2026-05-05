@@ -1,4 +1,9 @@
-import { isRetryablePeopleSoftTaskError } from "../peoplesoft";
+// Augmentation interface — implemented by every plugin in
+// `src/content/augmentations/`. The legacy `TemplateAugmentation` abstract
+// class lived here too; it was removed in Wave 4 because no remaining plugin
+// extended it (every plugin needed richer state than the base class
+// provided, and the new `createPsCellGridRuntime` covers the
+// duplication that motivated the abstract base in the first place).
 
 export interface Augmentation {
   readonly id: string;
@@ -8,91 +13,4 @@ export interface Augmentation {
   // or dataset marker the augmentation ever added so the host page is
   // visually indistinguishable from the never-installed state.
   cleanup?(doc?: Document): void;
-}
-
-export abstract class TemplateAugmentation<TTarget, TData> implements Augmentation {
-  readonly id: string;
-
-  private readonly cache = new Map<string, Promise<TData>>();
-  private queueTail: Promise<void> = Promise.resolve();
-
-  protected constructor(id: string) {
-    this.id = id;
-  }
-
-  run(doc: Document = document): void {
-    if (!this.appliesToPage(doc)) return;
-
-    this.beforeRun(doc);
-    const targets = this.collectTargets(doc);
-
-    for (const target of targets) {
-      const key = this.targetKey(target);
-      if (!this.shouldProcessTarget(target, key)) continue;
-
-      this.markLoading(target, key);
-      const dataPromise = this.getOrCreateDataPromise(key, target, doc);
-
-      void dataPromise
-        .then((data) => {
-          this.renderSuccess(target, data, key);
-          this.markLoaded(target, key);
-        })
-        .catch((error: unknown) => {
-          if (isRetryablePeopleSoftTaskError(error)) return;
-          this.renderError(target, this.toError(error), key);
-        });
-    }
-  }
-
-  protected beforeRun(_doc: Document): void {
-    // Optional hook for each run cycle.
-  }
-
-  protected abstract appliesToPage(doc: Document): boolean;
-  protected abstract collectTargets(doc: Document): TTarget[];
-  protected abstract targetKey(target: TTarget): string;
-  protected abstract shouldProcessTarget(target: TTarget, key: string): boolean;
-  protected abstract markLoading(target: TTarget, key: string): void;
-  protected abstract fetchData(target: TTarget, key: string, doc: Document): Promise<TData>;
-  protected abstract renderSuccess(target: TTarget, data: TData, key: string): void;
-  protected abstract renderError(target: TTarget, error: Error, key: string): void;
-
-  protected markLoaded(_target: TTarget, _key: string): void {
-    // Optional hook after successful render.
-  }
-
-  private getOrCreateDataPromise(key: string, target: TTarget, doc: Document): Promise<TData> {
-    const cached = this.cache.get(key);
-    if (cached) return cached;
-
-    const job = this.enqueue(() => this.fetchData(target, key, doc));
-    this.cache.set(key, job);
-    void job.catch((error: unknown) => {
-      if (!isRetryablePeopleSoftTaskError(error)) return;
-      if (this.cache.get(key) !== job) return;
-      this.cache.delete(key);
-    });
-    return job;
-  }
-
-  private enqueue(task: () => Promise<TData>): Promise<TData> {
-    const job = this.queueTail.then(task);
-
-    this.queueTail = job.then(
-      () => undefined,
-      () => undefined
-    );
-
-    return job;
-  }
-
-  protected clearCache(): void {
-    this.cache.clear();
-  }
-
-  private toError(error: unknown): Error {
-    if (error instanceof Error) return error;
-    return new Error(String(error));
-  }
 }

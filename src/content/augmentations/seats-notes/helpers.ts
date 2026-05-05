@@ -1,14 +1,6 @@
-import { GRID_TABLE_SELECTORS } from "./constants";
-
-export function queryTargetTables(): HTMLTableElement[] {
-  const tables: HTMLTableElement[] = [];
-  for (const selector of GRID_TABLE_SELECTORS) {
-    const table = document.querySelector<HTMLTableElement>(selector);
-    if (!table) continue;
-    tables.push(table);
-  }
-  return tables;
-}
+// Pure helpers shared across the seats-notes augmentation. The grid-level
+// `queryTargetTables` from the pre-Wave-4 codebase is gone — the runtime now
+// finds rows directly via `gridRowSelector`.
 
 export function extractClassNumber(rawText: string): string | null {
   const match = rawText.match(/\((\d{4,10})\)/);

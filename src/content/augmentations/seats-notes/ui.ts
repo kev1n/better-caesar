@@ -7,127 +7,12 @@ import {
   SEATS_HEADER_CLASS,
   STYLE_ID
 } from "./constants";
-import type { RowCells, SeatsNotesResult, SeatsNotesSuccess } from "./types";
+import type { SeatsNotesResult, SeatsNotesSuccess } from "./types";
 
 const TIMESTAMP_REFRESH_INTERVAL_MS = 30_000;
-let timestampRefreshTimer: number | null = null;
+export const FETCHED_AT_DATA_ATTR = "data-bc-fetched-at";
 
-export function ensureCustomHeaders(table: HTMLTableElement): void {
-  const headerRow = table.querySelector("tr");
-  if (!headerRow) return;
-
-  if (!headerRow.querySelector(`.${SEATS_HEADER_CLASS}`)) {
-    const seatsHeader = document.createElement("th");
-    seatsHeader.scope = "col";
-    seatsHeader.className = `PSLEVEL1GRIDCOLUMNHDR ${SEATS_HEADER_CLASS}`;
-    seatsHeader.textContent = "Seats";
-    headerRow.appendChild(seatsHeader);
-  }
-
-  if (!headerRow.querySelector(`.${NOTES_HEADER_CLASS}`)) {
-    const notesHeader = document.createElement("th");
-    notesHeader.scope = "col";
-    notesHeader.className = `PSLEVEL1GRIDCOLUMNHDR ${NOTES_HEADER_CLASS}`;
-    notesHeader.textContent = "Notes";
-    headerRow.appendChild(notesHeader);
-  }
-}
-
-export function ensureCustomCells(row: HTMLTableRowElement): RowCells {
-  return {
-    seatsCell: ensureCustomCell(row, SEATS_CELL_CLASS),
-    notesCell: ensureCustomCell(row, NOTES_CELL_CLASS)
-  };
-}
-
-export function renderIdle(cells: RowCells, classNumber: string, onLoad: () => void): void {
-  cells.seatsCell.dataset.classNumber = classNumber;
-  cells.notesCell.dataset.classNumber = classNumber;
-  cells.seatsCell.dataset.bcState = "idle";
-  cells.notesCell.dataset.bcState = "idle";
-
-  clearChildren(cells.seatsCell);
-  clearChildren(cells.notesCell);
-
-  cells.seatsCell.appendChild(
-    el(document, "div", { class: "better-caesar-idle" }, [
-      el(document, "button", {
-        class: "better-caesar-load-btn",
-        attrs: { type: "button" },
-        text: "Load seats & notes",
-        on: { click: () => onLoad() }
-      })
-    ])
-  );
-
-  cells.notesCell.appendChild(
-    el(document, "div", { class: "better-caesar-muted", text: "—" })
-  );
-}
-
-export function renderLoading(cells: RowCells, classNumber: string): void {
-  cells.seatsCell.dataset.classNumber = classNumber;
-  cells.notesCell.dataset.classNumber = classNumber;
-  cells.seatsCell.dataset.bcState = "loading";
-  cells.notesCell.dataset.bcState = "loading";
-  cells.seatsCell.textContent = "Loading seats…";
-  cells.notesCell.textContent = "Loading notes…";
-}
-
-export function renderLoaded(
-  cells: RowCells,
-  result: SeatsNotesResult,
-  fetchedAt: number,
-  classNumber: string,
-  onRefresh: () => void
-): void {
-  cells.seatsCell.dataset.classNumber = classNumber;
-  cells.notesCell.dataset.classNumber = classNumber;
-  cells.seatsCell.dataset.bcState = "loaded";
-  cells.notesCell.dataset.bcState = "loaded";
-
-  clearChildren(cells.seatsCell);
-  clearChildren(cells.notesCell);
-
-  const meta = buildMetaBar(fetchedAt, onRefresh);
-  cells.seatsCell.appendChild(meta);
-
-  if (!result.ok) {
-    cells.seatsCell.appendChild(buildError(`Unavailable: ${result.error}`));
-    cells.notesCell.appendChild(buildError("No notes available."));
-    return;
-  }
-
-  cells.seatsCell.appendChild(buildSeatsCard(result));
-  cells.notesCell.appendChild(buildNotesCard(result, classNumber));
-
-  ensureTimestampRefresh();
-}
-
-export function getCellState(cells: RowCells): string | undefined {
-  return cells.seatsCell.dataset.bcState;
-}
-
-export function removeAllInjectedDom(doc: Document = document): void {
-  const selectors = [
-    `.${SEATS_HEADER_CLASS}`,
-    `.${NOTES_HEADER_CLASS}`,
-    `.${SEATS_CELL_CLASS}`,
-    `.${NOTES_CELL_CLASS}`,
-    `#${STYLE_ID}`
-  ];
-  for (const selector of selectors) {
-    for (const el of Array.from(doc.querySelectorAll(selector))) {
-      el.remove();
-    }
-  }
-}
-
-export function injectStyles(): void {
-  ensureStyle(
-    document,
-    STYLE_ID,
-    `
+export const SEATS_NOTES_STYLES = `
     .${SEATS_HEADER_CLASS},
     .${NOTES_HEADER_CLASS} {
       min-width: 220px;
@@ -266,8 +151,97 @@ export function injectStyles(): void {
       font-size: var(--bc-font-11);
       padding: 4px 0;
     }
-  `
+  `;
+
+export interface SeatsNotesCells {
+  seatsCell: HTMLTableCellElement;
+  notesCell: HTMLTableCellElement;
+}
+
+export function paintIdle(
+  cells: SeatsNotesCells,
+  classNumber: string,
+  onLoad: () => void
+): void {
+  cells.seatsCell.dataset.classNumber = classNumber;
+  cells.notesCell.dataset.classNumber = classNumber;
+  cells.seatsCell.dataset.bcState = "idle";
+  cells.notesCell.dataset.bcState = "idle";
+
+  clearChildren(cells.seatsCell);
+  clearChildren(cells.notesCell);
+
+  cells.seatsCell.appendChild(
+    el(document, "div", { class: "better-caesar-idle" }, [
+      el(document, "button", {
+        class: "better-caesar-load-btn",
+        attrs: { type: "button" },
+        text: "Load seats & notes",
+        on: { click: () => onLoad() }
+      })
+    ])
   );
+
+  cells.notesCell.appendChild(
+    el(document, "div", { class: "better-caesar-muted", text: "—" })
+  );
+}
+
+export function paintLoading(cells: SeatsNotesCells, classNumber: string): void {
+  cells.seatsCell.dataset.classNumber = classNumber;
+  cells.notesCell.dataset.classNumber = classNumber;
+  cells.seatsCell.dataset.bcState = "loading";
+  cells.notesCell.dataset.bcState = "loading";
+  cells.seatsCell.textContent = "Loading seats…";
+  cells.notesCell.textContent = "Loading notes…";
+}
+
+export function paintLoaded(
+  cells: SeatsNotesCells,
+  result: SeatsNotesResult,
+  fetchedAt: number,
+  classNumber: string,
+  onRefresh: () => void
+): void {
+  cells.seatsCell.dataset.classNumber = classNumber;
+  cells.notesCell.dataset.classNumber = classNumber;
+  cells.seatsCell.dataset.bcState = "loaded";
+  cells.notesCell.dataset.bcState = "loaded";
+
+  clearChildren(cells.seatsCell);
+  clearChildren(cells.notesCell);
+
+  const meta = buildMetaBar(fetchedAt, onRefresh);
+  cells.seatsCell.appendChild(meta);
+
+  if (!result.ok) {
+    cells.seatsCell.appendChild(buildError(`Unavailable: ${result.error}`));
+    cells.notesCell.appendChild(buildError("No notes available."));
+    return;
+  }
+
+  cells.seatsCell.appendChild(buildSeatsCard(result));
+  cells.notesCell.appendChild(buildNotesCard(result, classNumber));
+}
+
+export function injectStyles(doc: Document = document): void {
+  ensureStyle(doc, STYLE_ID, SEATS_NOTES_STYLES);
+}
+
+// Background timer that re-paints "Loaded N min ago" timestamps. The runtime
+// calls `startTimestampTicker(doc)` once per mount and the returned stop
+// function once on cleanup — eliminating the long-standing setInterval leak
+// where the timer kept running after the user disabled the augmentation.
+export function startTimestampTicker(doc: Document): () => void {
+  const handle = (doc.defaultView ?? window).setInterval(() => {
+    const now = Date.now();
+    doc.querySelectorAll<HTMLElement>(`[${FETCHED_AT_DATA_ATTR}]`).forEach((node) => {
+      const ts = Number(node.dataset.bcFetchedAt);
+      if (!Number.isFinite(ts)) return;
+      node.textContent = `Loaded ${formatRelativeTime(now - ts)}`;
+    });
+  }, TIMESTAMP_REFRESH_INTERVAL_MS);
+  return () => (doc.defaultView ?? window).clearInterval(handle);
 }
 
 function buildMetaBar(fetchedAt: number, onRefresh: () => void): HTMLElement {
@@ -476,32 +450,8 @@ function buildError(text: string): HTMLElement {
   return el(document, "div", { class: "better-caesar-error", text });
 }
 
-function ensureCustomCell(row: HTMLTableRowElement, customClass: string): HTMLTableCellElement {
-  const existing = row.querySelector<HTMLTableCellElement>(`.${customClass}`);
-  if (existing) return existing;
-
-  const td = document.createElement("td");
-  const rowClass = row.querySelector("td,th")?.className ?? "";
-  td.className = `${rowClass} ${customClass}`.trim();
-  td.style.verticalAlign = "top";
-  row.appendChild(td);
-  return td;
-}
-
 function clearChildren(node: Node): void {
   while (node.firstChild) node.removeChild(node.firstChild);
-}
-
-function ensureTimestampRefresh(): void {
-  if (timestampRefreshTimer !== null) return;
-  timestampRefreshTimer = window.setInterval(() => {
-    const now = Date.now();
-    document.querySelectorAll<HTMLElement>("[data-bc-fetched-at]").forEach((el) => {
-      const ts = Number(el.dataset.bcFetchedAt);
-      if (!Number.isFinite(ts)) return;
-      el.textContent = `Loaded ${formatRelativeTime(now - ts)}`;
-    });
-  }, TIMESTAMP_REFRESH_INTERVAL_MS);
 }
 
 function formatRelativeTime(deltaMs: number): string {
