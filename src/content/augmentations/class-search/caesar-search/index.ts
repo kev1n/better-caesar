@@ -30,6 +30,11 @@ export {
   statusFromAlt
 } from "./parser";
 
+// Wave 9 — safe variants + schemas live in dedicated modules so production
+// callers (which still use the unsafe parsers above) don't pull zod into the
+// content bundle. Opt in by importing directly from `./parser.safe` /
+// `./parser.schemas`.
+
 export {
   buildClassNumberSearchParams,
   buildSearchPostParams,

@@ -266,3 +266,4 @@ export function careerOrderFor(bareCatalog: string): string[] {
   const gradFirst = Number.isFinite(num) && num >= 400;
   return gradFirst ? ["TGS", "UGRD"] : ["UGRD", "TGS"];
 }
+
