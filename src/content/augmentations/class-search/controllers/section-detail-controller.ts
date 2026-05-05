@@ -231,7 +231,11 @@ async function runFetchAndRender(
         classNumber: caesar.classNumber,
         careerHint
       },
-      { priority: "background", owner: "class-search-detail" }
+      {
+        priority: "background",
+        owner: "class-search-detail",
+        label: `Load section details for class ${caesar.classNumber}`
+      }
     );
     const result = toSeatsNotesResult(lookupResponse);
     const fetchedAt = Date.now();

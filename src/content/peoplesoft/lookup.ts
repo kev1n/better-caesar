@@ -8,12 +8,12 @@ import { isRetryablePeopleSoftTaskError, runPeopleSoftTask, type PeopleSoftTaskP
 
 export async function lookupClass(
   message: LookupClassMessage,
-  options?: { priority?: PeopleSoftTaskPriority; owner?: string }
+  options?: { priority?: PeopleSoftTaskPriority; owner?: string; label?: string }
 ): Promise<LookupClassResponse> {
   return runPeopleSoftTask(
     options?.priority ?? "background",
     () => lookupClassInternal(message),
-    { owner: options?.owner }
+    { owner: options?.owner, label: options?.label }
   );
 }
 

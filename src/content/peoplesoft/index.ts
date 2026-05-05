@@ -4,7 +4,12 @@ export {
   isRetryablePeopleSoftTaskError,
   releasePeopleSoftLock,
   runPeopleSoftTask,
-  waitForPeopleSoftIdle
+  snapshotTraffic,
+  subscribeTraffic,
+  waitForPeopleSoftIdle,
+  type TaskInfo,
+  type TrafficListener,
+  type TrafficSnapshot
 } from "./traffic";
 export {
   applyResponseState,

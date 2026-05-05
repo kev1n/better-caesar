@@ -8,6 +8,7 @@ import { bootstrapTheme } from "./design";
 import { gateTokensCss } from "./design/tokens";
 import { AugmentationRunner } from "./framework";
 import { registerLookupMessageHandler } from "./messaging";
+import { mountTrafficIndicator } from "./peoplesoft/traffic-indicator";
 
 // Gate tokens must paint synchronously, *before* anything else — the
 // access-gate UI and the early term-page mask both consume them on the
@@ -30,6 +31,9 @@ new AugmentationRunner(augmentationRegistry).start();
 // gates on a 1hr stale check so we don't hit CAESAR on every page load.
 if (/caesar\.ent\.northwestern\.edu/i.test(window.location.host)) {
   void initCartCache().then(() => runOpportunisticReconcile());
+  // Queue indicator is also CAESAR-only — paper.nu has its own
+  // status-bar surface and doesn't drive the PeopleSoft mutex.
+  mountTrafficIndicator(document);
 }
 
 function injectGateTokens(): void {

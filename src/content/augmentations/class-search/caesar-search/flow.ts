@@ -45,7 +45,10 @@ export async function searchCaesarCatalog(
   return runPeopleSoftTask(
     "user",
     () => searchCaesarCatalogInternal(input),
-    { owner: "class-search-discover" }
+    {
+      owner: "class-search-discover",
+      label: `Load CAESAR data for ${input.subject} ${input.bareCatalog}`
+    }
   );
 }
 
@@ -54,7 +57,10 @@ export async function addSectionToCart(input: CartFlowInput): Promise<CartFlowRe
   return runPeopleSoftTask(
     "user",
     () => addSectionToCartInternal(input),
-    { owner: "class-search-add" }
+    {
+      owner: "class-search-add",
+      label: `Add to cart: class ${input.classNumber}`
+    }
   );
 }
 
@@ -68,7 +74,10 @@ export async function continueCartAddWithRelated(
   return runPeopleSoftTask(
     "user",
     () => continueCartAddWithRelatedInternal(input),
-    { owner: "class-search-add-related" }
+    {
+      owner: "class-search-add-related",
+      label: `Add to cart: class ${input.classNumber}`
+    }
   );
 }
 

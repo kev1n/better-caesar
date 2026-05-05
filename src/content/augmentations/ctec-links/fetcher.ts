@@ -44,7 +44,7 @@ export async function fetchCtecLinks(
   return runPeopleSoftTask(
     "user",
     () => fetchCtecLinksInternal(params, false, onProgress),
-    { owner: REQUEST_OWNER }
+    { owner: REQUEST_OWNER, label: buildCtecTaskLabel(params) }
   );
 }
 
@@ -56,8 +56,12 @@ export async function fetchCtecLinksBackground(
   return runPeopleSoftTask(
     "background",
     () => fetchCtecLinksInternal(params, forceRefresh, onProgress),
-    { owner: REQUEST_OWNER }
+    { owner: REQUEST_OWNER, label: buildCtecTaskLabel(params) }
   );
+}
+
+function buildCtecTaskLabel(params: CtecLinkParams): string {
+  return `Load CTEC for ${params.subject} ${params.catalogNumber}`;
 }
 
 // Removes all cached entries (including sentinels) matching this course +

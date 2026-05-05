@@ -17,6 +17,8 @@ type LockState = {
 type QueueTask<T> = {
   id: number;
   owner?: string;
+  label?: string;
+  queuedAt: number;
   priority: PeopleSoftTaskPriority;
   controller: AbortController;
   execute: () => Promise<T>;
@@ -25,6 +27,25 @@ type QueueTask<T> = {
 };
 
 export type PeopleSoftTaskPriority = "navigation" | "user" | "background";
+
+// Public snapshot shape — observers (e.g. the bottom-of-screen queue
+// indicator) read from this rather than poking at internal queue state.
+export interface TaskInfo {
+  id: number;
+  owner?: string;
+  label?: string;
+  priority: PeopleSoftTaskPriority;
+  queuedAt: number;
+}
+
+export interface TrafficSnapshot {
+  active: TaskInfo | null;
+  pending: TaskInfo[];
+  /** Total count: active (0/1) + pending. Convenience for UI thresholds. */
+  depth: number;
+}
+
+export type TrafficListener = (snapshot: TrafficSnapshot) => void;
 
 export class PeopleSoftTaskCancelledError extends Error {
   readonly retryable = true;
@@ -40,11 +61,12 @@ let activeTask: QueueTask<any> | null = null;
 let activeTaskSignal: AbortSignal | null = null;
 let queue: QueueTask<any>[] = [];
 let idleResolvers: Array<() => void> = [];
+let trafficListeners: TrafficListener[] = [];
 
 export async function runPeopleSoftTask<T>(
   priority: PeopleSoftTaskPriority,
   execute: () => Promise<T>,
-  options?: { owner?: string }
+  options?: { owner?: string; label?: string }
 ): Promise<T> {
   if (isPeopleSoftLockedFor(options?.owner) && priority !== "navigation") {
     throw new Error("PeopleSoft requests are paused while term navigation is in progress.");
@@ -54,6 +76,8 @@ export async function runPeopleSoftTask<T>(
     const task: QueueTask<T> = {
       id: ++taskSequence,
       owner: options?.owner,
+      label: options?.label,
+      queuedAt: Date.now(),
       priority,
       controller: new AbortController(),
       execute,
@@ -64,6 +88,7 @@ export async function runPeopleSoftTask<T>(
     prepareQueueForTask(task);
     queue.push(task as QueueTask<any>);
     queue.sort(compareTasks);
+    notifyTrafficListeners();
     void pumpQueue();
   });
 }
@@ -176,6 +201,7 @@ function cancelQueuedTasks(
   message: string
 ): void {
   const kept: QueueTask<any>[] = [];
+  let dropped = false;
 
   for (const task of queue) {
     if (!predicate(task)) {
@@ -184,9 +210,11 @@ function cancelQueuedTasks(
     }
 
     task.reject(new PeopleSoftTaskCancelledError(message));
+    dropped = true;
   }
 
   queue = kept;
+  if (dropped) notifyTrafficListeners();
   resolveIdleIfNeeded();
 }
 
@@ -195,6 +223,7 @@ async function pumpQueue(): Promise<void> {
 
   const nextTask = queue.shift();
   if (!nextTask) {
+    notifyTrafficListeners();
     resolveIdleIfNeeded();
     return;
   }
@@ -203,6 +232,7 @@ async function pumpQueue(): Promise<void> {
     nextTask.reject(
       new Error("PeopleSoft requests are paused while term navigation is in progress.")
     );
+    notifyTrafficListeners();
     resolveIdleIfNeeded();
     void pumpQueue();
     return;
@@ -210,6 +240,7 @@ async function pumpQueue(): Promise<void> {
 
   activeTask = nextTask;
   activeTaskSignal = nextTask.controller.signal;
+  notifyTrafficListeners();
 
   try {
     const result = await nextTask.execute();
@@ -219,6 +250,7 @@ async function pumpQueue(): Promise<void> {
   } finally {
     activeTask = null;
     activeTaskSignal = null;
+    notifyTrafficListeners();
     resolveIdleIfNeeded();
     void pumpQueue();
   }
@@ -238,6 +270,58 @@ function resolveIdleIfNeeded(): void {
   idleResolvers = [];
   for (const resolve of resolvers) {
     resolve();
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Observability — read-only snapshot + subscription. Used by the queue
+// indicator in the content-script bootstrap. Listeners receive the current
+// snapshot synchronously when they subscribe so they can render their
+// initial state without racing the queue.
+
+export function snapshotTraffic(): TrafficSnapshot {
+  const active = activeTask ? toTaskInfo(activeTask) : null;
+  const pending = queue.map(toTaskInfo);
+  return {
+    active,
+    pending,
+    depth: (active ? 1 : 0) + pending.length
+  };
+}
+
+export function subscribeTraffic(listener: TrafficListener): () => void {
+  trafficListeners.push(listener);
+  try {
+    listener(snapshotTraffic());
+  } catch (err) {
+    logQuiet("peoplesoft.traffic.subscribe.initial", err);
+  }
+  return () => {
+    trafficListeners = trafficListeners.filter((other) => other !== listener);
+  };
+}
+
+function toTaskInfo(task: QueueTask<any>): TaskInfo {
+  return {
+    id: task.id,
+    owner: task.owner,
+    label: task.label,
+    priority: task.priority,
+    queuedAt: task.queuedAt
+  };
+}
+
+function notifyTrafficListeners(): void {
+  if (trafficListeners.length === 0) return;
+  const snapshot = snapshotTraffic();
+  // Copy the listener list so a listener that unsubscribes itself mid-fire
+  // doesn't perturb the iteration.
+  for (const listener of trafficListeners.slice()) {
+    try {
+      listener(snapshot);
+    } catch (err) {
+      logQuiet("peoplesoft.traffic.notify", err);
+    }
   }
 }
 

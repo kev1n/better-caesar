@@ -139,7 +139,11 @@ export class SeatsNotesAugmentation implements Augmentation {
       try {
         const lookupResponse = await lookupClass(
           { type: "lookup-class", classNumber: key, careerHint },
-          { priority: "background", owner: "seats-notes" }
+          {
+            priority: "background",
+            owner: "seats-notes",
+            label: `Load seats/notes for class ${key}`
+          }
         );
         result = toSeatsNotesResult(lookupResponse);
       } catch (error) {
