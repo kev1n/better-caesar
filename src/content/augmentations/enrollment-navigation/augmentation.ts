@@ -1,5 +1,5 @@
 import { logQuiet } from "../../../shared/log";
-import type { Augmentation } from "../../framework";
+import { ensureStyle, type Augmentation } from "../../framework";
 import { acquirePeopleSoftLock, releasePeopleSoftLock, runPeopleSoftTask } from "../../peoplesoft";
 
 type EnrollmentContext = {
@@ -691,11 +691,10 @@ function resolveTermSwitcherAnchor(doc: Document): Element | null {
 }
 
 function injectStyles(doc: Document): void {
-  if (doc.getElementById(STYLE_ID)) return;
-
-  const style = doc.createElement("style");
-  style.id = STYLE_ID;
-  style.textContent = `
+  ensureStyle(
+    doc,
+    STYLE_ID,
+    `
     .better-caesar-term-wrapper {
       margin-top: 6px;
       display: grid;
@@ -754,9 +753,6 @@ function injectStyles(doc: Document): void {
     @keyframes better-caesar-spin {
       to { transform: rotate(360deg); }
     }
-  `;
-
-  const host = doc.head ?? doc.documentElement ?? doc.body;
-  if (!host) return;
-  host.appendChild(style);
+  `
+  );
 }

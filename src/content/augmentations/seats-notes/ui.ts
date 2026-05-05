@@ -1,3 +1,5 @@
+import { ensureStyle, el } from "../../framework";
+
 import {
   NOTES_CELL_CLASS,
   NOTES_HEADER_CLASS,
@@ -47,24 +49,20 @@ export function renderIdle(cells: RowCells, classNumber: string, onLoad: () => v
   clearChildren(cells.seatsCell);
   clearChildren(cells.notesCell);
 
-  const wrap = document.createElement("div");
-  wrap.className = "better-caesar-idle";
+  cells.seatsCell.appendChild(
+    el(document, "div", { class: "better-caesar-idle" }, [
+      el(document, "button", {
+        class: "better-caesar-load-btn",
+        attrs: { type: "button" },
+        text: "Load seats & notes",
+        on: { click: () => onLoad() }
+      })
+    ])
+  );
 
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "better-caesar-load-btn";
-  button.textContent = "Load seats & notes";
-  button.addEventListener("click", () => {
-    onLoad();
-  });
-  wrap.appendChild(button);
-
-  cells.seatsCell.appendChild(wrap);
-
-  const dash = document.createElement("div");
-  dash.className = "better-caesar-muted";
-  dash.textContent = "—";
-  cells.notesCell.appendChild(dash);
+  cells.notesCell.appendChild(
+    el(document, "div", { class: "better-caesar-muted", text: "—" })
+  );
 }
 
 export function renderLoading(cells: RowCells, classNumber: string): void {
@@ -126,11 +124,10 @@ export function removeAllInjectedDom(doc: Document = document): void {
 }
 
 export function injectStyles(): void {
-  if (document.getElementById(STYLE_ID)) return;
-
-  const style = document.createElement("style");
-  style.id = STYLE_ID;
-  style.textContent = `
+  ensureStyle(
+    document,
+    STYLE_ID,
+    `
     .${SEATS_HEADER_CLASS},
     .${NOTES_HEADER_CLASS} {
       min-width: 220px;
@@ -269,32 +266,24 @@ export function injectStyles(): void {
       font-size: var(--bc-font-11);
       padding: 4px 0;
     }
-  `;
-  const host = document.head ?? document.documentElement ?? document.body;
-  if (!host) return;
-  host.appendChild(style);
+  `
+  );
 }
 
 function buildMetaBar(fetchedAt: number, onRefresh: () => void): HTMLElement {
-  const bar = document.createElement("div");
-  bar.className = "better-caesar-meta";
-
-  const time = document.createElement("span");
-  time.className = "better-caesar-meta-time";
-  time.dataset.bcFetchedAt = String(fetchedAt);
-  time.textContent = `Loaded ${formatRelativeTime(Date.now() - fetchedAt)}`;
-  bar.appendChild(time);
-
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "better-caesar-refresh-btn";
-  button.textContent = "↻ Refresh";
-  button.addEventListener("click", () => {
-    onRefresh();
-  });
-  bar.appendChild(button);
-
-  return bar;
+  return el(document, "div", { class: "better-caesar-meta" }, [
+    el(document, "span", {
+      class: "better-caesar-meta-time",
+      dataset: { bcFetchedAt: String(fetchedAt) },
+      text: `Loaded ${formatRelativeTime(Date.now() - fetchedAt)}`
+    }),
+    el(document, "button", {
+      class: "better-caesar-refresh-btn",
+      attrs: { type: "button" },
+      text: "↻ Refresh",
+      on: { click: () => onRefresh() }
+    })
+  ]);
 }
 
 function buildSeatsCard(response: SeatsNotesSuccess): HTMLElement {
@@ -361,31 +350,28 @@ function buildPrimarySeatsLine(response: SeatsNotesSuccess): string | null {
 
 function appendLine(container: HTMLElement, label: string, value: string | null): void {
   if (!value) return;
-  const line = document.createElement("div");
-  line.className = "better-caesar-line";
   const text = `${label}: ${value}`;
-  line.textContent = text;
-  line.title = text;
-  container.appendChild(line);
+  container.appendChild(
+    el(document, "div", {
+      class: "better-caesar-line",
+      text,
+      attrs: { title: text }
+    })
+  );
 }
 
 function appendNote(container: HTMLElement, label: string, value: string | null): void {
   if (!value) return;
-  const block = document.createElement("div");
-  block.className = "better-caesar-note";
-
-  const labelEl = document.createElement("div");
-  labelEl.className = "better-caesar-note-label";
-  labelEl.textContent = label;
-
-  const textEl = document.createElement("div");
-  textEl.className = "better-caesar-note-text";
-  textEl.textContent = value;
-  textEl.title = value;
-
-  block.appendChild(labelEl);
-  block.appendChild(textEl);
-  container.appendChild(block);
+  container.appendChild(
+    el(document, "div", { class: "better-caesar-note" }, [
+      el(document, "div", { class: "better-caesar-note-label", text: label }),
+      el(document, "div", {
+        class: "better-caesar-note-text",
+        text: value,
+        attrs: { title: value }
+      })
+    ])
+  );
 }
 
 function applySeatsTone(element: HTMLElement, response: SeatsNotesSuccess): void {
@@ -487,10 +473,7 @@ function toNumber(value: string | null): number | null {
 }
 
 function buildError(text: string): HTMLElement {
-  const el = document.createElement("div");
-  el.className = "better-caesar-error";
-  el.textContent = text;
-  return el;
+  return el(document, "div", { class: "better-caesar-error", text });
 }
 
 function ensureCustomCell(row: HTMLTableRowElement, customClass: string): HTMLTableCellElement {

@@ -1,11 +1,13 @@
+import { ensureStyle } from "../../framework";
+
 import { CTEC_CELL_CLASS, CTEC_HEADER_CLASS, STYLE_ID } from "./constants";
 import type { CtecLinkData } from "./types";
 
 export function injectStyles(): void {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = STYLE_ID;
-  style.textContent = `
+  ensureStyle(
+    document,
+    STYLE_ID,
+    `
 	    .${CTEC_CELL_CLASS} {
 	      padding: 4px 8px;
 	      min-width: 180px;
@@ -91,8 +93,8 @@ export function injectStyles(): void {
       letter-spacing: 0.3px;
     }
     .bc-ctec-fetch:hover { background: var(--bc-color-accent); color: var(--bc-color-accent-on); }
-  `;
-  (document.head ?? document.documentElement).appendChild(style);
+  `
+  );
 }
 
 export function renderFetchButton(container: HTMLElement, onFetch: () => void): void {
