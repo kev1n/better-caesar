@@ -30,6 +30,10 @@ export function disposeTrendChartObserver(): void {
 // Trend chart: per-metric line over loaded terms with area fill and value
 // labels. Uses a ResizeObserver to track wrapper width so the SVG aspect
 // matches the container instead of letterboxing or stretching.
+//
+// NOTE: The SVG-emission math here is owned by Wave 7 (chart kit migration to
+// d3). This module is intentionally left imperative — modal/charts-section.ts
+// (Wave 6c) splats the returned HTMLElement into a lit-html template.
 export function renderTrendChart(
   doc: Document,
   data: ModalDisplayData,
@@ -272,4 +276,3 @@ export function renderDistChart(
   );
   return wrapper;
 }
-

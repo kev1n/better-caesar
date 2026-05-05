@@ -1,0 +1,370 @@
+import { ctecCreditPool } from "../../../../shared/credit-pool";
+import { showToast } from "../../../../shared/toast";
+import { CTEC_ERROR_TOAST_MESSAGE } from "../../ctec-links/rate-limit";
+import {
+  fetchCtecCourseAnalytics,
+  getCachedReportAggregate,
+  getCtecCourseAnalyticsSnapshot
+} from "../../ctec-links/reports";
+import { PAPER_CTEC_CONFIG } from "../config";
+import type {
+  AnalyticsModalSource,
+  PaperCtecAnalyticsState,
+  PaperCtecWidgetData
+} from "../types";
+import type { ModalRefreshFlash } from "./types";
+
+// Wraps the CTEC fetch loops the modal needs: kickBatch (user-facing
+// load-more), kickRefresh (background "check for new CTECs"), and the
+// auto-dismiss timer that clears success-flash banners after a few seconds.
+//
+// The controller doesn't know about the modal UI — callers wire view sync
+// + status-bar refresh + chip mirror via the `callbacks` bag. Carved out of
+// ModalController in Wave 6c so each piece can be reasoned about (and
+// tested) on its own.
+
+export interface ModalDataControllerDeps {
+  // Cross-augmentation shared state — passed by reference. Writes here must
+  // be observed by both the modal sync loop AND the augmentation's status
+  // bar / schedule chips.
+  state: {
+    resolved: Map<string, PaperCtecWidgetData>;
+    inFlight: Map<string, Promise<PaperCtecWidgetData>>;
+    analyticsResolved: Map<string, PaperCtecAnalyticsState>;
+    analyticsInFlight: Map<string, Promise<PaperCtecAnalyticsState>>;
+    loadingMessages: Map<string, { message: string; updatedAt: number }>;
+  };
+  callbacks: {
+    generation: () => number;
+    setProgress: (key: string, message: string) => void;
+    syncStatusBar: () => void;
+    syncSideCard: () => void;
+    syncView: () => void;
+    // Background refresh path also needs to push fresh aggregate data into
+    // the schedule-card chip mini-summary when new CTECs land — newly-
+    // published terms shift the rating/responses count.
+    renderForKey: (key: string, data: PaperCtecWidgetData) => void;
+  };
+  // Injectable for tests. Default wires the production fetcher.
+  fetcher?: typeof fetchCtecCourseAnalytics;
+}
+
+export interface ModalDataController {
+  isBackgroundRefreshing(key: string): boolean;
+  getRefreshFlash(key: string): ModalRefreshFlash | null;
+  getTargetCount(key: string): number | undefined;
+  setRefreshFlash(key: string, flash: ModalRefreshFlash): void;
+  clearRefreshFlash(key: string): void;
+  kickBatch(context: AnalyticsModalSource, increment?: boolean): void;
+  kickRefresh(context: AnalyticsModalSource): void;
+  // Frees auto-dismiss timers — used by ModalController.invalidate to
+  // ensure no pending callback fires after the modal is torn down.
+  reset(): void;
+}
+
+export function createModalDataController(
+  deps: ModalDataControllerDeps
+): ModalDataController {
+  const { state, callbacks } = deps;
+  const fetcher = deps.fetcher ?? fetchCtecCourseAnalytics;
+
+  // Distinct from analyticsInFlight: tracks background "check for new CTECs"
+  // passes that must NOT flip the modal to a loading state. The user keeps
+  // interacting with cached data while we re-poll Northwestern.
+  const analyticsBackgroundRefresh = new Set<string>();
+
+  // Result of the most recent background refresh per key. Cleared on user
+  // dismiss or after a setTimeout for success cases.
+  const analyticsRefreshFlash = new Map<string, ModalRefreshFlash>();
+  const analyticsRefreshFlashTimers = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
+
+  // Per-key target count for analytics. Each user click on "+N more terms"
+  // bumps this by recentTerms; the next fetch uses it as fetchLimit so we
+  // pull exactly the next batch.
+  const analyticsTargetCount = new Map<string, number>();
+
+  function clearRefreshFlash(key: string): void {
+    const timer = analyticsRefreshFlashTimers.get(key);
+    if (timer) clearTimeout(timer);
+    analyticsRefreshFlashTimers.delete(key);
+    analyticsRefreshFlash.delete(key);
+  }
+
+  function setRefreshFlash(key: string, flash: ModalRefreshFlash): void {
+    analyticsRefreshFlash.set(key, flash);
+    const existingTimer = analyticsRefreshFlashTimers.get(key);
+    if (existingTimer) clearTimeout(existingTimer);
+    analyticsRefreshFlashTimers.delete(key);
+    if (flash.kind === "success") {
+      const timer = setTimeout(() => {
+        analyticsRefreshFlashTimers.delete(key);
+        if (analyticsRefreshFlash.get(key) === flash) {
+          analyticsRefreshFlash.delete(key);
+          callbacks.syncView();
+        }
+      }, 6000);
+      analyticsRefreshFlashTimers.set(key, timer);
+    }
+  }
+
+  // Fetches the next batch of recentTerms-sized term reports for this course.
+  // Each user-initiated call bumps the per-key target so the underlying
+  // fetchLimit grows by recentTerms — pulling exactly the next batch of
+  // unparsed entries. `increment=false` is used to resume an interrupted
+  // batch (e.g. after a login retry) without bumping the target.
+  function kickBatch(context: AnalyticsModalSource, increment = true): void {
+    if (state.analyticsInFlight.has(context.key)) return;
+
+    const credit = ctecCreditPool.tryConsume("modal-load-more");
+    if (!credit.allowed) {
+      showToast(ctecCreditPool.formatLimitReached(credit.waitMs), {
+        tone: "warn",
+        durationMs: 6000
+      });
+      return;
+    }
+
+    const batchSize = PAPER_CTEC_CONFIG.aggregate.recentTerms;
+    const snapshot = getCtecCourseAnalyticsSnapshot(
+      context.params,
+      context.titleHint,
+      batchSize
+    );
+    const parsedCount = countParsedEntries(snapshot);
+    const previousTarget = analyticsTargetCount.get(context.key) ?? parsedCount;
+    const nextTarget = increment
+      ? Math.max(previousTarget, parsedCount) + batchSize
+      : Math.max(previousTarget, parsedCount + batchSize);
+    analyticsTargetCount.set(context.key, nextTarget);
+
+    const start = async (): Promise<PaperCtecAnalyticsState> => {
+      const currentFrontPageJob = state.inFlight.get(context.key);
+      if (currentFrontPageJob) {
+        await currentFrontPageJob.catch(() => undefined);
+      }
+
+      const result = await fetcher(
+        context.params,
+        context.titleHint,
+        PAPER_CTEC_CONFIG.aggregate.recentTerms,
+        (message) => {
+          callbacks.setProgress(context.key, `Loading term history… ${message}`);
+        },
+        nextTarget
+      );
+
+      return result.state === "found"
+        ? { state: "found", analytics: result.analytics }
+        : result;
+    };
+
+    const generation = callbacks.generation();
+    const isStale = () => generation !== callbacks.generation();
+    const job = start()
+      .then((resultState) => {
+        if (isStale()) return resultState;
+        state.analyticsResolved.set(context.key, resultState);
+        if (resultState.state === "error") {
+          showToast(CTEC_ERROR_TOAST_MESSAGE, { tone: "warn", durationMs: 9000 });
+        } else {
+          const warning = ctecCreditPool.format();
+          if (warning) {
+            showToast(`Loaded CTEC. ${warning}.`, { tone: "warn", durationMs: 5000 });
+          }
+        }
+        return resultState;
+      })
+      .catch((error) => {
+        const errorState: PaperCtecAnalyticsState = {
+          state: "error",
+          message: error instanceof Error ? error.message : String(error)
+        };
+        if (isStale()) return errorState;
+        state.analyticsResolved.set(context.key, errorState);
+        showToast(CTEC_ERROR_TOAST_MESSAGE, { tone: "warn", durationMs: 9000 });
+        return errorState;
+      })
+      .finally(() => {
+        state.analyticsInFlight.delete(context.key);
+        if (!state.inFlight.has(context.key)) {
+          state.loadingMessages.delete(context.key);
+        }
+        if (isStale()) return;
+        callbacks.syncStatusBar();
+        callbacks.syncSideCard();
+        callbacks.syncView();
+      });
+
+    state.analyticsInFlight.set(context.key, job);
+  }
+
+  // Background "check for new CTECs": re-pulls the link list from
+  // Northwestern (forceRefreshLinks=true) so newly-published evaluations are
+  // discovered, then fetches reports only for entries we haven't seen
+  // before. Existing cached reportSummary data is preserved across the
+  // refresh so the modal, side card, and schedule chip stay fully populated
+  // and usable. Distinct from kickBatch (which the modal's load-more uses)
+  // because it does NOT use analyticsInFlight — that flag drives the
+  // modal's global loading state, which we explicitly want to avoid here.
+  function kickRefresh(context: AnalyticsModalSource): void {
+    if (analyticsBackgroundRefresh.has(context.key)) return;
+    if (state.analyticsInFlight.has(context.key)) return;
+
+    const credit = ctecCreditPool.tryConsume("modal-refresh");
+    if (!credit.allowed) {
+      showToast(ctecCreditPool.formatLimitReached(credit.waitMs), {
+        tone: "warn",
+        durationMs: 6000
+      });
+      return;
+    }
+
+    analyticsBackgroundRefresh.add(context.key);
+    // Clear any prior flash so the user doesn't see stale success/error
+    // from the previous run while a new check is in flight.
+    clearRefreshFlash(context.key);
+
+    const previousSnapshot = getCtecCourseAnalyticsSnapshot(
+      context.params,
+      context.titleHint,
+      PAPER_CTEC_CONFIG.aggregate.recentTerms
+    );
+    const previousParsed = countParsedEntries(previousSnapshot);
+    const previousTotal = previousSnapshot?.entries.length ?? 0;
+    const previousTarget = analyticsTargetCount.get(context.key) ?? previousParsed;
+    const refreshTarget = Math.max(previousTarget, PAPER_CTEC_CONFIG.aggregate.recentTerms);
+    analyticsTargetCount.set(context.key, refreshTarget);
+
+    // Re-render so the refresh button immediately shows "Checking…".
+    callbacks.syncView();
+
+    const generation = callbacks.generation();
+    const isStale = () => generation !== callbacks.generation();
+
+    void (async () => {
+      try {
+        const result = await fetcher(
+          context.params,
+          context.titleHint,
+          PAPER_CTEC_CONFIG.aggregate.recentTerms,
+          undefined,
+          refreshTarget,
+          /* forceRefreshLinks */ true
+        );
+
+        if (isStale()) return;
+
+        if (result.state === "found") {
+          state.analyticsResolved.set(context.key, {
+            state: "found",
+            analytics: result.analytics
+          });
+          const updatedSnapshot = getCtecCourseAnalyticsSnapshot(
+            context.params,
+            context.titleHint,
+            PAPER_CTEC_CONFIG.aggregate.recentTerms
+          );
+          const newTotal = updatedSnapshot?.entries.length ?? 0;
+          const addedCount = Math.max(0, newTotal - previousTotal);
+          setRefreshFlash(context.key, { kind: "success", addedCount });
+          const warning = ctecCreditPool.format();
+          if (warning) {
+            showToast(`Refreshed CTEC. ${warning}.`, { tone: "warn", durationMs: 5000 });
+          }
+          // Refresh the schedule chip's mini-summary too — newly-published
+          // terms can shift the aggregated rating/responses count. Pull the
+          // updated aggregate straight from cache without going through the
+          // chip's loading state.
+          const refreshedAggregate = getCachedReportAggregate(
+            context.params,
+            context.titleHint,
+            PAPER_CTEC_CONFIG.aggregate.recentTerms
+          );
+          if (refreshedAggregate) {
+            const widgetData: PaperCtecWidgetData = {
+              state: "found",
+              aggregate: refreshedAggregate
+            };
+            state.resolved.set(context.key, widgetData);
+            callbacks.renderForKey(context.key, widgetData);
+          }
+        } else if (result.state === "auth-required") {
+          state.analyticsResolved.set(context.key, {
+            state: "auth-required",
+            loginUrl: result.loginUrl
+          });
+          setRefreshFlash(context.key, {
+            kind: "auth",
+            loginUrl: result.loginUrl
+          });
+        } else if (result.state === "error") {
+          state.analyticsResolved.set(context.key, {
+            state: "error",
+            message: result.message
+          });
+          setRefreshFlash(context.key, {
+            kind: "error",
+            message: result.message
+          });
+          showToast(CTEC_ERROR_TOAST_MESSAGE, { tone: "warn", durationMs: 9000 });
+        } else if (result.state === "not-found") {
+          // Existing data stays; flag it as up-to-date with zero added.
+          setRefreshFlash(context.key, { kind: "success", addedCount: 0 });
+        }
+      } catch (error) {
+        if (isStale()) return;
+        setRefreshFlash(context.key, {
+          kind: "error",
+          message: error instanceof Error ? error.message : String(error)
+        });
+        showToast(CTEC_ERROR_TOAST_MESSAGE, { tone: "warn", durationMs: 9000 });
+      } finally {
+        analyticsBackgroundRefresh.delete(context.key);
+        // Don't `return` from finally — that swallows any pending throw from
+        // the try/catch chain. Skip the post-refresh sync work instead.
+        if (!isStale()) {
+          callbacks.syncStatusBar();
+          callbacks.syncSideCard();
+          callbacks.syncView();
+        }
+      }
+    })();
+  }
+
+  return {
+    isBackgroundRefreshing(key) {
+      return analyticsBackgroundRefresh.has(key);
+    },
+    getRefreshFlash(key) {
+      return analyticsRefreshFlash.get(key) ?? null;
+    },
+    getTargetCount(key) {
+      return analyticsTargetCount.get(key);
+    },
+    setRefreshFlash,
+    clearRefreshFlash,
+    kickBatch,
+    kickRefresh,
+    reset() {
+      for (const timer of analyticsRefreshFlashTimers.values()) {
+        clearTimeout(timer);
+      }
+      analyticsRefreshFlashTimers.clear();
+      analyticsRefreshFlash.clear();
+      analyticsBackgroundRefresh.clear();
+      analyticsTargetCount.clear();
+    }
+  };
+}
+
+function countParsedEntries(
+  snapshot: ReturnType<typeof getCtecCourseAnalyticsSnapshot>
+): number {
+  if (!snapshot) return 0;
+  return snapshot.entries.filter(
+    (entry) => entry.status === "ready" || entry.status === "unavailable"
+  ).length;
+}

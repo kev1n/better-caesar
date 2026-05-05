@@ -1,5 +1,8 @@
+import { html, type TemplateResult } from "lit-html";
+
 import type { ModalDisplayData } from "../modal-data";
 import { attachTooltip, preventAndStop, stopPropagation } from "../ui-shared";
+import type { Section } from "./section";
 import type {
   AnalyticsModalCallbacks,
   AnalyticsModalInput,
@@ -8,65 +11,68 @@ import type {
   ModalTab
 } from "./types";
 
+export type HeaderSectionProps = {
+  doc: Document;
+  input: AnalyticsModalInput;
+  state: AnalyticsModalState;
+  callbacks: AnalyticsModalCallbacks;
+};
+
 // Modal header: close button, identity row (title + meta strip + actions),
 // optional refresh-flash banner, optional tab strip. The tab strip only
 // appears when data is loaded — otherwise the body shows a status card.
-export function renderHeader(
+export const HeaderSection: Section<HeaderSectionProps> = {
+  render({ doc, input, state, callbacks }) {
+    return html`<header class="bc-paper-ctec-modal-header">
+      <button
+        type="button"
+        class="bc-paper-ctec-modal-close"
+        aria-label="Close"
+        @click=${(event: Event) => {
+          preventAndStop(event);
+          callbacks.onClose();
+        }}
+      >✕</button>
+      <div class="bc-paper-ctec-modal-identity">
+        <div>
+          <h1 class="bc-paper-ctec-modal-title">
+            ${input.identity.title || `${input.identity.subject} ${input.identity.catalog}`}
+          </h1>
+          <div class="bc-paper-ctec-modal-meta">
+            <span class="bc-paper-ctec-modal-code"
+              >${input.identity.subject} ${input.identity.catalog}</span
+            >
+            ${metaItem(input.identity.instructor, input.identity.sectionTerm)}
+            ${input.data
+              ? metaItem(
+                  `${input.data.terms.length} ${
+                    input.data.terms.length === 1 ? "term" : "terms"
+                  }`,
+                  `${input.data.responses} responses`
+                )
+              : ""}
+          </div>
+        </div>
+        ${renderActions(doc, input, callbacks)}
+      </div>
+      ${input.refreshFlash ? renderRefreshFlash(input.refreshFlash, callbacks) : ""}
+      ${input.data
+        ? html`${renderDisclaimer()}${renderTabs(state, callbacks, input.data)}`
+        : ""}
+    </header>`;
+  }
+};
+
+// Right side: Refresh + Load-more + Open-original-report. These are the
+// controls that used to live in the side panel; they're now part of the
+// modal header so the analytics view is self-contained. Built imperatively
+// so we can use attachTooltip (DOM-attached helper) on the refresh button.
+function renderActions(
   doc: Document,
   input: AnalyticsModalInput,
-  state: AnalyticsModalState,
   callbacks: AnalyticsModalCallbacks
-): HTMLElement {
-  const header = doc.createElement("header");
-  header.className = "bc-paper-ctec-modal-header";
-
-  const close = doc.createElement("button");
-  close.type = "button";
-  close.className = "bc-paper-ctec-modal-close";
-  close.setAttribute("aria-label", "Close");
-  close.textContent = "✕";
-  close.addEventListener("click", (event) => {
-    preventAndStop(event);
-    callbacks.onClose();
-  });
-  header.append(close);
-
-  const identityRow = doc.createElement("div");
-  identityRow.className = "bc-paper-ctec-modal-identity";
-
-  const identityLeft = doc.createElement("div");
-
-  const title = doc.createElement("h1");
-  title.className = "bc-paper-ctec-modal-title";
-  title.textContent =
-    input.identity.title || `${input.identity.subject} ${input.identity.catalog}`;
-  identityLeft.append(title);
-
-  const meta = doc.createElement("div");
-  meta.className = "bc-paper-ctec-modal-meta";
-
-  const code = doc.createElement("span");
-  code.className = "bc-paper-ctec-modal-code";
-  code.textContent = `${input.identity.subject} ${input.identity.catalog}`;
-  meta.append(code);
-
-  appendMetaItem(doc, meta, input.identity.instructor, input.identity.sectionTerm);
-  if (input.data) {
-    appendMetaItem(
-      doc,
-      meta,
-      `${input.data.terms.length} ${input.data.terms.length === 1 ? "term" : "terms"}`,
-      `${input.data.responses} responses`
-    );
-  }
-  identityLeft.append(meta);
-  identityRow.append(identityLeft);
-
-  // Right side: Refresh + Load-more + Open-original-report. These are the
-  // controls that used to live in the side panel; they're now part of the
-  // modal header so the analytics view is self-contained.
-  const actions = doc.createElement("div");
-  actions.className = "bc-paper-ctec-modal-actions";
+): TemplateResult | string {
+  const children: HTMLElement[] = [];
 
   if (input.canLoadMore || input.loading) {
     const loadMore = doc.createElement("button");
@@ -88,7 +94,7 @@ export function renderHeader(
       if (loadMore.disabled) return;
       callbacks.onLoadMore();
     });
-    actions.append(loadMore);
+    children.push(loadMore);
   }
 
   if (input.canRefresh) {
@@ -117,7 +123,7 @@ export function renderHeader(
       if (refresh.disabled) return;
       callbacks.onRefresh();
     });
-    actions.append(refresh);
+    children.push(refresh);
   }
 
   if (input.data?.course.reportUrl) {
@@ -128,173 +134,131 @@ export function renderHeader(
     link.rel = "noopener noreferrer";
     link.textContent = "↗ Open original CTEC report";
     link.addEventListener("click", stopPropagation);
-    actions.append(link);
+    children.push(link);
   }
 
-  if (actions.childElementCount > 0) {
-    identityRow.append(actions);
-  }
-  header.append(identityRow);
-
-  if (input.refreshFlash) {
-    header.append(renderRefreshFlash(doc, input.refreshFlash, callbacks));
-  }
-
-  if (input.data) {
-    header.append(renderDisclaimer(doc));
-    header.append(renderTabs(doc, state, callbacks, input.data));
-  }
-  return header;
+  if (children.length === 0) return "";
+  return html`<div class="bc-paper-ctec-modal-actions">${children}</div>`;
 }
 
 // Persistent header note clarifying what trend deltas mean and the project's
 // stance on instructor comparisons. Sits between the identity row and tabs
 // so users see it on every analytics view.
-function renderDisclaimer(doc: Document): HTMLElement {
-  const note = doc.createElement("div");
-  note.className = "bc-paper-ctec-modal-disclaimer";
-
-  const icon = doc.createElement("span");
-  icon.className = "bc-paper-ctec-modal-disclaimer-icon";
-  icon.setAttribute("aria-hidden", "true");
-  icon.textContent = "i";
-  note.append(icon);
-
-  const text = doc.createElement("span");
-  text.className = "bc-paper-ctec-modal-disclaimer-text";
-  const lead = doc.createElement("strong");
-  lead.textContent =
-    "We only compare this professor to past times they taught this same class.";
-  text.append(
-    lead,
-    doc.createTextNode(
-      " Every trend and “vs recent term” number is just this professor's earlier sections of this exact course."
-    )
-  );
-  note.append(text);
-
-  return note;
+function renderDisclaimer(): TemplateResult {
+  return html`<div class="bc-paper-ctec-modal-disclaimer">
+    <span class="bc-paper-ctec-modal-disclaimer-icon" aria-hidden="true">i</span>
+    <span class="bc-paper-ctec-modal-disclaimer-text">
+      <strong
+        >We only compare this professor to past times they taught this same class.</strong
+      >
+      Every trend and “vs recent term” number is just this professor's earlier
+      sections of this exact course.
+    </span>
+  </div>`;
 }
 
 function renderRefreshFlash(
-  doc: Document,
   flash: ModalRefreshFlash,
   callbacks: AnalyticsModalCallbacks
-): HTMLElement {
-  const banner = doc.createElement("div");
-  banner.className = `bc-paper-ctec-modal-flash bc-paper-ctec-modal-flash-${flash.kind}`;
-  banner.setAttribute("role", flash.kind === "success" ? "status" : "alert");
-
-  const icon = doc.createElement("span");
-  icon.className = "bc-paper-ctec-modal-flash-icon";
-  icon.setAttribute("aria-hidden", "true");
-  icon.textContent =
+): TemplateResult {
+  const icon =
     flash.kind === "success" ? "✓" : flash.kind === "auth" ? "🔒" : "!";
-  banner.append(icon);
+  const role = flash.kind === "success" ? "status" : "alert";
 
-  const text = doc.createElement("div");
-  text.className = "bc-paper-ctec-modal-flash-text";
-
-  const title = doc.createElement("strong");
-  title.className = "bc-paper-ctec-modal-flash-title";
-  const body = doc.createElement("span");
-  body.className = "bc-paper-ctec-modal-flash-body";
-
+  let title: string;
+  let body: string;
   if (flash.kind === "success") {
     if (flash.addedCount > 0) {
-      title.textContent =
+      title =
         flash.addedCount === 1
           ? "1 new evaluation found"
           : `${flash.addedCount} new evaluations found`;
-      body.textContent = "Newly-published CTECs were added to your view.";
+      body = "Newly-published CTECs were added to your view.";
     } else {
-      title.textContent = "You're up to date";
-      body.textContent = "Northwestern has no new CTECs for this course right now.";
+      title = "You're up to date";
+      body = "Northwestern has no new CTECs for this course right now.";
     }
   } else if (flash.kind === "auth") {
-    title.textContent = "Northwestern login required";
-    body.textContent = "Sign in to CAESAR and try again.";
+    title = "Northwestern login required";
+    body = "Sign in to CAESAR and try again.";
   } else {
-    title.textContent = "Couldn't check for new CTECs";
-    body.textContent = flash.message;
+    title = "Couldn't check for new CTECs";
+    body = flash.message;
   }
 
-  text.append(title, body);
-  banner.append(text);
-
-  if (flash.kind === "auth") {
-    const action = doc.createElement("button");
-    action.type = "button";
-    action.className = "bc-paper-ctec-modal-flash-action";
-    action.textContent = "Open login";
-    action.addEventListener("click", (event) => {
-      preventAndStop(event);
-      callbacks.onLogin();
-    });
-    banner.append(action);
-  }
-
-  const dismiss = doc.createElement("button");
-  dismiss.type = "button";
-  dismiss.className = "bc-paper-ctec-modal-flash-dismiss";
-  dismiss.setAttribute("aria-label", "Dismiss");
-  dismiss.textContent = "✕";
-  dismiss.addEventListener("click", (event) => {
-    preventAndStop(event);
-    callbacks.onDismissRefreshFlash();
-  });
-  banner.append(dismiss);
-
-  return banner;
+  return html`<div
+    class=${`bc-paper-ctec-modal-flash bc-paper-ctec-modal-flash-${flash.kind}`}
+    role=${role}
+  >
+    <span class="bc-paper-ctec-modal-flash-icon" aria-hidden="true">${icon}</span>
+    <div class="bc-paper-ctec-modal-flash-text">
+      <strong class="bc-paper-ctec-modal-flash-title">${title}</strong>
+      <span class="bc-paper-ctec-modal-flash-body">${body}</span>
+    </div>
+    ${flash.kind === "auth"
+      ? html`<button
+          type="button"
+          class="bc-paper-ctec-modal-flash-action"
+          @click=${(event: Event) => {
+            preventAndStop(event);
+            callbacks.onLogin();
+          }}
+        >Open login</button>`
+      : ""}
+    <button
+      type="button"
+      class="bc-paper-ctec-modal-flash-dismiss"
+      aria-label="Dismiss"
+      @click=${(event: Event) => {
+        preventAndStop(event);
+        callbacks.onDismissRefreshFlash();
+      }}
+    >✕</button>
+  </div>`;
 }
 
-function appendMetaItem(
-  doc: Document,
-  meta: HTMLElement,
-  primary: string,
-  secondary: string
-): void {
-  const span = doc.createElement("span");
-  const strong = doc.createElement("strong");
-  strong.textContent = primary;
-  span.append(strong, doc.createTextNode(secondary ? ` · ${secondary}` : ""));
-  meta.append(span);
+function metaItem(primary: string, secondary: string): TemplateResult {
+  return html`<span><strong>${primary}</strong>${secondary ? ` · ${secondary}` : ""}</span>`;
 }
 
 function renderTabs(
-  doc: Document,
   state: AnalyticsModalState,
   callbacks: AnalyticsModalCallbacks,
   data: ModalDisplayData
-): HTMLElement {
-  const tabs = doc.createElement("div");
-  tabs.className = "bc-paper-ctec-modal-tabs";
-
+): TemplateResult {
   const definitions: Array<{ id: ModalTab; label: string; count?: number }> = [
     { id: "overview", label: "Overview" },
     { id: "comments", label: "Comments", count: data.comments.length },
     { id: "terms", label: "Terms", count: data.terms.length }
   ];
 
-  for (const definition of definitions) {
-    const button = doc.createElement("button");
-    button.type = "button";
-    button.className = `bc-paper-ctec-modal-tab${
-      state.tab === definition.id ? " is-active" : ""
-    }`;
-    button.textContent = definition.label;
-    if (definition.count != null) {
-      const count = doc.createElement("span");
-      count.className = "bc-paper-ctec-modal-tab-count";
-      count.textContent = String(definition.count);
-      button.append(count);
-    }
-    button.addEventListener("click", (event) => {
-      preventAndStop(event);
-      callbacks.onTabChange(definition.id);
-    });
-    tabs.append(button);
-  }
+  return html`<div class="bc-paper-ctec-modal-tabs">
+    ${definitions.map(
+      (definition) => html`<button
+        type="button"
+        class=${`bc-paper-ctec-modal-tab${
+          state.tab === definition.id ? " is-active" : ""
+        }`}
+        @click=${(event: Event) => {
+          preventAndStop(event);
+          callbacks.onTabChange(definition.id);
+        }}
+      >${definition.label}${definition.count != null
+          ? html`<span class="bc-paper-ctec-modal-tab-count"
+              >${definition.count}</span
+            >`
+          : ""}</button>`
+    )}
+  </div>`;
+}
 
-  return tabs;
+// Backwards-compat: pre-Wave-6c callsite kept while the orchestrator
+// migrates to lit-html sections wholesale.
+export function renderHeader(
+  doc: Document,
+  input: AnalyticsModalInput,
+  state: AnalyticsModalState,
+  callbacks: AnalyticsModalCallbacks
+): TemplateResult {
+  return HeaderSection.render({ doc, input, state, callbacks });
 }

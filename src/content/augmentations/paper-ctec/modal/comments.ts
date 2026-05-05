@@ -1,5 +1,8 @@
+import { html, render, type TemplateResult } from "lit-html";
+
 import type { ModalCommentTone, ModalDisplayData } from "../modal-data";
 import { preventAndStop, stopPropagation } from "../ui-shared";
+import type { Section } from "./section";
 import {
   COMMENTS_PAGE_SIZE,
   TONE_META,
@@ -11,33 +14,30 @@ import {
   type ModalCommentSort
 } from "./types";
 
+export type CommentsSectionProps = {
+  doc: Document;
+  data: ModalDisplayData;
+  state: AnalyticsModalState;
+  callbacks: AnalyticsModalCallbacks;
+};
+
 // Comments tab: rail of filter buttons (sentiment + frequent topics + term)
 // alongside a main panel with search/sort toolbar, active filter chips,
 // count, and the filtered comment-card list.
-export function renderComments(
-  doc: Document,
-  data: ModalDisplayData,
-  state: AnalyticsModalState,
-  callbacks: AnalyticsModalCallbacks
-): HTMLElement {
-  const root = doc.createElement("div");
-  root.className = "bc-paper-ctec-modal-comments";
-
-  root.append(renderCommentsRail(doc, data, state, callbacks));
-  root.append(renderCommentsMain(doc, data, state, callbacks));
-
-  return root;
-}
+export const CommentsSection: Section<CommentsSectionProps> = {
+  render({ doc, data, state, callbacks }) {
+    return html`<div class="bc-paper-ctec-modal-comments">
+      ${renderCommentsRail(data, state, callbacks)}
+      ${renderCommentsMain(doc, data, state, callbacks)}
+    </div>`;
+  }
+};
 
 function renderCommentsRail(
-  doc: Document,
   data: ModalDisplayData,
   state: AnalyticsModalState,
   callbacks: AnalyticsModalCallbacks
-): HTMLElement {
-  const rail = doc.createElement("aside");
-  rail.className = "bc-paper-ctec-modal-rail";
-
+): TemplateResult {
   // Sentiment, term, and topic all cross-filter each other: each rail's
   // counts respect the *other* two active filters but ignore its own, so
   // toggling the active selection in any rail still works.
@@ -54,10 +54,14 @@ function renderCommentsRail(
         c.tone === state.commentsSentimentFilter) &&
       topicMatches(c)
   );
-  const sentimentCounts: Record<ModalCommentTone, number> = { pos: 0, mix: 0, neu: 0, neg: 0 };
+  const sentimentCounts: Record<ModalCommentTone, number> = {
+    pos: 0,
+    mix: 0,
+    neu: 0,
+    neg: 0
+  };
   for (const c of termFiltered) sentimentCounts[c.tone] += 1;
 
-  rail.append(railHeader(doc, "Sentiment"));
   const sentimentRows: Array<{
     key: ModalCommentSentimentFilter;
     label: string;
@@ -70,127 +74,120 @@ function renderCommentsRail(
     { key: "neu", label: "Neutral", count: sentimentCounts.neu, dot: "var(--bc-color-sentiment-neu-fg)" },
     { key: "neg", label: "Critical", count: sentimentCounts.neg, dot: "var(--bc-color-sentiment-neg-fg)" }
   ];
-  for (const row of sentimentRows) {
-    const active = state.commentsSentimentFilter === row.key;
-    const button = railButton(doc, row.label, row.count, active, () => {
-      callbacks.onCommentsSentimentChange(row.key);
-    });
-    const dot = doc.createElement("span");
-    dot.className = "bc-paper-ctec-modal-rail-dot";
-    dot.style.background = row.dot;
-    button.prepend(dot);
-    rail.append(button);
-  }
 
-  rail.append(railHeader(doc, "Frequent topics"));
-  rail.append(
-    railButton(doc, "All topics", data.comments.length, !state.commentsActiveTopic, () => {
-      callbacks.onCommentsTopicChange(null);
-    })
-  );
-  if (data.topics.length === 0) {
-    const empty = doc.createElement("div");
-    empty.className = "bc-paper-ctec-modal-rail-empty";
-    empty.textContent = "Not enough comments yet to surface common phrases.";
-    rail.append(empty);
-  }
-  for (const topic of data.topics) {
-    const active = state.commentsActiveTopic === topic.label;
-    const button = railButton(doc, topic.label, topic.count, active, () => {
-      callbacks.onCommentsTopicChange(active ? null : topic.label);
-    });
-    // Tone bar sits below the label/count so users can see at a glance
-    // whether mentions of this phrase skew positive vs critical.
-    button.append(renderTopicSentimentBar(doc, topic.sentiments));
-    button.classList.add("has-sentiment");
-    rail.append(button);
-  }
-
-  rail.append(railHeader(doc, "Term"));
   const allTerms = Array.from(new Set(data.comments.map((c) => c.term)));
-  rail.append(
-    railButton(
-      doc,
+
+  return html`<aside class="bc-paper-ctec-modal-rail">
+    ${railHeader("Sentiment")}
+    ${sentimentRows.map((row) =>
+      railButton(
+        row.label,
+        row.count,
+        state.commentsSentimentFilter === row.key,
+        () => callbacks.onCommentsSentimentChange(row.key),
+        html`<span
+          class="bc-paper-ctec-modal-rail-dot"
+          style=${`background: ${row.dot}`}
+        ></span>`
+      )
+    )}
+    ${railHeader("Frequent topics")}
+    ${railButton(
+      "All topics",
+      data.comments.length,
+      !state.commentsActiveTopic,
+      () => callbacks.onCommentsTopicChange(null)
+    )}
+    ${data.topics.length === 0
+      ? html`<div class="bc-paper-ctec-modal-rail-empty"
+          >Not enough comments yet to surface common phrases.</div
+        >`
+      : ""}
+    ${data.topics.map((topic) => {
+      const active = state.commentsActiveTopic === topic.label;
+      return railButton(
+        topic.label,
+        topic.count,
+        active,
+        () => callbacks.onCommentsTopicChange(active ? null : topic.label),
+        undefined,
+        renderTopicSentimentBar(topic.sentiments),
+        true
+      );
+    })}
+    ${railHeader("Term")}
+    ${railButton(
       "All terms",
       sentimentFiltered.length,
       state.commentsTermFilter === "all",
       () => callbacks.onCommentsTermFilterChange("all")
-    )
-  );
-  for (const termLabel of allTerms) {
-    const count = sentimentFiltered.filter((c) => c.term === termLabel).length;
-    const active = state.commentsTermFilter === termLabel;
-    rail.append(
-      railButton(doc, termLabel, count, active, () =>
-        callbacks.onCommentsTermFilterChange(termLabel)
-      )
-    );
-  }
-
-  return rail;
+    )}
+    ${allTerms.map((termLabel) => {
+      const count = sentimentFiltered.filter((c) => c.term === termLabel).length;
+      return railButton(
+        termLabel,
+        count,
+        state.commentsTermFilter === termLabel,
+        () => callbacks.onCommentsTermFilterChange(termLabel)
+      );
+    })}
+  </aside>`;
 }
 
-function railHeader(doc: Document, text: string): HTMLElement {
-  const header = doc.createElement("div");
-  header.className = "bc-paper-ctec-modal-rail-header";
-  header.textContent = text;
-  return header;
+function railHeader(text: string): TemplateResult {
+  return html`<div class="bc-paper-ctec-modal-rail-header">${text}</div>`;
 }
 
 function railButton(
-  doc: Document,
   label: string,
   count: number,
   active: boolean,
-  onClick: () => void
-): HTMLElement {
-  const button = doc.createElement("button");
-  button.type = "button";
-  button.className = `bc-paper-ctec-modal-rail-btn${active ? " is-active" : ""}`;
-  const labelEl = doc.createElement("span");
-  labelEl.className = "bc-paper-ctec-modal-rail-label";
-  labelEl.textContent = label;
-  const countEl = doc.createElement("span");
-  countEl.className = "bc-paper-ctec-modal-rail-count";
-  countEl.textContent = String(count);
-  button.append(labelEl, countEl);
-  button.addEventListener("click", (event) => {
-    preventAndStop(event);
-    onClick();
-  });
-  return button;
+  onClick: () => void,
+  prefix?: TemplateResult,
+  suffix?: TemplateResult,
+  hasSentiment?: boolean
+): TemplateResult {
+  const cls = `bc-paper-ctec-modal-rail-btn${active ? " is-active" : ""}${
+    hasSentiment ? " has-sentiment" : ""
+  }`;
+  return html`<button
+    type="button"
+    class=${cls}
+    @click=${(event: Event) => {
+      preventAndStop(event);
+      onClick();
+    }}
+  >${prefix ?? ""}<span class="bc-paper-ctec-modal-rail-label">${label}</span
+    ><span class="bc-paper-ctec-modal-rail-count">${count}</span>${suffix ?? ""}</button>`;
 }
 
 // Tiny segmented bar showing tone distribution of comments containing a
 // given frequent topic. Colors match the Sentiment rail dots — green
 // (pos), amber (mix), gray (neu), red (neg).
 function renderTopicSentimentBar(
-  doc: Document,
   sentiments: Record<ModalCommentTone, number>
-): HTMLElement {
-  const wrapper = doc.createElement("div");
-  wrapper.className = "bc-paper-ctec-modal-rail-tone";
-
+): TemplateResult {
   const total =
     sentiments.pos + sentiments.mix + sentiments.neu + sentiments.neg;
-  if (total === 0) return wrapper;
+  if (total === 0) {
+    return html`<div class="bc-paper-ctec-modal-rail-tone"></div>`;
+  }
 
   const tooltip = (["pos", "mix", "neu", "neg"] as ModalCommentTone[])
     .filter((tone) => sentiments[tone] > 0)
     .map((tone) => `${sentiments[tone]} ${TOPIC_TONE_LABELS[tone]}`)
     .join(" · ");
-  wrapper.title = tooltip;
 
-  for (const tone of ["pos", "mix", "neu", "neg"] as ModalCommentTone[]) {
-    const value = sentiments[tone];
-    if (value === 0) continue;
-    const segment = doc.createElement("div");
-    segment.className = "bc-paper-ctec-modal-rail-tone-seg";
-    segment.style.flexGrow = String(value);
-    segment.style.background = TOPIC_TONE_COLORS[tone];
-    wrapper.append(segment);
-  }
-  return wrapper;
+  return html`<div class="bc-paper-ctec-modal-rail-tone" title=${tooltip}>
+    ${(["pos", "mix", "neu", "neg"] as ModalCommentTone[]).map((tone) => {
+      const value = sentiments[tone];
+      if (value === 0) return "";
+      return html`<div
+        class="bc-paper-ctec-modal-rail-tone-seg"
+        style=${`flex-grow: ${value}; background: ${TOPIC_TONE_COLORS[tone]}`}
+      ></div>`;
+    })}
+  </div>`;
 }
 
 function renderCommentsMain(
@@ -198,119 +195,101 @@ function renderCommentsMain(
   data: ModalDisplayData,
   state: AnalyticsModalState,
   callbacks: AnalyticsModalCallbacks
-): HTMLElement {
-  const main = doc.createElement("main");
-  main.className = "bc-paper-ctec-modal-comments-main";
+): TemplateResult {
+  // Imperative comment list + count: keystroke-driven local re-renders avoid
+  // the cost of running the full modal sync on every input event. lit-html
+  // splats the host elements via ${} interpolation, then we mount the
+  // comment-list view into them after they're attached.
+  const commentsList = doc.createElement("div");
+  commentsList.className = "bc-paper-ctec-modal-comments-list";
+  const countLabel = doc.createElement("div");
+  countLabel.className = "bc-paper-ctec-modal-comments-count";
 
-  const toolbar = doc.createElement("div");
-  toolbar.className = "bc-paper-ctec-modal-comments-toolbar";
+  const draw = (query: string) => {
+    renderCommentList(commentsList, countLabel, data, state, query);
+  };
+  draw(state.commentsQuery);
 
-  const searchWrap = doc.createElement("div");
-  searchWrap.className = "bc-paper-ctec-modal-comments-search";
-  const searchIcon = doc.createElement("span");
-  searchIcon.textContent = "⌕";
-  searchIcon.className = "bc-paper-ctec-modal-comments-search-icon";
-  const input = doc.createElement("input");
-  input.type = "search";
-  input.placeholder = `Search ${data.comments.length} comments…`;
-  input.className = "bc-paper-ctec-modal-comments-input";
-  input.dataset.bcPaperCtecModalSearch = "1";
-  input.value = state.commentsQuery;
-  input.addEventListener("click", stopPropagation);
-  input.addEventListener("keydown", stopPropagation);
-  input.addEventListener("input", () => {
-    state.commentsVisibleCount = COMMENTS_PAGE_SIZE;
-    renderCommentList(commentsList, countLabel, data, state, input.value);
-  });
-  searchWrap.append(searchIcon, input);
-  toolbar.append(searchWrap);
-
-  const sortWrap = doc.createElement("div");
-  sortWrap.className = "bc-paper-ctec-modal-comments-sort";
-  const sortLabel = doc.createElement("span");
-  sortLabel.textContent = "Sort";
-  const sortSelect = doc.createElement("select");
-  sortSelect.className = "bc-paper-ctec-modal-comments-sort-select";
-  for (const option of [
-    { value: "recent", label: "Most recent" },
-    { value: "longest", label: "Longest" },
-    { value: "shortest", label: "Shortest" }
-  ] as const) {
-    const optEl = doc.createElement("option");
-    optEl.value = option.value;
-    optEl.textContent = option.label;
-    if (state.commentsSortBy === option.value) optEl.selected = true;
-    sortSelect.append(optEl);
-  }
-  sortSelect.addEventListener("click", stopPropagation);
-  sortSelect.addEventListener("change", () => {
-    callbacks.onCommentsSortChange(sortSelect.value as ModalCommentSort);
-  });
-  sortWrap.append(sortLabel, sortSelect);
-  toolbar.append(sortWrap);
-
-  main.append(toolbar);
-
-  const filterChips = doc.createElement("div");
-  filterChips.className = "bc-paper-ctec-modal-filter-chips";
   const hasFilters =
     state.commentsActiveTopic ||
     state.commentsSentimentFilter !== "all" ||
     state.commentsTermFilter !== "all";
-  if (hasFilters) {
-    const tag = doc.createElement("span");
-    tag.className = "bc-paper-ctec-modal-filter-label";
-    tag.textContent = "Filtered:";
-    filterChips.append(tag);
 
-    if (state.commentsSentimentFilter !== "all") {
-      filterChips.append(
-        renderChip(doc, sentimentLabel(state.commentsSentimentFilter), () =>
-          callbacks.onCommentsSentimentChange("all")
-        )
-      );
-    }
-    if (state.commentsActiveTopic) {
-      filterChips.append(
-        renderChip(doc, state.commentsActiveTopic, () =>
-          callbacks.onCommentsTopicChange(null)
-        )
-      );
-    }
-    if (state.commentsTermFilter !== "all") {
-      filterChips.append(
-        renderChip(doc, state.commentsTermFilter, () =>
-          callbacks.onCommentsTermFilterChange("all")
-        )
-      );
-    }
-    const clear = doc.createElement("button");
-    clear.type = "button";
-    clear.className = "bc-paper-ctec-modal-filter-clear";
-    clear.textContent = "Clear all";
-    clear.addEventListener("click", (event) => {
-      preventAndStop(event);
-      callbacks.onCommentsSentimentChange("all");
-      callbacks.onCommentsTopicChange(null);
-      callbacks.onCommentsTermFilterChange("all");
-    });
-    filterChips.append(clear);
-  }
-  main.append(filterChips);
-
-  const countLabel = doc.createElement("div");
-  countLabel.className = "bc-paper-ctec-modal-comments-count";
-  main.append(countLabel);
-
-  const commentsList = doc.createElement("div");
-  commentsList.className = "bc-paper-ctec-modal-comments-list";
-  main.append(commentsList);
-
-  renderCommentList(commentsList, countLabel, data, state, state.commentsQuery);
-
-  return main;
+  return html`<main class="bc-paper-ctec-modal-comments-main">
+    <div class="bc-paper-ctec-modal-comments-toolbar">
+      <div class="bc-paper-ctec-modal-comments-search">
+        <span class="bc-paper-ctec-modal-comments-search-icon">⌕</span>
+        <input
+          type="search"
+          placeholder=${`Search ${data.comments.length} comments…`}
+          class="bc-paper-ctec-modal-comments-input"
+          data-bc-paper-ctec-modal-search="1"
+          .value=${state.commentsQuery}
+          @click=${stopPropagation}
+          @keydown=${stopPropagation}
+          @input=${(event: Event) => {
+            const value = (event.target as HTMLInputElement).value;
+            state.commentsQuery = value;
+            state.commentsVisibleCount = COMMENTS_PAGE_SIZE;
+            draw(value);
+          }}
+        />
+      </div>
+      <div class="bc-paper-ctec-modal-comments-sort">
+        <span>Sort</span>
+        <select
+          class="bc-paper-ctec-modal-comments-sort-select"
+          @click=${stopPropagation}
+          @change=${(event: Event) => {
+            callbacks.onCommentsSortChange(
+              (event.target as HTMLSelectElement).value as ModalCommentSort
+            );
+          }}
+        >
+          <option value="recent" ?selected=${state.commentsSortBy === "recent"}>Most recent</option>
+          <option value="longest" ?selected=${state.commentsSortBy === "longest"}>Longest</option>
+          <option value="shortest" ?selected=${state.commentsSortBy === "shortest"}>Shortest</option>
+        </select>
+      </div>
+    </div>
+    <div class="bc-paper-ctec-modal-filter-chips">
+      ${hasFilters
+        ? html`<span class="bc-paper-ctec-modal-filter-label">Filtered:</span>
+            ${state.commentsSentimentFilter !== "all"
+              ? renderChip(sentimentLabel(state.commentsSentimentFilter), () =>
+                  callbacks.onCommentsSentimentChange("all")
+                )
+              : ""}
+            ${state.commentsActiveTopic
+              ? renderChip(state.commentsActiveTopic, () =>
+                  callbacks.onCommentsTopicChange(null)
+                )
+              : ""}
+            ${state.commentsTermFilter !== "all"
+              ? renderChip(state.commentsTermFilter, () =>
+                  callbacks.onCommentsTermFilterChange("all")
+                )
+              : ""}
+            <button
+              type="button"
+              class="bc-paper-ctec-modal-filter-clear"
+              @click=${(event: Event) => {
+                preventAndStop(event);
+                callbacks.onCommentsSentimentChange("all");
+                callbacks.onCommentsTopicChange(null);
+                callbacks.onCommentsTermFilterChange("all");
+              }}
+            >Clear all</button>`
+        : ""}
+    </div>
+    ${countLabel}
+    ${commentsList}
+  </main>`;
 }
 
+// Imperative inner render so input keystrokes can repaint the comment list
+// without triggering the full modal sync (which would teardown + rebuild
+// the rail, toolbar, and other expensive subtrees).
 function renderCommentList(
   container: HTMLElement,
   countLabel: HTMLElement,
@@ -319,7 +298,6 @@ function renderCommentList(
   query: string
 ): void {
   const doc = container.ownerDocument;
-  container.replaceChildren();
 
   let filtered = data.comments.filter((c) => {
     if (state.commentsSentimentFilter !== "all" && c.tone !== state.commentsSentimentFilter) {
@@ -344,16 +322,14 @@ function renderCommentList(
 
   const visibleCount = Math.min(filtered.length, state.commentsVisibleCount);
 
-  const updateCountLabel = (visible: number): void => {
-    const showingStrong = doc.createElement("strong");
-    showingStrong.textContent = String(visible);
-    countLabel.replaceChildren(
-      doc.createTextNode("Showing "),
-      showingStrong,
-      doc.createTextNode(` of ${filtered.length} comments`)
-    );
-  };
-  updateCountLabel(visibleCount);
+  // Count label uses lit-html for the small dom write so we don't have to
+  // hand-roll the strong+text builder.
+  render(
+    html`Showing <strong>${visibleCount}</strong> of ${filtered.length} comments`,
+    countLabel
+  );
+
+  container.replaceChildren();
 
   if (filtered.length === 0) {
     const empty = doc.createElement("div");
@@ -402,7 +378,10 @@ function renderCommentList(
         );
       }
       container.insertBefore(fragment, more);
-      updateCountLabel(nextRendered);
+      render(
+        html`Showing <strong>${nextRendered}</strong> of ${filtered.length} comments`,
+        countLabel
+      );
       if (nextRendered >= filtered.length) more.remove();
       else renderMoreLabel(nextRendered);
     });
@@ -554,24 +533,17 @@ function appendHighlighted(
   }
 }
 
-function renderChip(
-  doc: Document,
-  label: string,
-  onClear: () => void
-): HTMLElement {
-  const chip = doc.createElement("span");
-  chip.className = "bc-paper-ctec-modal-filter-chip";
-  chip.textContent = label;
-  const x = doc.createElement("button");
-  x.type = "button";
-  x.textContent = "✕";
-  x.className = "bc-paper-ctec-modal-filter-chip-x";
-  x.addEventListener("click", (event) => {
-    preventAndStop(event);
-    onClear();
-  });
-  chip.append(x);
-  return chip;
+function renderChip(label: string, onClear: () => void): TemplateResult {
+  return html`<span class="bc-paper-ctec-modal-filter-chip"
+    >${label}<button
+      type="button"
+      class="bc-paper-ctec-modal-filter-chip-x"
+      @click=${(event: Event) => {
+        preventAndStop(event);
+        onClear();
+      }}
+    >✕</button></span
+  >`;
 }
 
 function sentimentLabel(filter: ModalCommentSentimentFilter): string {
@@ -593,4 +565,14 @@ function isHiddenPrompt(prompt: string): boolean {
     .replace(/[.!?;:,]+$/u, "")
     .trim();
   return HIDDEN_PROMPTS.has(normalized);
+}
+
+// Backwards-compat shim.
+export function renderComments(
+  doc: Document,
+  data: ModalDisplayData,
+  state: AnalyticsModalState,
+  callbacks: AnalyticsModalCallbacks
+): TemplateResult {
+  return CommentsSection.render({ doc, data, state, callbacks });
 }

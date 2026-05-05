@@ -1,3 +1,5 @@
+import { html, type TemplateResult } from "lit-html";
+
 import {
   renderHoursDensity,
   type HoursDensitySeries
@@ -21,8 +23,9 @@ import { pickMetricHue } from "../widget-chips";
 import { appendBandLabel } from "./band-labels";
 import { renderDistChart, renderTrendChart } from "./charts";
 import { abbrTerm } from "../term-format";
-import { pickSelectedTerm, renderCard } from "./common";
+import { cardTemplate, pickSelectedTerm } from "./common";
 import { renderHeatmap } from "./heatmap";
+import type { Section } from "./section";
 import type {
   AnalyticsModalCallbacks,
   AnalyticsModalState,
@@ -74,16 +77,10 @@ function kpiUnitText(kind: ModalMetricKind | "global"): string {
   return `/ ${max} avg`;
 }
 
-// Renders the value portion of a KPI as a chip-style pill: same hue
-// palette and the same bg/border/fg vars the schedule-card chips use
-// (see widget-chips.ts buildCompactChipTone). Honors the same two toggles
-// the mini viewer respects:
-//   - COMPACT_CARD_STARS_FEATURE_ID → stars instead of the number (rating
-//     metrics only; hours never use stars)
-//   - RATING_PERCENT_FEATURE_ID → "92%" instead of "5.5" (via
-//     formatChipRating)
-// When value <= 0 the pill stays neutral (no tone vars) so "no data"
-// reads as muted rather than colored.
+// Renders the value portion of a KPI as a chip-style pill. Returns an
+// imperative element rather than a template because createRatingStars
+// (the stars-mode branch) builds DOM nodes directly. lit-html splats the
+// element via ${pill} interpolation.
 function renderKpiPill(
   doc: Document,
   value: number,
@@ -134,37 +131,35 @@ function renderKpiPill(
 // scope is configurable in extension settings). Adapts copy to the actual
 // number of loaded terms — if fewer than N are loaded, says so honestly.
 function renderKpiScopeNote(
-  doc: Document,
   data: ModalDisplayData,
   recent: number
-): HTMLElement {
-  const note = doc.createElement("div");
-  note.className = "bc-paper-ctec-modal-kpi-scope";
+): TemplateResult {
   const effective = Math.min(recent, data.terms.length);
   const term = effective === 1 ? "term" : "terms";
-  const lead = doc.createElement("strong");
   if (effective < recent) {
-    lead.textContent = `Averages below cover all ${effective} loaded ${term}`;
-    note.append(
-      lead,
-      doc.createTextNode(
-        ` (recent-terms aggregation set to ${recent} in extension settings).`
-      )
-    );
-  } else {
-    lead.textContent = `Averages below use the most recent ${effective} ${term}.`;
-    note.append(
-      lead,
-      doc.createTextNode(
-        " Adjust the “Recent terms aggregation” number in the extension popup to widen or narrow the window."
-      )
-    );
+    return html`<div class="bc-paper-ctec-modal-kpi-scope">
+      <strong>Averages below cover all ${effective} loaded ${term}</strong>
+      (recent-terms aggregation set to ${recent} in extension settings).
+    </div>`;
   }
-  return note;
+  return html`<div class="bc-paper-ctec-modal-kpi-scope">
+    <strong
+      >Averages below use the most recent ${effective} ${term}.</strong
+    >
+    Adjust the “Recent terms aggregation” number in the extension popup to
+    widen or narrow the window.
+  </div>`;
 }
 
 const GLOBAL_KPI_TOOLTIP =
   "Global = average of the Instruction, Course, and Learned mean ratings (each 0–6). Excludes Challenge and Interest because they're descriptive rather than quality signals, and excludes Hours because it's a different scale.";
+
+export type OverviewSectionProps = {
+  doc: Document;
+  data: ModalDisplayData;
+  state: AnalyticsModalState;
+  callbacks: AnalyticsModalCallbacks;
+};
 
 // Overview tab. KPI strip selects a view: a specific metric (instruction,
 // course, learned, challenge, interest, hours) or "Global" — the global
@@ -172,28 +167,21 @@ const GLOBAL_KPI_TOOLTIP =
 // the cross-metric experimental charts (stacked + trend-lines). The
 // workload-distribution card stays visible in both views as a stable
 // reference for the hours data.
-export function renderOverview(
-  doc: Document,
-  data: ModalDisplayData,
-  state: AnalyticsModalState,
-  callbacks: AnalyticsModalCallbacks
-): HTMLElement {
-  const root = doc.createElement("div");
-  root.className = "bc-paper-ctec-modal-overview";
-
-  const recent = getRecentAggregationTerms();
-  root.append(renderKpiScopeNote(doc, data, recent));
-  root.append(renderKpiStrip(doc, data, state, callbacks, recent));
-
-  if (state.activeMetric === "global") {
-    root.append(renderGlobalSection(doc, data, state, callbacks));
-    root.append(renderWorkloadCard(doc, data));
-  } else {
-    root.append(renderMetricSection(doc, data, state, state.activeMetric));
+export const OverviewSection: Section<OverviewSectionProps> = {
+  render({ doc, data, state, callbacks }) {
+    const recent = getRecentAggregationTerms();
+    return html`<div class="bc-paper-ctec-modal-overview">
+      ${renderKpiScopeNote(data, recent)}
+      ${renderKpiStrip(doc, data, state, callbacks, recent)}
+      ${state.activeMetric === "global"
+        ? html`${renderGlobalSection(doc, data, state, callbacks)}${renderWorkloadCard(
+            doc,
+            data
+          )}`
+        : renderMetricSection(doc, data, state, state.activeMetric)}
+    </div>`;
   }
-
-  return root;
-}
+};
 
 // Per-metric body: trend + selected-term distribution. Always shown when a
 // metric category (not Global) is active.
@@ -202,33 +190,22 @@ function renderMetricSection(
   data: ModalDisplayData,
   state: AnalyticsModalState,
   metric: ModalMetricKind
-): HTMLElement {
-  const charts = doc.createElement("div");
-  charts.className = "bc-paper-ctec-modal-charts";
-
+): TemplateResult {
   const selectedTerm = pickSelectedTerm(data, state.selectedTermId);
-
-  const trendCard = renderCard(
-    doc,
-    `Trend · ${data.terms.length} ${data.terms.length === 1 ? "term" : "terms"}`,
-    `${MODAL_METRIC_LABELS[metric]}${
-      metric === "hours" ? " · hrs/wk" : " · mean rating"
-    }`
-  );
-  trendCard.body.append(renderTrendChart(doc, data, metric));
-  charts.append(trendCard.root);
-
-  const distCard = renderCard(
-    doc,
-    "Distribution",
-    selectedTerm
-      ? `${selectedTerm.term} · ${selectedTerm.responses} responses`
-      : ""
-  );
-  distCard.body.append(renderDistChart(doc, selectedTerm, metric, data));
-  charts.append(distCard.root);
-
-  return charts;
+  return html`<div class="bc-paper-ctec-modal-charts">
+    ${cardTemplate(
+      `Trend · ${data.terms.length} ${data.terms.length === 1 ? "term" : "terms"}`,
+      `${MODAL_METRIC_LABELS[metric]}${
+        metric === "hours" ? " · hrs/wk" : " · mean rating"
+      }`,
+      renderTrendChart(doc, data, metric)
+    )}
+    ${cardTemplate(
+      "Distribution",
+      selectedTerm ? `${selectedTerm.term} · ${selectedTerm.responses} responses` : "",
+      renderDistChart(doc, selectedTerm, metric, data)
+    )}
+  </div>`;
 }
 
 // Global body: just the heatmap. The cross-metric "stacked" and
@@ -240,22 +217,17 @@ function renderGlobalSection(
   data: ModalDisplayData,
   state: AnalyticsModalState,
   callbacks: AnalyticsModalCallbacks
-): HTMLElement {
-  const wrapper = doc.createElement("div");
-  wrapper.className = "bc-paper-ctec-modal-global-section";
-
-  const heatCard = renderCard(
-    doc,
-    "Term × Metric heatmap",
-    "Shading scaled within these terms only"
-  );
-  heatCard.body.append(renderHeatmap(doc, data, state, callbacks));
-  wrapper.append(heatCard.root);
-
-  return wrapper;
+): TemplateResult {
+  return html`<div class="bc-paper-ctec-modal-global-section">
+    ${cardTemplate(
+      "Term × Metric heatmap",
+      "Shading scaled within these terms only",
+      renderHeatmap(doc, data, state, callbacks)
+    )}
+  </div>`;
 }
 
-function renderWorkloadCard(doc: Document, data: ModalDisplayData): HTMLElement {
+function renderWorkloadCard(doc: Document, data: ModalDisplayData): TemplateResult {
   const aggregateTotal = data.aggregateHoursBuckets.reduce(
     (sum, b) => sum + b.count,
     0
@@ -299,21 +271,21 @@ function renderWorkloadCard(doc: Document, data: ModalDisplayData): HTMLElement 
     });
   }
 
-  const hoursCard = renderCard(
-    doc,
+  const right = showBoth && latestTerm
+    ? `${latestTerm.term} vs ${data.terms.length}-term avg${
+        aggregateTotal > 0
+          ? ` · ${aggregateTotal.toLocaleString()} responses`
+          : ""
+      }`
+    : `Self-reported hours per week, across ${data.terms.length} ${
+        data.terms.length === 1 ? "term" : "terms"
+      }${aggregateTotal > 0 ? ` · ${aggregateTotal.toLocaleString()} responses` : ""}`;
+
+  return cardTemplate(
     "Workload distribution",
-    showBoth && latestTerm
-      ? `${latestTerm.term} vs ${data.terms.length}-term avg${
-          aggregateTotal > 0
-            ? ` · ${aggregateTotal.toLocaleString()} responses`
-            : ""
-        }`
-      : `Self-reported hours per week, across ${data.terms.length} ${
-          data.terms.length === 1 ? "term" : "terms"
-        }${aggregateTotal > 0 ? ` · ${aggregateTotal.toLocaleString()} responses` : ""}`
+    right,
+    renderHoursDensity(doc, hoursSeries)
   );
-  hoursCard.body.append(renderHoursDensity(doc, hoursSeries));
-  return hoursCard.root;
 }
 
 // KPI strip: each gestalt grouping is rendered as a labeled rectangle that
@@ -328,11 +300,8 @@ function renderKpiStrip(
   state: AnalyticsModalState,
   callbacks: AnalyticsModalCallbacks,
   recent: number
-): HTMLElement {
-  const groups: Array<{
-    label: string;
-    cards: HTMLElement[];
-  }> = [
+): TemplateResult {
+  const groups: Array<{ label: string; cards: HTMLElement[] }> = [
     {
       label: "Overall",
       cards: [renderGlobalKpiCard(doc, data, state, callbacks, recent)]
@@ -355,38 +324,24 @@ function renderKpiStrip(
     }
   ];
 
-  const strip = doc.createElement("div");
-  strip.className = "bc-paper-ctec-modal-kpi-strip";
   // Set column templates via CSS custom properties (not inline
   // grid-template-columns) so the responsive media queries in
   // styles/modal-charts.ts can override them at narrow widths.
-  strip.style.setProperty(
-    "--bc-paper-ctec-kpi-cols",
-    groups.map((group) => `${group.cards.length}fr`).join(" ")
-  );
+  const stripStyle = `--bc-paper-ctec-kpi-cols: ${groups
+    .map((group) => `${group.cards.length}fr`)
+    .join(" ")}`;
 
-  for (const group of groups) {
-    const groupEl = doc.createElement("div");
-    groupEl.className = "bc-paper-ctec-modal-kpi-group";
-
-    const label = doc.createElement("div");
-    label.className = "bc-paper-ctec-modal-kpi-group-label";
-    label.textContent = group.label;
-    groupEl.append(label);
-
-    const cardsEl = doc.createElement("div");
-    cardsEl.className = "bc-paper-ctec-modal-kpi-group-cards";
-    cardsEl.style.setProperty(
-      "--bc-paper-ctec-kpi-card-cols",
-      `repeat(${group.cards.length}, minmax(0, 1fr))`
-    );
-    for (const card of group.cards) cardsEl.append(card);
-    groupEl.append(cardsEl);
-
-    strip.append(groupEl);
-  }
-
-  return strip;
+  return html`<div class="bc-paper-ctec-modal-kpi-strip" style=${stripStyle}>
+    ${groups.map(
+      (group) => html`<div class="bc-paper-ctec-modal-kpi-group">
+        <div class="bc-paper-ctec-modal-kpi-group-label">${group.label}</div>
+        <div
+          class="bc-paper-ctec-modal-kpi-group-cards"
+          style=${`--bc-paper-ctec-kpi-card-cols: repeat(${group.cards.length}, minmax(0, 1fr))`}
+        >${group.cards}</div>
+      </div>`
+    )}
+  </div>`;
 }
 
 function renderKpiCard(
@@ -580,4 +535,14 @@ function renderSparkline(
   }
 
   return svg;
+}
+
+// Backwards-compat for callers still on the imperative entry point.
+export function renderOverview(
+  doc: Document,
+  data: ModalDisplayData,
+  state: AnalyticsModalState,
+  callbacks: AnalyticsModalCallbacks
+): TemplateResult {
+  return OverviewSection.render({ doc, data, state, callbacks });
 }

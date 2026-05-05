@@ -1,3 +1,5 @@
+import { html, type TemplateResult } from "lit-html";
+
 import { getRecentAggregationTerms } from "../../../settings";
 import {
   MODAL_METRIC_LABELS,
@@ -7,7 +9,7 @@ import {
   type ModalMetricKind,
   type ModalTerm
 } from "../modal-data";
-import { spacerCell } from "./common";
+import type { Section } from "./section";
 import type { AnalyticsModalCallbacks, AnalyticsModalState } from "./types";
 
 // Internal column kind: ModalMetricKind plus the synthetic "global" column
@@ -31,162 +33,135 @@ const HEATMAP_GROUPS: HeatmapGroup[] = [
   { label: "Workload", slug: "workload", columns: ["hours"] }
 ];
 
+export type HeatmapSectionProps = {
+  data: ModalDisplayData;
+  state: AnalyticsModalState;
+  callbacks: AnalyticsModalCallbacks;
+};
+
 // Term × Metric heatmap with grouped columns (Overall / Quality / Character
 // / Workload). Term-name cells on the left are read-only labels (term
 // picking lives in the Terms tab dropdown). Rating cells share one shading
 // scale (deep maroon — includes the Global column so it's directly
 // comparable to its components) and hours cells share another (purple).
-export function renderHeatmap(
-  doc: Document,
-  data: ModalDisplayData,
-  state: AnalyticsModalState,
-  callbacks: AnalyticsModalCallbacks
-): HTMLElement {
-  const wrapper = doc.createElement("div");
-  wrapper.className = "bc-paper-ctec-modal-heatmap-wrap";
+export const HeatmapSection: Section<HeatmapSectionProps> = {
+  render({ data, state, callbacks }) {
+    const recent = getRecentAggregationTerms();
+    const totalTerms = data.terms.length;
+    const collapsedCount = Math.min(recent, totalTerms);
+    const expanded = state.heatmapExpanded || totalTerms <= collapsedCount;
+    const visibleTerms = expanded ? data.terms : data.terms.slice(0, collapsedCount);
 
-  const recent = getRecentAggregationTerms();
-  const totalTerms = data.terms.length;
-  const collapsedCount = Math.min(recent, totalTerms);
-  const expanded = state.heatmapExpanded || totalTerms <= collapsedCount;
-  const visibleTerms = expanded ? data.terms : data.terms.slice(0, collapsedCount);
+    const totalCols = HEATMAP_GROUPS.reduce(
+      (sum, group) => sum + group.columns.length,
+      0
+    );
+    // Shading scale uses only the visible rows so the on-screen contrast
+    // doesn't shift dramatically when expanding/collapsing.
+    const ratingShade = buildRatingShader(visibleTerms);
+    const hoursShade = buildHoursShader(visibleTerms);
 
-  const grid = doc.createElement("div");
-  grid.className = "bc-paper-ctec-modal-heatmap";
-
-  const totalCols = HEATMAP_GROUPS.reduce(
-    (sum, group) => sum + group.columns.length,
-    0
-  );
-  // First column for term names; one column per metric after.
-  grid.style.gridTemplateColumns = `minmax(120px, 0.9fr) repeat(${totalCols}, 1fr)`;
-
-  appendGroupLabelRow(doc, grid);
-  appendMetricHeaderRow(doc, grid);
-
-  // Shading scale uses only the visible rows so the on-screen contrast
-  // doesn't shift dramatically when expanding/collapsing.
-  const ratingShade = buildRatingShader(visibleTerms);
-  const hoursShade = buildHoursShader(visibleTerms);
-
-  for (const term of visibleTerms) {
-    appendTermRow(doc, grid, term, ratingShade, hoursShade);
+    return html`<div class="bc-paper-ctec-modal-heatmap-wrap">
+      <div
+        class="bc-paper-ctec-modal-heatmap"
+        style=${`grid-template-columns: minmax(120px, 0.9fr) repeat(${totalCols}, 1fr)`}
+      >
+        ${groupLabelRow()}
+        ${metricHeaderRow()}
+        ${visibleTerms.map((term) => termRow(term, ratingShade, hoursShade))}
+      </div>
+      ${totalTerms > collapsedCount
+        ? html`<button
+            type="button"
+            class="bc-paper-ctec-modal-heatmap-toggle"
+            @click=${(event: Event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              callbacks.onToggleHeatmapExpanded();
+            }}
+          >${expanded
+            ? `Show recent ${collapsedCount} only`
+            : `Show all ${totalTerms} terms (${
+                totalTerms - collapsedCount
+              } more)`}</button>`
+        : ""}
+    </div>`;
   }
+};
 
-  wrapper.append(grid);
-
-  if (totalTerms > collapsedCount) {
-    const toggle = doc.createElement("button");
-    toggle.type = "button";
-    toggle.className = "bc-paper-ctec-modal-heatmap-toggle";
-    const hiddenCount = totalTerms - collapsedCount;
-    toggle.textContent = expanded
-      ? `Show recent ${collapsedCount} only`
-      : `Show all ${totalTerms} terms (${hiddenCount} more)`;
-    toggle.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      callbacks.onToggleHeatmapExpanded();
-    });
-    wrapper.append(toggle);
-  }
-
-  return wrapper;
+function groupLabelRow(): TemplateResult {
+  return html`<div class="bc-paper-ctec-modal-heatmap-spacer"></div>
+    ${HEATMAP_GROUPS.map(
+      (group) => html`<div
+        class=${`bc-paper-ctec-modal-heatmap-group is-group-${group.slug}`}
+        style=${`grid-column: span ${group.columns.length}`}
+      >${group.label}</div>`
+    )}`;
 }
 
-function appendGroupLabelRow(doc: Document, grid: HTMLElement): void {
-  // Empty cell over the term-name column.
-  grid.append(spacerCell(doc));
-  for (const group of HEATMAP_GROUPS) {
-    const label = doc.createElement("div");
-    label.className = `bc-paper-ctec-modal-heatmap-group is-group-${group.slug}`;
-    label.style.gridColumn = `span ${group.columns.length}`;
-    label.textContent = group.label;
-    grid.append(label);
-  }
+function metricHeaderRow(): TemplateResult {
+  return html`<div class="bc-paper-ctec-modal-heatmap-spacer"></div>
+    ${HEATMAP_GROUPS.flatMap((group) =>
+      group.columns.map(
+        (column) => html`<div
+          class=${`bc-paper-ctec-modal-heatmap-header is-group-${group.slug}`}
+        >${column === "global" ? "Global" : MODAL_METRIC_LABELS[column]}</div>`
+      )
+    )}`;
 }
 
-function appendMetricHeaderRow(doc: Document, grid: HTMLElement): void {
-  grid.append(spacerCell(doc));
-  for (const group of HEATMAP_GROUPS) {
-    for (const column of group.columns) {
-      const header = doc.createElement("div");
-      header.className = `bc-paper-ctec-modal-heatmap-header is-group-${group.slug}`;
-      header.textContent = column === "global" ? "Global" : MODAL_METRIC_LABELS[column];
-      grid.append(header);
-    }
-  }
-}
-
-function appendTermRow(
-  doc: Document,
-  grid: HTMLElement,
+function termRow(
   term: ModalTerm,
   ratingShade: (value: number) => string,
   hoursShade: (value: number) => string
-): void {
-  const termCell = doc.createElement("div");
-  termCell.className = "bc-paper-ctec-modal-heatmap-term";
-  const termTitle = doc.createElement("div");
-  termTitle.className = "bc-paper-ctec-modal-heatmap-term-title";
-  termTitle.textContent = term.term;
-  const termSub = doc.createElement("div");
-  termSub.className = "bc-paper-ctec-modal-heatmap-term-sub";
-  termSub.textContent = `${term.responses} responded`;
-  termCell.append(termTitle, termSub);
-  grid.append(termCell);
-
-  for (const group of HEATMAP_GROUPS) {
-    for (const column of group.columns) {
-      grid.append(renderDataCell(doc, term, column, group.slug, ratingShade, hoursShade));
-    }
-  }
+): TemplateResult {
+  return html`<div class="bc-paper-ctec-modal-heatmap-term">
+      <div class="bc-paper-ctec-modal-heatmap-term-title">${term.term}</div>
+      <div class="bc-paper-ctec-modal-heatmap-term-sub">${term.responses} responded</div>
+    </div>
+    ${HEATMAP_GROUPS.flatMap((group) =>
+      group.columns.map((column) =>
+        renderDataCell(term, column, group.slug, ratingShade, hoursShade)
+      )
+    )}`;
 }
 
 function renderDataCell(
-  doc: Document,
   term: ModalTerm,
   column: HeatmapColumn,
   groupSlug: HeatmapGroup["slug"],
   ratingShade: (value: number) => string,
   hoursShade: (value: number) => string
-): HTMLElement {
-  const cell = doc.createElement("div");
-  cell.className = `bc-paper-ctec-modal-heatmap-cell is-group-${groupSlug}`;
+): TemplateResult {
+  const className = `bc-paper-ctec-modal-heatmap-cell is-group-${groupSlug}`;
 
   if (column === "global") {
     const value = computeGlobalMean([term]);
     if (value > 0) {
-      cell.style.background = ratingShade(value);
-      cell.textContent = value.toFixed(1);
-    } else {
-      cell.classList.add("is-empty");
-      cell.textContent = "—";
+      return html`<div class=${className} style=${`background: ${ratingShade(value)}`}
+        >${value.toFixed(1)}</div
+      >`;
     }
-    return cell;
+    return html`<div class=${`${className} is-empty`}>—</div>`;
   }
 
   if (column === "hours") {
     const value = term.metrics.hours;
     if (typeof value === "number") {
-      cell.style.background = hoursShade(value);
-      cell.textContent = `${value.toFixed(1)}h`;
-    } else {
-      cell.classList.add("is-empty");
-      cell.textContent = "—";
+      return html`<div class=${className} style=${`background: ${hoursShade(value)}`}
+        >${value.toFixed(1)}h</div
+      >`;
     }
-    return cell;
+    return html`<div class=${`${className} is-empty`}>—</div>`;
   }
 
   const value = term.metrics[column];
   if (typeof value === "number") {
-    cell.style.background = ratingShade(value);
-    cell.textContent = value.toFixed(1);
-  } else {
-    cell.classList.add("is-empty");
-    cell.textContent = "—";
+    return html`<div class=${className} style=${`background: ${ratingShade(value)}`}
+      >${value.toFixed(1)}</div
+    >`;
   }
-  return cell;
+  return html`<div class=${`${className} is-empty`}>—</div>`;
 }
 
 // Shading scale spans every rating-style value across the supplied terms
@@ -250,4 +225,15 @@ function buildHoursShader(terms: ModalTerm[]): (value: number) => string {
     if (span < 0.05) return rgbaWith(rgb, 0.85);
     return rgbaWith(rgb, 0.65 + ((value - min) / span) * 0.35);
   };
+}
+
+// Backwards-compat shim: callers (overview.ts) still expect a
+// `renderHeatmap(doc, data, state, callbacks)` returning a TemplateResult.
+export function renderHeatmap(
+  _doc: Document,
+  data: ModalDisplayData,
+  state: AnalyticsModalState,
+  callbacks: AnalyticsModalCallbacks
+): TemplateResult {
+  return HeatmapSection.render({ data, state, callbacks });
 }

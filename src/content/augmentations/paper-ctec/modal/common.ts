@@ -1,58 +1,37 @@
+import { html, type TemplateResult } from "lit-html";
+
 import type { ModalDisplayData, ModalTerm } from "../modal-data";
 import { stopPropagation } from "../ui-shared";
 
 // Section card with a header (title + optional right-side meta + optional
-// CTA link) and an empty body slot the caller fills. Used by overview and
-// terms tabs to keep card visuals consistent.
-export function renderCard(
-  doc: Document,
+// CTA link) and a body slot. lit-html flavor — preferred for new section
+// migrations.
+export function cardTemplate(
   title: string,
   right: string,
+  body: unknown,
   cta?: { label: string; href: string }
-): { root: HTMLElement; body: HTMLElement } {
-  const root = doc.createElement("section");
-  root.className = "bc-paper-ctec-modal-card-section";
-
-  const head = doc.createElement("div");
-  head.className = "bc-paper-ctec-modal-card-head";
-  const titleEl = doc.createElement("div");
-  titleEl.className = "bc-paper-ctec-modal-card-title";
-  titleEl.textContent = title;
-  head.append(titleEl);
-
-  if (right || cta) {
-    const meta = doc.createElement("div");
-    meta.className = "bc-paper-ctec-modal-card-meta";
-    if (right) {
-      const right_el = doc.createElement("span");
-      right_el.textContent = right;
-      meta.append(right_el);
-    }
-    if (cta) {
-      const link = doc.createElement("a");
-      link.href = cta.href;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.textContent = cta.label;
-      link.className = "bc-paper-ctec-modal-card-cta";
-      link.addEventListener("click", stopPropagation);
-      meta.append(link);
-    }
-    head.append(meta);
-  }
-  root.append(head);
-
-  const body = doc.createElement("div");
-  body.className = "bc-paper-ctec-modal-card-body";
-  root.append(body);
-
-  return { root, body };
-}
-
-export function spacerCell(doc: Document): HTMLElement {
-  const cell = doc.createElement("div");
-  cell.className = "bc-paper-ctec-modal-heatmap-spacer";
-  return cell;
+): TemplateResult {
+  return html`<section class="bc-paper-ctec-modal-card-section">
+    <div class="bc-paper-ctec-modal-card-head">
+      <div class="bc-paper-ctec-modal-card-title">${title}</div>
+      ${right || cta
+        ? html`<div class="bc-paper-ctec-modal-card-meta">
+            ${right ? html`<span>${right}</span>` : ""}
+            ${cta
+              ? html`<a
+                  href=${cta.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="bc-paper-ctec-modal-card-cta"
+                  @click=${stopPropagation}
+                >${cta.label}</a>`
+              : ""}
+          </div>`
+        : ""}
+    </div>
+    <div class="bc-paper-ctec-modal-card-body">${body}</div>
+  </section>`;
 }
 
 // Selected term resolver. The selectedId might be stale (term gone from the
