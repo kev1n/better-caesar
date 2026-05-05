@@ -340,12 +340,25 @@ function attachAnalyticsAnchor(
   const existing = anchor.querySelector<HTMLElement>(
     `:scope > .${ANALYTICS_BTN_CLASS}`
   );
-  existing?.remove();
 
   if (!onOpenAnalytics) {
+    existing?.remove();
     // No analytics callback — drop the wrapper if cart was also missing so
     // we don't leave an empty positioned element behind.
     if (!anchor.querySelector(`:scope > .${CART_BTN_CLASS}`)) anchor.remove();
+    return;
+  }
+
+  // Idempotent on existence: paper.nu remounts schedule cards on every
+  // drag/scroll, and the augmentation runner re-invokes us many times per
+  // second. Recreating the button each time would tear down the browser's
+  // :hover state mid-transition (label collapses again the moment the
+  // cursor enters), defeating the icon-pill → icon+label expand. Keep the
+  // existing button and just refresh its click handler. Mirrors the
+  // signature-dedupe pattern used by attachCartAnchor.
+  if (existing) {
+    (existing as HTMLButtonElement & { __bcAnalyticsClick?: () => void })
+      .__bcAnalyticsClick = onOpenAnalytics;
     return;
   }
 
@@ -365,9 +378,14 @@ function makeAnalyticsButton(onClick: () => void): HTMLElement {
   labelEl.textContent = "Analytics";
   button.append(labelEl);
 
+  const buttonRef = button as HTMLButtonElement & {
+    __bcAnalyticsClick?: () => void;
+  };
+  buttonRef.__bcAnalyticsClick = onClick;
+
   const trigger = (event: Event) => {
     preventAndStop(event);
-    onClick();
+    buttonRef.__bcAnalyticsClick?.();
   };
   button.addEventListener("pointerdown", trigger);
   button.addEventListener("click", preventAndStop);
