@@ -11,7 +11,7 @@ import {
   tryConsumePeopleSoftCredit,
   writeCachedEntry
 } from "./storage";
-import { showToast } from "./toast";
+import { showToast } from "../../../shared/toast";
 import type { RowCells, RowTarget, SeatsNotesResult } from "./types";
 import {
   ensureCustomCells,

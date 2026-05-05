@@ -1,6 +1,6 @@
 import type { Augmentation } from "../../framework";
 import { isRetryablePeopleSoftTaskError } from "../../peoplesoft";
-import { showToast } from "../seats-notes/toast";
+import { showToast } from "../../../shared/toast";
 import { CLASS_LINK_SELECTOR, CLASS_ROW_SELECTOR, PAGE_ID } from "./constants";
 import { fetchCtecLinks, getCtecLinksFromCache } from "./fetcher";
 import { extractInstructorFromRow, extractSubjectAndCatalog } from "./helpers";

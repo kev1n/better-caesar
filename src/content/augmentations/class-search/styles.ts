@@ -797,7 +797,7 @@ export function classSearchStyles(): string {
       cursor: progress;
     }
 
-    /* Toast styles live in seats-notes/toast.ts (shared across augmentations). */
+    /* Toast styles live in src/shared/toast.ts (shared across augmentations). */
 
     /* ── Responsive ─────────────────────────────────────────────────────── */
     @media ${maxWidth("xl")} {

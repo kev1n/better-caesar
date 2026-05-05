@@ -1,3 +1,10 @@
+// Shared toast surface, lifted out of seats-notes/toast.ts so paper-ctec,
+// class-search, ctec-links, and seats-notes itself can render the same
+// floating notifications without one feature reaching into another's folder.
+//
+// DOM contract (id, class names, animation timings, token references) is
+// preserved verbatim — all CSS variables come from the design system tokens.
+
 const TOAST_HOST_ID = "bc-seats-toast-host";
 const TOAST_STYLE_ID = "bc-seats-toast-style";
 

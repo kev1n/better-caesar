@@ -21,7 +21,7 @@ import {
   writeCachedEntry as writeSeatsNotesCache
 } from "../seats-notes/storage";
 import { toSeatsNotesResult, toFailure as seatsNotesFailure } from "../seats-notes/parser";
-import { showToast } from "../seats-notes/toast";
+import { showToast } from "../../../shared/toast";
 import type { SeatsNotesResult, SeatsNotesSuccess } from "../seats-notes/types";
 
 import {

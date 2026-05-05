@@ -1,15 +1,11 @@
-import {
-  buildCtecCreditToastMessage,
-  CTEC_ERROR_TOAST_MESSAGE,
-  formatCtecCreditsWarning,
-  tryConsumeCtecCredit
-} from "../ctec-links/rate-limit";
+import { ctecCreditPool } from "../../../shared/credit-pool";
+import { showToast } from "../../../shared/toast";
+import { CTEC_ERROR_TOAST_MESSAGE } from "../ctec-links/rate-limit";
 import {
   fetchCtecCourseAnalytics,
   getCachedReportAggregate,
   getCtecCourseAnalyticsSnapshot
 } from "../ctec-links/reports";
-import { showToast } from "../seats-notes/toast";
 import { PAPER_CTEC_CONFIG } from "./config";
 import { buildModalDisplayData } from "./modal-data";
 import type {
@@ -326,9 +322,9 @@ export class ModalController {
   kickBatch(context: AnalyticsModalSource, increment = true): void {
     if (this.state.analyticsInFlight.has(context.key)) return;
 
-    const credit = tryConsumeCtecCredit(Date.now(), "modal-load-more");
-    if (!credit.ok) {
-      showToast(buildCtecCreditToastMessage(credit.waitMs), {
+    const credit = ctecCreditPool.tryConsume("modal-load-more");
+    if (!credit.allowed) {
+      showToast(ctecCreditPool.formatLimitReached(credit.waitMs), {
         tone: "warn",
         durationMs: 6000
       });
@@ -378,7 +374,7 @@ export class ModalController {
         if (state.state === "error") {
           showToast(CTEC_ERROR_TOAST_MESSAGE, { tone: "warn", durationMs: 9000 });
         } else {
-          const warning = formatCtecCreditsWarning();
+          const warning = ctecCreditPool.format();
           if (warning) {
             showToast(`Loaded CTEC. ${warning}.`, { tone: "warn", durationMs: 5000 });
           }
@@ -421,9 +417,9 @@ export class ModalController {
     if (this.analyticsBackgroundRefresh.has(context.key)) return;
     if (this.state.analyticsInFlight.has(context.key)) return;
 
-    const credit = tryConsumeCtecCredit(Date.now(), "modal-refresh");
-    if (!credit.ok) {
-      showToast(buildCtecCreditToastMessage(credit.waitMs), {
+    const credit = ctecCreditPool.tryConsume("modal-refresh");
+    if (!credit.allowed) {
+      showToast(ctecCreditPool.formatLimitReached(credit.waitMs), {
         tone: "warn",
         durationMs: 6000
       });
@@ -478,7 +474,7 @@ export class ModalController {
           const newTotal = updatedSnapshot?.entries.length ?? 0;
           const addedCount = Math.max(0, newTotal - previousTotal);
           this.setRefreshFlash(context.key, { kind: "success", addedCount });
-          const warning = formatCtecCreditsWarning();
+          const warning = ctecCreditPool.format();
           if (warning) {
             showToast(`Refreshed CTEC. ${warning}.`, { tone: "warn", durationMs: 5000 });
           }
