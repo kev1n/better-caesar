@@ -1,3 +1,4 @@
+import { decodeEntities as decodeEntitiesPure } from "../../../shared/decode-entities";
 import type { LookupClassResponse } from "../../../shared/messages";
 import type { SeatsNotesFailure, SeatsNotesResult, SeatsNotesSuccess } from "./types";
 
@@ -129,7 +130,5 @@ function normalizeText(value: string | undefined): string | null {
 }
 
 function decodeEntities(value: string): string {
-  const element = document.createElement("textarea");
-  element.innerHTML = value;
-  return element.value.replace(/\s+/g, " ").trim();
+  return decodeEntitiesPure(value).replace(/\s+/g, " ").trim();
 }

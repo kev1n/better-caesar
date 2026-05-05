@@ -5,6 +5,8 @@ export const DEFAULT_CLASS_FIELD = "SSR_CLSRCH_WRK_CLASS_NBR$8";
 export const DEFAULT_TERM_FIELD = "CLASS_SRCH_WRK2_STRM$35$";
 export const DEFAULT_CAREER_FIELD = "SSR_CLSRCH_WRK_ACAD_CAREER$2";
 export const DEFAULT_INSTITUTION_FIELD = "CLASS_SRCH_WRK2_INSTITUTION$31$";
+import { decodeEntities as decodeEntitiesPure } from "../../shared/decode-entities";
+
 export const CAESAR_ORIGIN = "https://caesar.ent.northwestern.edu";
 
 export type CareerCode = "UGRD" | "TGS";
@@ -23,10 +25,12 @@ export function resolveActionUrl(pathOrUrl: string): string {
   return CAESAR_ORIGIN;
 }
 
+// Decodes HTML entities and collapses whitespace runs to single spaces.
+// Several PS-parser call sites rely on the trim/collapse behavior, so this
+// wrapper keeps that contract while delegating the entity work to the
+// pure shared/decode-entities helper.
 export function decodeEntities(value: string): string {
-  const element = document.createElement("textarea");
-  element.innerHTML = value;
-  return element.value.replace(/\s+/g, " ").trim();
+  return decodeEntitiesPure(value).replace(/\s+/g, " ").trim();
 }
 
 export function sanitizeClassNumber(value: string): string {
