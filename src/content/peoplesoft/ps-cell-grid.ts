@@ -19,7 +19,7 @@
 // success on a cache hit do so from inside `render.idle` by calling
 // `controls.renderSuccess(data)` synchronously.
 
-import { ensureStyle } from "./dom";
+import { ensureStyle } from "../framework/dom";
 
 export interface PsCellGridColumn {
   /** Class added to each row's <td>. Used for cleanup attribution. */

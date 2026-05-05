@@ -4,8 +4,8 @@
 // fetch flow, cache short-circuit, credit-pool gating, and toast surfacing.
 
 import type { Augmentation } from "../../framework";
-import { createPsCellGridRuntime } from "../../framework";
 import {
+  createPsCellGridRuntime,
   isRetryablePeopleSoftTaskError,
   lookupClass
 } from "../../peoplesoft";

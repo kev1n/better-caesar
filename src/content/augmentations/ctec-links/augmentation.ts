@@ -3,8 +3,10 @@
 // fetch / cache / toast / progress-callback choreography stays here.
 
 import type { Augmentation } from "../../framework";
-import { createPsCellGridRuntime } from "../../framework";
-import { isRetryablePeopleSoftTaskError } from "../../peoplesoft";
+import {
+  createPsCellGridRuntime,
+  isRetryablePeopleSoftTaskError
+} from "../../peoplesoft";
 import { showToast } from "../../../shared/toast";
 import {
   CLASS_LINK_SELECTOR,
