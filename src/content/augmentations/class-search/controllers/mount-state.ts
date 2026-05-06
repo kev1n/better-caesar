@@ -99,7 +99,8 @@ export function createMountState(deps: MountStateDeps): MountedState {
     doc,
     consumePsCredit: deps.consumePsCredit,
     ensureLiveData: (row, card) => liveDataPainter.ensureLiveData(row, card),
-    peekLiveData: (row) => liveDataPainter.peekLiveData(row)
+    peekLiveData: (row) => liveDataPainter.peekLiveData(row),
+    getTermId
   });
 
   // searchOrchestrator's onSearchReady → resultsRenderer.render. Since

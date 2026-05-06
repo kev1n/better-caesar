@@ -48,6 +48,7 @@ function makeDeps(overrides: Partial<SectionDetailDeps> = {}): SectionDetailDeps
     consumePsCredit: vi.fn().mockReturnValue(true),
     ensureLiveData: vi.fn().mockResolvedValue(null),
     peekLiveData: vi.fn().mockReturnValue(null),
+    getTermId: vi.fn().mockReturnValue("4980"),
     ...overrides
   };
 }

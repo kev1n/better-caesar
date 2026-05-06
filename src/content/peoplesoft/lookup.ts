@@ -31,7 +31,7 @@ async function lookupClassInternal(message: LookupClassMessage): Promise<LookupC
   while (attempts < 2) {
     attempts += 1;
     try {
-      const context = await initializeSearchContext();
+      const context = await initializeSearchContext({ termId: message.termId });
       for (const career of careers) {
         const params = buildSearchParams(context, classNumber, career);
         const searchResponseText = await fetchPeopleSoft(context.actionUrl, params);

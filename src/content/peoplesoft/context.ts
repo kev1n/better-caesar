@@ -13,7 +13,9 @@ import {
 } from "./shared";
 import { fetchPeopleSoftGet } from "./http";
 
-export async function initializeSearchContext(): Promise<SearchContext> {
+export async function initializeSearchContext(
+  overrides: { termId?: string } = {}
+): Promise<SearchContext> {
   // Always GET fresh — never trust the live form. The live form's
   // ICSID/ICStateNum are frozen at page-load while our XHR POSTs advance
   // the server's session past them, so reusing the live form's state
@@ -25,10 +27,13 @@ export async function initializeSearchContext(): Promise<SearchContext> {
   if (!(form instanceof HTMLFormElement)) {
     throw new Error("Class search form not found while initializing context.");
   }
-  return buildSearchContextFromForm(form);
+  return buildSearchContextFromForm(form, overrides);
 }
 
-function buildSearchContextFromForm(form: HTMLFormElement): SearchContext {
+function buildSearchContextFromForm(
+  form: HTMLFormElement,
+  overrides: { termId?: string }
+): SearchContext {
   const classFieldName = findFieldName(form, "SSR_CLSRCH_WRK_CLASS_NBR") ?? DEFAULT_CLASS_FIELD;
   const termFieldName = findFieldName(form, "CLASS_SRCH_WRK2_STRM") ?? DEFAULT_TERM_FIELD;
   const careerFieldName = findFieldName(form, "SSR_CLSRCH_WRK_ACAD_CAREER") ?? DEFAULT_CAREER_FIELD;
@@ -40,6 +45,12 @@ function buildSearchContextFromForm(form: HTMLFormElement): SearchContext {
   if (contextCodes.institution) baseParams.set(institutionFieldName, contextCodes.institution);
   if (contextCodes.term) baseParams.set(termFieldName, contextCodes.term);
   if (contextCodes.career) baseParams.set(careerFieldName, contextCodes.career);
+  // Caller-provided term wins over both URL-derived and form-default values
+  // — the Sharper Search UI runs from the entry page (no STRM in the URL),
+  // so without this override the lookup falls back to whatever term CAESAR
+  // happens to render the entry form with (typically the current term, not
+  // the one the user selected in our UI).
+  if (overrides.termId) baseParams.set(termFieldName, overrides.termId);
 
   const openOnlyField =
     findFieldName(form, "SSR_CLSRCH_WRK_SSR_OPEN_ONLY$chk$") ?? "SSR_CLSRCH_WRK_SSR_OPEN_ONLY$chk$3";

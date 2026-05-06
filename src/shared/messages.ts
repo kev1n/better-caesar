@@ -2,6 +2,12 @@ export type LookupClassMessage = {
   type: "lookup-class";
   classNumber: string;
   careerHint?: "UGRD" | "TGS";
+  // CAESAR term (STRM) for the lookup. When set, overrides the term that
+  // would otherwise be inferred from window.location.href / the entry-form
+  // default. Required when the caller is not on a CAESAR page that already
+  // carries STRM in its URL (e.g. the Sharper Search class-search UI, where
+  // the user picks a term independently of CAESAR's default).
+  termId?: string;
 };
 
 export type FetchTextMessage = {

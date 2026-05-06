@@ -86,6 +86,12 @@ export type SectionDetailDeps = {
    * disk cache is fresh.
    */
   peekLiveData(row: ResultRow): CaesarSearchResult | null;
+  /** Active term (STRM) selected in the Sharper Search UI. Threaded into
+   *  `lookupClass` so the second CAESAR search hits the user's term — the
+   *  entry page URL doesn't carry STRM, so without this the lookup falls
+   *  back to CAESAR's default term and a Spring class queried under a Fall
+   *  default returns "no results." */
+  getTermId(): string;
 };
 
 export function createSectionDetailController(
@@ -262,7 +268,8 @@ async function runFetchAndRender(
       {
         type: "lookup-class",
         classNumber: caesar.classNumber,
-        careerHint
+        careerHint,
+        termId: deps.getTermId()
       },
       {
         priority: "background",
