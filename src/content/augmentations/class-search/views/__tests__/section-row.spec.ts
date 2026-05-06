@@ -33,6 +33,7 @@ describe("renderSectionRow", () => {
     const li = renderSectionRow(doc, {
       section: makeSection(),
       sigKey: "K",
+      showActions: true,
       registerAddButton: vi.fn(),
       onAddToCart: vi.fn(),
       onToggleDetails: vi.fn()
@@ -51,6 +52,7 @@ describe("renderSectionRow", () => {
     const li = renderSectionRow(doc, {
       section: makeSection(),
       sigKey: "K",
+      showActions: true,
       registerAddButton: vi.fn(),
       onAddToCart: vi.fn(),
       onToggleDetails: vi.fn()
@@ -65,6 +67,7 @@ describe("renderSectionRow", () => {
     const li = renderSectionRow(doc, {
       section: makeSection(),
       sigKey: "K",
+      showActions: true,
       registerAddButton: vi.fn(),
       onAddToCart: vi.fn(),
       onToggleDetails: vi.fn()
@@ -81,6 +84,7 @@ describe("renderSectionRow", () => {
     const li = renderSectionRow(doc, {
       section: makeSection(),
       sigKey: "K",
+      showActions: true,
       registerAddButton: vi.fn(),
       onAddToCart: onAdd,
       onToggleDetails: vi.fn()
@@ -98,6 +102,7 @@ describe("renderSectionRow", () => {
     const li = renderSectionRow(doc, {
       section: makeSection(),
       sigKey: "K",
+      showActions: true,
       registerAddButton: vi.fn(),
       onAddToCart: vi.fn(),
       onToggleDetails: onToggle
@@ -112,6 +117,7 @@ describe("renderSectionRow", () => {
     const li = renderSectionRow(doc, {
       section: makeSection(),
       sigKey: "SIG",
+      showActions: true,
       registerAddButton: register,
       onAddToCart: vi.fn(),
       onToggleDetails: vi.fn()
@@ -127,11 +133,31 @@ describe("renderSectionRow", () => {
     const li = renderSectionRow(doc, {
       section: makeSection(),
       sigKey: "K",
+      showActions: true,
       registerAddButton: vi.fn(),
       onAddToCart: vi.fn(),
       onToggleDetails: vi.fn()
     });
     const range = li.querySelector(".bc-cs-section-time .bc-cs-mute");
     expect(range?.textContent).toBe("2026-09-15 – 2026-12-09");
+  });
+
+  it("renders an empty actions cell with no buttons when showActions is false", () => {
+    const doc = fresh();
+    const register = vi.fn();
+    const li = renderSectionRow(doc, {
+      section: makeSection({ component: "DIS" }),
+      sigKey: "K",
+      showActions: false,
+      registerAddButton: register,
+      onAddToCart: vi.fn(),
+      onToggleDetails: vi.fn()
+    });
+    const actions = li.querySelector<HTMLElement>(".bc-cs-section-actions");
+    expect(actions).not.toBeNull();
+    expect(actions?.dataset.hidden).toBe("true");
+    expect(li.querySelector(".bc-cs-details-btn")).toBeNull();
+    expect(li.querySelector(".bc-cs-add")).toBeNull();
+    expect(register).not.toHaveBeenCalled();
   });
 });

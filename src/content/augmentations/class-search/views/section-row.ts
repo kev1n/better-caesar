@@ -22,10 +22,18 @@ export type SectionRowProps = {
    *  separator convention. */
   sigKey: string;
   /** Called with (button, sigKey) on render so the augmentation can paint
-   *  the initial cart-cache state and wire the registry. */
+   *  the initial cart-cache state and wire the registry. Skipped when
+   *  `showActions` is false (no Add button gets built). */
   registerAddButton(button: HTMLButtonElement, sigKey: string): void;
   onAddToCart(): void;
   onToggleDetails(): void;
+  /** When false, renders an empty actions cell with no Details / Add
+   *  buttons. Used for DIS / LAB rows of a course that has a LEC: CAESAR
+   *  adds those via the lecture's related-section picker, so direct
+   *  buttons are misleading (the click would either re-trigger the LEC
+   *  flow or fail). The empty cell keeps the row's grid column reserved
+   *  so LEC and related rows stay visually aligned. */
+  showActions: boolean;
 };
 
 export function renderSectionRow(
@@ -112,6 +120,16 @@ function buildLiveCell(doc: Document): HTMLElement {
 }
 
 function buildActionsCell(doc: Document, props: SectionRowProps): HTMLElement {
+  if (!props.showActions) {
+    // Empty cell — preserves the row's actions column so LEC + related
+    // rows stay visually aligned (each row is its own CSS grid; styles
+    // pin a min-width on `.bc-cs-section-actions` to reserve the
+    // column when the cell has no children).
+    return el(doc, "div", {
+      class: "bc-cs-section-actions",
+      dataset: { hidden: "true" }
+    });
+  }
   // Both buttons delegate their click semantics to dedicated controllers
   // (createSectionDetailController, createAddToCartController) which own
   // their full state machine — sync-disable on click, re-entry guard,
@@ -142,4 +160,19 @@ function buildActionsCell(doc: Document, props: SectionRowProps): HTMLElement {
   props.registerAddButton(addBtn, props.sigKey);
 
   return el(doc, "div", { class: "bc-cs-section-actions" }, [detailsBtn, addBtn]);
+}
+
+/**
+ * Replace `button` content with an inline spinner + label so the loading
+ * indicator lives inside the button (no detached "Loading…" text). Used by
+ * the Details and Add-to-cart controllers; `textContent` of the resulting
+ * button still equals `label`, since the spinner span has no text.
+ */
+export function paintButtonLoading(
+  doc: Document,
+  button: HTMLButtonElement,
+  label: string
+): void {
+  const spinner = el(doc, "span", { class: "bc-cs-btn-spinner" });
+  button.replaceChildren(spinner, doc.createTextNode(label));
 }

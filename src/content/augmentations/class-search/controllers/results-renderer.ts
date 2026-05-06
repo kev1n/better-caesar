@@ -67,9 +67,17 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
     const planEntry =
       deps.catalogIndex.get(`${row.course.subject} ${row.course.catalog}`) ?? null;
 
+    // CAESAR treats DIS / LAB as related components of the LEC: adding the
+    // lecture triggers a related-section picker for them. Direct Add /
+    // Details buttons on those rows are misleading (and currently route
+    // through the LEC flow anyway), so we suppress them when a LEC sibling
+    // exists in the same course. Sections in courses without a LEC (e.g.
+    // SEM-only or DIS-only courses) keep their buttons.
+    const hasLecture = row.sections.some((s) => s.component === "LEC");
+
     const sectionRows: HTMLLIElement[] = [];
     for (const section of row.sections) {
-      sectionRows.push(buildSectionRow(row, section));
+      sectionRows.push(buildSectionRow(row, section, hasLecture));
     }
 
     // Holder pattern: `onRefresh` closes over `cardRef.el` so it can resolve
@@ -115,7 +123,11 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
     return card;
   }
 
-  function buildSectionRow(row: ResultRow, section: PaperSection): HTMLLIElement {
+  function buildSectionRow(
+    row: ResultRow,
+    section: PaperSection,
+    hasLecture: boolean
+  ): HTMLLIElement {
     const sigKey = deps.cartButtons.encodeSigKey({
       termId: deps.filters.termId,
       subject: row.course.subject,
@@ -123,12 +135,17 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
       sectionLabel: `${section.section}-${section.component}`
     });
 
+    const isRelatedComponent =
+      section.component === "DIS" || section.component === "LAB";
+    const showActions = !(hasLecture && isRelatedComponent);
+
     // Holder so the click callbacks can find their own row after render —
     // the row needs its own ref to pass to `toggleSectionDetails`.
     const liRef: { el: HTMLLIElement | null } = { el: null };
     const li = renderSectionRow(deps.doc, {
       section,
       sigKey,
+      showActions,
       registerAddButton: (button) => {
         deps.cartButtons.register(sigKey, button);
         deps.cartCachePainter.applyForSection(row, section, button);

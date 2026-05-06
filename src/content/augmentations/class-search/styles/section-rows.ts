@@ -75,6 +75,13 @@ export function sectionRowsStyles(): string {
       display: flex;
       gap: 6px;
       align-items: center;
+      justify-content: flex-end;
+      /* Each .bc-cs-section is its own grid (the auto last column sizes
+         to content) — a min-width here reserves the actions column even
+         on rows that hide buttons (DIS / LAB under a LEC), so the row
+         stays aligned with its LEC sibling. Width covers the natural
+         "Details" + "Add to cart" cluster. */
+      min-width: 188px;
     }
     .bc-cs-details-btn {
       background: transparent;
@@ -87,6 +94,16 @@ export function sectionRowsStyles(): string {
       color: var(--bc-color-text-muted);
       cursor: pointer;
       transition: color var(--bc-tx-fast), border-color var(--bc-tx-fast), background-color var(--bc-tx-fast);
+      /* Inline-flex so a spinner span sits next to the label text inside
+         the button when data-state="loading". min-width keeps the button
+         a stable size across "Details" / "Loading…" / "Hide" so the row's
+         actions cluster never reflows mid-click — important at narrow
+         viewports where a few extra pixels can push Add-to-cart to wrap. */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-width: 76px;
     }
     .bc-cs-details-btn:hover {
       color: var(--bc-color-text);
@@ -106,6 +123,22 @@ export function sectionRowsStyles(): string {
     .bc-cs-details-btn[data-state="loading"] {
       background: var(--bc-color-surface-hover);
       color: var(--bc-color-text);
+    }
+
+    /* Inline button spinner — used inside .bc-cs-details-btn and
+       .bc-cs-add when data-state="loading". Inherits color from the
+       host button via currentColor so it reads on both transparent and
+       filled backgrounds without per-button overrides. */
+    .bc-cs-btn-spinner {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: var(--bc-radius-circle);
+      opacity: 0.75;
+      animation: bc-cs-spin 0.7s linear infinite;
+      flex: 0 0 auto;
     }
   `;
 }
