@@ -72,15 +72,16 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
     // SEM-only or DIS-only courses) keep their buttons.
     const hasLecture = row.sections.some((s) => s.component === "LEC");
 
-    const sectionRows: HTMLLIElement[] = [];
+    const builtSections: { section: PaperSection; li: HTMLLIElement }[] = [];
     for (const section of row.sections) {
-      sectionRows.push(buildSectionRow(row, section, hasLecture));
+      const li = buildSectionRow(row, section, hasLecture);
+      builtSections.push({ section, li });
     }
 
     const card = renderCourseCard(deps.doc, {
       row,
       planEntry,
-      sectionRows
+      sectionRows: builtSections.map((b) => b.li)
     });
 
     // Eagerly paint live data on render. Try the in-memory cache first
@@ -101,6 +102,16 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
       if (diskHit) {
         deps.liveData.mergeLiveCache(liveKey, diskHit.result.groups);
         deps.liveDataPainter.applyLiveDataToCard(row, card, diskHit.result);
+      }
+    }
+
+    // Auto-expand any section whose detail data is already cached. The
+    // controller's openIfCached is a no-op when either the catalog or the
+    // seats-notes cache misses, so cold sections stay collapsed.
+    for (const { section, li } of builtSections) {
+      const detailsBtn = li.querySelector<HTMLButtonElement>(".bc-cs-details-btn");
+      if (detailsBtn) {
+        deps.detailController.openIfCached(row, section, li, detailsBtn);
       }
     }
 

@@ -58,6 +58,19 @@ export interface SectionDetailController {
     li: HTMLLIElement,
     button: HTMLButtonElement
   ): Promise<void>;
+  /**
+   * Auto-open the detail panel if (and only if) both the catalog and
+   * seats-notes caches hit synchronously. No-op otherwise — never triggers
+   * a fetch or consumes a PS credit. Used by the results-renderer to
+   * pre-expand sections whose data the user has already loaded once.
+   * Returns true when the panel was opened.
+   */
+  openIfCached(
+    row: ResultRow,
+    section: PaperSection,
+    li: HTMLLIElement,
+    button: HTMLButtonElement
+  ): boolean;
 }
 
 export type SectionDetailDeps = {
@@ -107,7 +120,46 @@ export function createSectionDetailController(
     return runFetchAndRender(deps, detailRow, caesar, bareCatalog);
   }
 
+  function tryRenderFromCache(
+    row: ResultRow,
+    section: PaperSection,
+    li: HTMLLIElement,
+    button: HTMLButtonElement
+  ): boolean {
+    const cachedLive = deps.peekLiveData(row);
+    if (!cachedLive) return false;
+    const matchingGroup = matchCaesarGroup(cachedLive.groups, row.course.catalog);
+    const caesar = matchingGroup
+      ? matchCaesarSection(matchingGroup, section.section, section.component)
+      : null;
+    const cachedSeats = caesar ? readSeatsNotesCache(caesar.classNumber) : null;
+    if (!caesar || !cachedSeats?.result) return false;
+
+    const bareCatalog = bareCatalogNumber(row.course.catalog);
+    const detailRow = doc.createElement("li");
+    detailRow.className = "bc-cs-detail-row";
+    li.parentElement?.insertBefore(detailRow, li.nextSibling);
+    renderRow(deps, detailRow, caesar, cachedSeats.result, cachedSeats.fetchedAt, () => {
+      if (!deps.consumePsCredit("refresh-detail")) return;
+      void fetchAndRender(detailRow, caesar, bareCatalog);
+    });
+    button.dataset.expanded = "true";
+    button.dataset.state = "expanded";
+    button.disabled = false;
+    button.textContent = "Hide";
+    return true;
+  }
+
   return {
+    openIfCached(row, section, li, button) {
+      // No-op if the panel is already open.
+      const existing =
+        li.nextElementSibling instanceof HTMLLIElement &&
+        li.nextElementSibling.classList.contains("bc-cs-detail-row");
+      if (existing) return false;
+      return tryRenderFromCache(row, section, li, button);
+    },
+
     async toggle(row, section, li, button) {
       let detailRow = li.nextElementSibling instanceof HTMLLIElement && li.nextElementSibling.classList.contains("bc-cs-detail-row")
         ? (li.nextElementSibling as HTMLLIElement)
@@ -131,29 +183,7 @@ export function createSectionDetailController(
       // are already populated, render the panel synchronously without any
       // loading flicker and without consuming a PS credit. The user can
       // hit the inline Refresh button inside the panel for fresh data.
-      const cachedLive = deps.peekLiveData(row);
-      if (cachedLive) {
-        const matchingGroup = matchCaesarGroup(cachedLive.groups, row.course.catalog);
-        const caesar = matchingGroup
-          ? matchCaesarSection(matchingGroup, section.section, section.component)
-          : null;
-        const cachedSeats = caesar ? readSeatsNotesCache(caesar.classNumber) : null;
-        if (caesar && cachedSeats?.result) {
-          const bareCatalog = bareCatalogNumber(row.course.catalog);
-          detailRow = doc.createElement("li");
-          detailRow.className = "bc-cs-detail-row";
-          li.parentElement?.insertBefore(detailRow, li.nextSibling);
-          renderRow(deps, detailRow, caesar, cachedSeats.result, cachedSeats.fetchedAt, () => {
-            if (!deps.consumePsCredit("refresh-detail")) return;
-            void fetchAndRender(detailRow!, caesar, bareCatalog);
-          });
-          button.dataset.expanded = "true";
-          button.dataset.state = "expanded";
-          button.disabled = false;
-          button.textContent = "Hide";
-          return;
-        }
-      }
+      if (tryRenderFromCache(row, section, li, button)) return;
 
       // Lock the UI synchronously *before* the first await so a fast
       // re-click is filtered both by the guard above and by the browser's
