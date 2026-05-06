@@ -70,7 +70,7 @@ const REFRESH_TOOLTIP =
 // controls that used to live in the side panel; they're now part of the
 // modal header so the analytics view is self-contained. Templated via
 // lit-html — the refresh-button tooltip is just a styled `<span>` child of
-// the host (the tip-host class is what styles.ts reads to render hover
+// the host (the design-system `bc-tooltip-host` class drives hover/focus
 // behavior), so it inlines cleanly.
 function renderActions(
   input: AnalyticsModalInput,
@@ -111,7 +111,7 @@ function renderActions(
     ${showRefresh
       ? html`<button
           type="button"
-          class="bc-paper-ctec-modal-action-btn bc-paper-ctec-modal-action-refresh bc-paper-ctec-modal-tip-host"
+          class="bc-paper-ctec-modal-action-btn bc-paper-ctec-modal-action-refresh bc-tooltip-host"
           ?disabled=${input.backgroundRefreshing}
           @click=${(event: Event) => {
             preventAndStop(event);
@@ -123,7 +123,7 @@ function renderActions(
             ? "Checking Northwestern…"
             : "↻ Check for new CTECs"}</span
           > <span class="bc-paper-ctec-modal-info-icon" aria-hidden="true">i</span
-          ><span class="bc-paper-ctec-modal-tip is-right">${REFRESH_TOOLTIP}</span></button>`
+          ><span class="bc-tooltip bc-tooltip--rich bc-tooltip--right">${REFRESH_TOOLTIP}</span></button>`
       : ""}
     ${reportUrl
       ? html`<a

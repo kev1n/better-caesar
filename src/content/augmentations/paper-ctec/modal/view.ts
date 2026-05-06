@@ -172,7 +172,7 @@ function renderStatusBody(
         </p>
         <button
           type="button"
-          class="bc-paper-ctec-modal-status-primary"
+          class="bc-btn bc-btn--primary bc-btn--pill"
           @click=${(event: Event) => {
             preventAndStop(event);
             callbacks.onLogin();
@@ -188,7 +188,7 @@ function renderStatusBody(
         ${input.canRefresh
           ? html`<button
               type="button"
-              class="bc-paper-ctec-modal-status-primary"
+              class="bc-btn bc-btn--primary bc-btn--pill"
               ?disabled=${input.backgroundRefreshing}
               @click=${(event: Event) => {
                 preventAndStop(event);

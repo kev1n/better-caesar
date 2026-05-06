@@ -24,6 +24,7 @@ export function renderAuthModal(
   if (!modal) {
     modal = doc.createElement("div");
     modal.id = AUTH_MODAL_ID;
+    modal.className = "bc-modal";
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
     modal.setAttribute("aria-labelledby", `${AUTH_MODAL_ID}-title`);
@@ -41,10 +42,10 @@ export function renderAuthModal(
   };
 
   render(
-    html`<div class="bc-paper-ctec-auth-card" @click=${stopPropagation}>
+    html`<div class="bc-modal-card" @click=${stopPropagation}>
       <button
         type="button"
-        class="bc-paper-ctec-auth-close"
+        class="bc-modal-close"
         aria-label=${data.pending ? "Cancel login flow" : "Dismiss login prompt"}
         @click=${(event: Event) => {
           preventAndStop(event);
@@ -66,11 +67,11 @@ function renderLoginCard(
   callbacks: AuthModalCallbacks
 ): TemplateResult {
   return html`
-    <div class="bc-paper-ctec-auth-icon">${iconTemplate("lock")}</div>
-    <h2 id=${`${AUTH_MODAL_ID}-title`} class="bc-paper-ctec-auth-title">
+    <div class="bc-modal-icon">${iconTemplate("lock")}</div>
+    <h2 id=${`${AUTH_MODAL_ID}-title`} class="bc-modal-title">
       Northwestern login required
     </h2>
-    <p class="bc-paper-ctec-auth-body">
+    <p class="bc-modal-body">
       pencil.nu needs a CAESAR login to read CTEC reports on your behalf to
       display on your paper.nu.
       <strong
@@ -78,14 +79,14 @@ function renderLoginCard(
         can view them.</strong
       >
     </p>
-    <p class="bc-paper-ctec-auth-note">
+    <p class="bc-modal-note">
       You'll need to repeat this any time Northwestern signs you out (typically
       every few hours).
     </p>
-    <p class="bc-paper-ctec-auth-trust">
+    <p class="bc-modal-trust">
       pencil.nu is open source. If you'd like, you may review the code at
       <a
-        class="bc-paper-ctec-auth-link"
+        class="bc-modal-link"
         href="https://github.com/kev1n/pencil"
         target="_blank"
         rel="noopener noreferrer"
@@ -93,11 +94,11 @@ function renderLoginCard(
         >github.com/kev1n/pencil</a
       >.
     </p>
-    <div class="bc-paper-ctec-auth-actions">
+    <div class="bc-modal-actions">
       ${data.loginUrl
         ? html`<button
             type="button"
-            class="bc-paper-ctec-auth-primary"
+            class="bc-btn bc-btn--primary bc-btn--soft bc-btn--fill"
             @click=${(event: Event) => {
               preventAndStop(event);
               callbacks.onLogin();
@@ -108,7 +109,7 @@ function renderLoginCard(
         : ""}
       <button
         type="button"
-        class="bc-paper-ctec-auth-secondary"
+        class="bc-btn bc-btn--secondary-accent"
         @click=${(event: Event) => {
           preventAndStop(event);
           callbacks.onDismiss();
@@ -124,25 +125,25 @@ function renderPendingCard(
 ): TemplateResult {
   return html`
     <div
-      class="bc-paper-ctec-auth-icon bc-paper-ctec-auth-spinner"
+      class="bc-modal-icon bc-modal-spinner"
       aria-hidden="true"
     ></div>
-    <h2 id=${`${AUTH_MODAL_ID}-title`} class="bc-paper-ctec-auth-title">
+    <h2 id=${`${AUTH_MODAL_ID}-title`} class="bc-modal-title">
       Waiting for Northwestern login…
     </h2>
-    <p class="bc-paper-ctec-auth-body">
+    <p class="bc-modal-body">
       Finish signing in on the Northwestern tab. pencil.nu will detect when
       you're back and resume loading CTECs automatically — the login tab will
       close on its own.
     </p>
-    <p class="bc-paper-ctec-auth-note">
+    <p class="bc-modal-note">
       Don't see the login tab? Click the button below to reopen it.
     </p>
-    <div class="bc-paper-ctec-auth-actions">
+    <div class="bc-modal-actions">
       ${data.loginUrl
         ? html`<button
             type="button"
-            class="bc-paper-ctec-auth-primary"
+            class="bc-btn bc-btn--primary bc-btn--soft bc-btn--fill"
             @click=${(event: Event) => {
               preventAndStop(event);
               callbacks.onLogin();
@@ -151,7 +152,7 @@ function renderPendingCard(
         : ""}
       <button
         type="button"
-        class="bc-paper-ctec-auth-secondary"
+        class="bc-btn bc-btn--secondary-accent"
         @click=${(event: Event) => {
           preventAndStop(event);
           callbacks.onCancelPending();

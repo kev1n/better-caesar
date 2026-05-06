@@ -33,20 +33,20 @@ export function guardNestedInteraction(element: HTMLElement): void {
 }
 
 // Attaches a hover/focus tooltip to `host`. Styling lives in the shared
-// `.bc-paper-ctec-modal-tip` rule so every callsite gets the same popup.
-// `align: "right"` anchors the tooltip's right edge to the host (use when
-// the host sits on the right side of its container so the tooltip doesn't
-// overflow off-screen).
+// design-system `.bc-tooltip` rule (with the `--rich` modifier for the
+// multi-line below-host popup paper-ctec needs). `align: "right"` anchors
+// the tooltip's right edge to the host (use when the host sits on the
+// right side of its container so the tooltip doesn't overflow off-screen).
 export function attachTooltip(
   doc: Document,
   host: HTMLElement,
   text: string,
   options?: { align?: "left" | "right" }
 ): void {
-  host.classList.add("bc-paper-ctec-modal-tip-host");
+  host.classList.add("bc-tooltip-host");
   const tip = doc.createElement("span");
-  tip.className = `bc-paper-ctec-modal-tip${
-    options?.align === "right" ? " is-right" : ""
+  tip.className = `bc-tooltip bc-tooltip--rich${
+    options?.align === "right" ? " bc-tooltip--right" : ""
   }`;
   tip.textContent = text;
   host.append(tip);

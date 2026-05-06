@@ -1,6 +1,6 @@
 import { startAccessGate } from "./access-gate";
 import { mountServerBanner } from "./access-gate/banner";
-import { mountAccessGateToast } from "./access-gate/toast";
+import { mountAccessGateModal } from "./access-gate/modal";
 import { augmentationRegistry } from "./augmentations/registry";
 import { initModalCache } from "./augmentations/paper-ctec/modal-cache";
 import { initCartCache, runOpportunisticReconcile } from "./cart-cache";
@@ -19,7 +19,7 @@ void bootstrapTheme();
 injectEarlyTermPageMask();
 registerLookupMessageHandler();
 void startAccessGate();
-mountAccessGateToast();
+mountAccessGateModal();
 mountServerBanner();
 void initCartCache();
 initModalCache();

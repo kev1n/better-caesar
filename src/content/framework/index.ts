@@ -19,3 +19,4 @@ export {
   ACTION_BUTTON_STYLE_ID,
   ACTION_BUTTON_STYLES
 } from "./styles/action-button";
+export { MODAL_CSS, MODAL_STYLE_ID, injectModalStyles } from "./modal";

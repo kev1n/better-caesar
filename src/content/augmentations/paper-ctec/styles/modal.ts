@@ -306,21 +306,6 @@ export function modalStyles(): string {
       color: var(--bc-color-text-soft);
       margin: 0 0 16px;
     }
-    .bc-paper-ctec-modal-status-primary {
-      font: inherit;
-      font-size: var(--bc-font-13);
-      font-weight: var(--bc-fw-bold);
-      letter-spacing: var(--bc-ls-wide);
-      padding: 9px 16px;
-      border-radius: var(--bc-radius-pill);
-      border: 1px solid var(--bc-color-accent);
-      background: var(--bc-color-accent);
-      color: var(--bc-color-accent-on);
-      cursor: pointer;
-    }
-    .bc-paper-ctec-modal-status-primary:hover {
-      background: var(--bc-color-accent-hover);
-    }
     .bc-paper-ctec-modal-status-spinner {
       width: 32px;
       height: 32px;

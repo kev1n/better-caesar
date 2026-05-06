@@ -1,3 +1,4 @@
+import { maxWidth } from "../../../design/breakpoints";
 import { PAPER_CTEC_CONFIG } from "../config";
 import { STATUS_BAR_ID } from "../constants";
 
@@ -82,6 +83,11 @@ export function statusBarStyles(): string {
     }
     .bc-paper-ctec-status-action:hover {
       background: var(--bc-color-surface-translucent-92);
+    }
+    @media ${maxWidth("lg")} {
+      .bc-paper-ctec-status-brand {
+        display: none;
+      }
     }
   `;
 }

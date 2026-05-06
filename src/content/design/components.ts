@@ -68,29 +68,6 @@ function surfaces(): string {
   color: var(--bc-color-text-mauve-panel);
 }
 
-/* Modal overlay — fixed full-viewport scrim. */
-.bc-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--bc-color-overlay-modal);
-  backdrop-filter: blur(2px);
-  z-index: 2147483600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.bc-modal-overlay--auth {
-  background: var(--bc-color-overlay-auth);
-}
-
-/* Modal card — centered panel inside the overlay. */
-.bc-modal-card {
-  background: var(--bc-color-bg);
-  color: var(--bc-color-text);
-  border-radius: var(--bc-radius-3xl);
-  box-shadow: var(--bc-shadow-modal);
-}
-
 /* Status surface for inline empty/loading/error states inside a modal body. */
 .bc-modal-status-card {
   background: var(--bc-color-bg);
@@ -131,7 +108,9 @@ function surfaces(): string {
 // -----------------------------------------------------------------------------
 function buttons(): string {
   return `
-/* Base button. Inherit type, no chrome by default — variants supply visuals. */
+/* Base button. Inherit type, no chrome by default — variants supply visuals.
+   Defaults match the modal/dialog action shape (the de-facto standard across
+   features); use --xs/--sm/--lg modifiers below to scale. */
 .bc-btn {
   appearance: none;
   display: inline-flex;
@@ -142,12 +121,14 @@ function buttons(): string {
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: var(--bc-font-12);
-  font-weight: var(--bc-fw-semibold);
+  font-size: var(--bc-font-13);
+  font-weight: var(--bc-fw-bold);
+  letter-spacing: var(--bc-ls-wide);
   line-height: 1;
-  padding: 6px 12px;
-  border-radius: var(--bc-radius-lg);
+  padding: 9px 14px;
+  border-radius: var(--bc-radius-xl);
   cursor: pointer;
+  text-decoration: none;
   transition:
     background var(--bc-tx-base) var(--bc-easing),
     border-color var(--bc-tx-base) var(--bc-easing),
@@ -170,6 +151,19 @@ function buttons(): string {
   border-color: var(--bc-color-accent-hover);
 }
 
+/* Soft modifier — swaps a primary button's hard accent for the softer accent
+   ladder (used by modal/dialog action rows where the harder accent reads as
+   too loud). Stack with --primary: bc-btn bc-btn--primary bc-btn--soft. */
+.bc-btn--soft {
+  background: var(--bc-color-accent-soft);
+  border-color: var(--bc-color-accent-soft);
+  color: var(--bc-color-accent-soft-on);
+}
+.bc-btn--soft:hover:not(:disabled) {
+  background: var(--bc-color-accent-soft-hover);
+  border-color: var(--bc-color-accent-soft-hover);
+}
+
 /* Secondary: outline with surface bg. */
 .bc-btn--secondary {
   background: var(--bc-color-bg);
@@ -178,6 +172,24 @@ function buttons(): string {
 }
 .bc-btn--secondary:hover:not(:disabled) {
   background: var(--bc-color-surface-hover);
+}
+
+/* Accent-outline secondary — transparent bg, accent-tinted border, inherits
+   text color. Used in modal/dialog action rows alongside --primary --soft. */
+.bc-btn--secondary-accent {
+  background: transparent;
+  border-color: var(--bc-color-accent-border-22);
+  color: inherit;
+}
+.bc-btn--secondary-accent:hover:not(:disabled) {
+  background: var(--bc-color-accent-fill-08);
+}
+
+/* Fill modifier — expands the button along the main axis of a flex actions
+   row (e.g. modal action rows where the primary stretches and the secondary
+   stays compact). */
+.bc-btn--fill {
+  flex: 1 1 auto;
 }
 
 /* Ghost: transparent, text only. */
@@ -217,8 +229,8 @@ function buttons(): string {
 /* Pill modifier — fully-rounded edge. */
 .bc-btn--pill {
   border-radius: var(--bc-radius-pill);
-  padding-left: 14px;
-  padding-right: 14px;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 /* Size modifiers. */
@@ -585,7 +597,16 @@ function feedback(): string {
   color: var(--bc-color-danger-text);
 }
 
-/* Tooltip — host + popup; show on hover/focus of host. */
+/* Tooltip — host + popup; show on hover/focus of host.
+   Default: single-line, anchored above the host, centered.
+   Modifiers (added when paper-ctec migrated off its private tooltip):
+     .bc-tooltip--rich  — multi-line wrapping popup anchored below the
+                          host with a CSS arrow; high z-index so it
+                          renders above modals.
+     .bc-tooltip--right — right-edge anchored; pair with --rich when the
+                          host sits near the right side of its container
+                          so the popup hugs the right instead of
+                          overflowing. */
 .bc-tooltip-host {
   position: relative;
   display: inline-flex;
@@ -595,8 +616,9 @@ function feedback(): string {
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--bc-color-text);
-  color: var(--bc-color-text-on-tooltip);
+  background: var(--bc-color-bg);
+  color: var(--bc-color-text);
+  border: 1px solid var(--bc-color-border);
   padding: 6px 10px;
   border-radius: var(--bc-radius-lg);
   font-size: var(--bc-font-11);
@@ -608,6 +630,40 @@ function feedback(): string {
   transition: opacity var(--bc-tx-base) var(--bc-easing), visibility var(--bc-tx-base) var(--bc-easing);
   box-shadow: var(--bc-shadow-tooltip);
   z-index: 10;
+}
+.bc-tooltip--rich {
+  bottom: auto;
+  top: calc(100% + 8px);
+  left: -8px;
+  transform: none;
+  width: min(260px, calc(100vw - 32px));
+  padding: 10px 12px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: var(--bc-fw-medium);
+  font-style: normal;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: left;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  z-index: 2147483647;
+}
+.bc-tooltip--rich.bc-tooltip--right {
+  left: auto;
+  right: 0;
+}
+.bc-tooltip--rich::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 14px;
+  border: 6px solid transparent;
+  border-bottom-color: var(--bc-color-bg);
+}
+.bc-tooltip--rich.bc-tooltip--right::before {
+  left: auto;
+  right: 14px;
 }
 .bc-tooltip-host:hover .bc-tooltip,
 .bc-tooltip-host:focus-within .bc-tooltip {
