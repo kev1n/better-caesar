@@ -1,3 +1,4 @@
+import { maxWidth } from "../../../design/breakpoints";
 import { PAPER_CTEC_CONFIG } from "../config";
 import { NO_HOVER_LIFT_CLASS, WIDGET_CLASS } from "../constants";
 
@@ -325,16 +326,16 @@ export function cardStyles(): string {
        overflow:hidden. Hidden by default and toggled via .is-visible
        from the per-card preview controller. */
     .${WIDGET_CLASS}-preview-trigger {
-      cursor: help;
+      cursor: pointer;
     }
     .${WIDGET_CLASS}-preview {
       position: absolute;
       top: 100%;
       left: 0;
       margin-top: 6px;
-      width: 500px;
+      width: 640px;
       max-width: 92vw;
-      padding: 12px 14px 10px;
+      padding: 16px 18px 14px;
       border: 1px solid var(--bc-color-border);
       border-radius: var(--bc-radius-lg);
       background: var(--bc-color-bg);
@@ -342,13 +343,21 @@ export function cardStyles(): string {
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
-      transition: opacity var(--bc-tx-base) var(--bc-easing), visibility var(--bc-tx-base) var(--bc-easing);
+      cursor: pointer;
+      transition: opacity 80ms var(--bc-easing), visibility 80ms var(--bc-easing);
       z-index: 30;
+    }
+    .${WIDGET_CLASS}-preview.is-above {
+      top: auto;
+      bottom: 100%;
+      margin-top: 0;
+      margin-bottom: 6px;
     }
     /* Invisible hover bridge over the 6px gap so the cursor never enters
        dead space between the chip and the popup. Without this, the
        popup's mouseenter only fires after the cursor crosses the gap,
-       and a slow hand can lose the trigger before reaching it. */
+       and a slow hand can lose the trigger before reaching it. Bridge
+       flips with the popup when it's positioned above the card. */
     .${WIDGET_CLASS}-preview::before {
       content: "";
       position: absolute;
@@ -356,6 +365,10 @@ export function cardStyles(): string {
       right: 0;
       bottom: 100%;
       height: 12px;
+    }
+    .${WIDGET_CLASS}-preview.is-above::before {
+      bottom: auto;
+      top: 100%;
     }
     .${WIDGET_CLASS}-preview.is-visible {
       opacity: 1;
@@ -365,22 +378,22 @@ export function cardStyles(): string {
     .${WIDGET_CLASS}-preview-inner {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 14px;
     }
     .${WIDGET_CLASS}-preview-section {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
     }
     .${WIDGET_CLASS}-preview-section-title {
-      font-size: var(--bc-font-10);
+      font-size: var(--bc-font-12);
       font-weight: var(--bc-fw-extrabold);
       letter-spacing: var(--bc-ls-widest);
       text-transform: uppercase;
       color: var(--bc-color-text-muted);
     }
     .${WIDGET_CLASS}-preview-methodology {
-      font-size: var(--bc-font-11);
+      font-size: var(--bc-font-12);
       line-height: 1.4;
       color: var(--bc-color-text-soft);
       margin: -2px 0 2px;
@@ -396,7 +409,7 @@ export function cardStyles(): string {
        (Chart-zone bands previously needed explicit dark-mode CSS rules;
        they now consume --bc-color-trend-zone-* vars that swap by theme.) */
     .${WIDGET_CLASS}-preview-empty {
-      font-size: var(--bc-font-11);
+      font-size: var(--bc-font-12);
       color: var(--bc-color-text-muted);
       padding: 4px 0;
     }
@@ -406,6 +419,11 @@ export function cardStyles(): string {
       transform: none !important;
       box-shadow: none !important;
       z-index: 30;
+    }
+    @media ${maxWidth("lg")} {
+      .bc-paper-ctec-instructor-line {
+        max-width: 50%;
+      }
     }
   `;
 }

@@ -121,7 +121,7 @@ export function renderWidget(
       )
     );
     if (chipNodes.length > 0) {
-      attachPreviewToChips(widget, chipNodes, getPreviewData);
+      attachPreviewToChips(widget, chipNodes, getPreviewData, onOpenAnalytics);
     }
   }
 }
@@ -174,14 +174,15 @@ function buildWidgetSummary(
 function attachPreviewToChips(
   widget: HTMLElement,
   chips: HTMLElement[],
-  getPreviewData: AnalyticsPreviewSource
+  getPreviewData: AnalyticsPreviewSource,
+  onOpenAnalytics?: () => void
 ): void {
   const card = widget.closest<HTMLElement>(
     PAPER_CTEC_CONFIG.selectors.scheduleCard
   );
   if (!card) return;
   const controller = getOrCreatePreviewController(card);
-  controller.refreshData(getPreviewData);
+  controller.refreshData(getPreviewData, onOpenAnalytics);
   for (const chip of chips) {
     controller.attachTrigger(chip);
   }

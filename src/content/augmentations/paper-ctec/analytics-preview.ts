@@ -205,9 +205,15 @@ function buildPopupContent(
 // cache so the next hover reflects current data.
 type PreviewController = {
   attachTrigger: (chip: HTMLElement) => void;
-  refreshData: (getData: () => ModalDisplayData | null) => void;
+  refreshData: (
+    getData: () => ModalDisplayData | null,
+    onOpenAnalytics?: () => void
+  ) => void;
   destroy: () => void;
 };
+
+const HIDE_DELAY_MS = 80;
+const VIEWPORT_PADDING = 8;
 
 function createPreviewController(card: HTMLElement): PreviewController {
   const doc = card.ownerDocument;
@@ -215,6 +221,7 @@ function createPreviewController(card: HTMLElement): PreviewController {
   const active = new Set<HTMLElement>();
   let built = false;
   let dataSource: () => ModalDisplayData | null = () => null;
+  let openAnalytics: (() => void) | undefined;
   let hideTimer: ReturnType<typeof setTimeout> | null = null;
 
   const cancelHide = () => {
@@ -241,6 +248,19 @@ function createPreviewController(card: HTMLElement): PreviewController {
       active.delete(el);
       scheduleHide();
     });
+    // Click anywhere on the popup opens the full analytics modal. Stop
+    // propagation so the click doesn't bubble up to paper.nu's schedule
+    // card, which would otherwise open its built-in section panel.
+    const triggerOpen = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openAnalytics?.();
+    };
+    el.addEventListener("pointerdown", triggerOpen);
+    el.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
     popup = el;
     return el;
   };
@@ -252,12 +272,47 @@ function createPreviewController(card: HTMLElement): PreviewController {
     built = true;
   };
 
+  // Anchor the popup to whichever card edge keeps it on-screen. Popup is
+  // `position: absolute` relative to the card; flipping horizontal anchor
+  // to `right: 0` extends it leftward, and toggling `.is-above` flips it
+  // above the card. Both axes fall back to viewport-clamped values when
+  // neither edge offers enough room (very narrow / very short viewports).
+  const positionPopup = (el: HTMLElement) => {
+    const cardRect = card.getBoundingClientRect();
+    const popupWidth = el.offsetWidth || 640;
+    const popupHeight = el.offsetHeight || 320;
+    const viewW = doc.defaultView?.innerWidth ?? 0;
+    const viewH = doc.defaultView?.innerHeight ?? 0;
+
+    const fitsLeftAnchor = cardRect.left + popupWidth <= viewW - VIEWPORT_PADDING;
+    const fitsRightAnchor = cardRect.right - popupWidth >= VIEWPORT_PADDING;
+    if (fitsLeftAnchor) {
+      el.style.left = "0";
+      el.style.right = "auto";
+    } else if (fitsRightAnchor) {
+      el.style.left = "auto";
+      el.style.right = "0";
+    } else {
+      const clampedLeft = Math.max(
+        VIEWPORT_PADDING - cardRect.left,
+        viewW - VIEWPORT_PADDING - popupWidth - cardRect.left
+      );
+      el.style.left = `${clampedLeft}px`;
+      el.style.right = "auto";
+    }
+
+    const fitsBelow = cardRect.bottom + popupHeight + 6 <= viewH - VIEWPORT_PADDING;
+    const fitsAbove = cardRect.top - popupHeight - 6 >= VIEWPORT_PADDING;
+    el.classList.toggle("is-above", !fitsBelow && fitsAbove);
+  };
+
   const show = (chip: HTMLElement) => {
     cancelHide();
     active.add(chip);
     buildIfNeeded();
     const el = ensurePopup();
     if (el.parentElement !== card) card.appendChild(el);
+    positionPopup(el);
     el.classList.add("is-visible");
   };
 
@@ -272,7 +327,7 @@ function createPreviewController(card: HTMLElement): PreviewController {
       if (active.size === 0 && popup) {
         popup.classList.remove("is-visible");
       }
-    }, 200);
+    }, HIDE_DELAY_MS);
   };
 
   const hide = (chip: HTMLElement) => {
@@ -292,10 +347,28 @@ function createPreviewController(card: HTMLElement): PreviewController {
     chip.addEventListener("mouseleave", () => hide(chip));
     chip.addEventListener("focus", () => show(chip));
     chip.addEventListener("blur", () => hide(chip));
+    // Click on the chip opens the full analytics modal. Stop propagation so
+    // the click doesn't bubble up to paper.nu's schedule card (which would
+    // otherwise open its built-in section-detail panel). Mirrors the popup
+    // click handler so chip and popup behave identically.
+    const triggerOpen = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openAnalytics?.();
+    };
+    chip.addEventListener("pointerdown", triggerOpen);
+    chip.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
   };
 
-  const refreshData = (getData: () => ModalDisplayData | null) => {
+  const refreshData = (
+    getData: () => ModalDisplayData | null,
+    onOpenAnalytics?: () => void
+  ) => {
     dataSource = getData;
+    openAnalytics = onOpenAnalytics;
     built = false;
   };
 
