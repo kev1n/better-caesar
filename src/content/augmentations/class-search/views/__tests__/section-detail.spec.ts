@@ -133,7 +133,7 @@ describe("renderSectionDetail — success", () => {
     );
   });
 
-  it("renders a footer with a relative timestamp + Refresh button", () => {
+  it("renders a stats-bar with the relative timestamp + 'Refresh seats' button (no bottom footer)", () => {
     const doc = fresh();
     const wrap = renderSectionDetail(doc, {
       header: HEADER,
@@ -141,9 +141,11 @@ describe("renderSectionDetail — success", () => {
       fetchedAt: Date.now(),
       onRefresh: vi.fn()
     });
-    const footer = wrap.querySelector<HTMLElement>(".bc-cs-detail-footer");
-    expect(footer?.querySelector(".bc-cs-detail-stamp")?.textContent).toContain("just now");
-    expect(footer?.querySelector(".bc-cs-detail-refresh")?.textContent).toBe("Refresh");
+    const bar = wrap.querySelector<HTMLElement>(".bc-cs-detail-stats-bar");
+    expect(bar?.querySelector(".bc-cs-detail-stamp")?.textContent).toContain("just now");
+    expect(bar?.querySelector(".bc-cs-detail-refresh")?.textContent).toBe("Refresh seats");
+    // Refresh control no longer lives in a separate bottom footer on success.
+    expect(wrap.querySelector(".bc-cs-detail-footer")).toBeNull();
   });
 
   it("calls onRefresh when the Refresh button is clicked + disables it", () => {

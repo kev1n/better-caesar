@@ -15,6 +15,12 @@ export function addCtaStyles(): string {
       letter-spacing: var(--bc-ls-wide);
       cursor: pointer;
       transition: background-color 100ms, transform var(--bc-tx-fast), box-shadow 100ms;
+      /* Inline-flex so the spinner span (added when data-state="loading")
+         sits next to the label inside the button. */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
     .bc-cs-add:hover {
       background: var(--bc-color-accent-hover);
@@ -28,10 +34,17 @@ export function addCtaStyles(): string {
       cursor: progress;
       box-shadow: none;
     }
-    .bc-cs-add[data-state="loading"] {
-      background: var(--bc-color-accent-hover);
-      border-color: var(--bc-color-accent-hover);
+    /* Loading state must read as clearly disabled — accent-vs-accent-hover
+       was nearly imperceptible and tempted users to click again. Drop to
+       the shared disabled-bg + muted text so the locked state is obvious
+       even before the inline spinner spins up. */
+    .bc-cs-add[data-state="loading"],
+    .bc-cs-add[disabled][data-state="loading"] {
+      background: var(--bc-color-disabled-bg);
+      border-color: var(--bc-color-disabled-bg);
+      color: var(--bc-color-text-muted);
       cursor: progress;
+      box-shadow: none;
     }
     .bc-cs-add[data-state="success"] {
       background: var(--bc-color-success);

@@ -51,9 +51,6 @@ export type ResultsRendererDeps = {
   cartCachePainter: CartCachePainter;
   detailController: SectionDetailController;
 
-  /** PS credit gate for refresh-live. Returns true on success, false
-   *  (and toasts) when the budget is exhausted. */
-  consumePsCredit(owner: string): boolean;
   /** Click → cart-add wizard for `(row, section)`'s Add button. */
   handleAdd(
     row: ResultRow,
@@ -80,24 +77,11 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
       sectionRows.push(buildSectionRow(row, section, hasLecture));
     }
 
-    // Holder pattern: `onRefresh` closes over `cardRef.el` so it can resolve
-    // the card after `renderCourseCard` returns. The callback only fires on
-    // user click, by which point we've populated cardRef.el.
-    const cardRef: { el: HTMLElement | null } = { el: null };
-    const onRefresh = (): void => {
-      if (!cardRef.el) return;
-      if (!deps.consumePsCredit("refresh-live")) return;
-      const refreshBtn = cardRef.el.querySelector<HTMLButtonElement>(".bc-cs-refresh-btn");
-      if (!refreshBtn) return;
-      void deps.liveDataPainter.refreshLiveData(row, cardRef.el, refreshBtn);
-    };
     const card = renderCourseCard(deps.doc, {
       row,
       planEntry,
-      sectionRows,
-      onRefresh
+      sectionRows
     });
-    cardRef.el = card;
 
     // Eagerly paint live data on render. Try the in-memory cache first
     // (warmed by an earlier action this session), then fall back to the

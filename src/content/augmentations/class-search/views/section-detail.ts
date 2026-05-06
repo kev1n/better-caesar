@@ -48,12 +48,16 @@ export function renderSectionDetail(
         text: props.detail.error ?? "Couldn't load CAESAR detail."
       })
     );
+    // Error path keeps the bottom footer — there's no stats grid to attach
+    // the refresh control to, so the retry button stays in its own row.
     wrap.appendChild(buildFooter(doc, props.fetchedAt, props.onRefresh));
     return wrap;
   }
 
-  const stats = buildStatsGrid(doc, props.detail);
-  if (stats.children.length > 0) wrap.appendChild(stats);
+  // Success path: refresh control + "loaded X ago" timestamp ride alongside
+  // the seat-stats area instead of in a bottom footer, so the refresh
+  // affordance sits next to the info it refreshes.
+  wrap.appendChild(buildStatsSection(doc, props.detail, props.fetchedAt, props.onRefresh));
 
   appendDetailBlock(doc, wrap, "Class Attributes", props.detail.classAttributes);
   appendDetailBlock(doc, wrap, "Enrollment Requirements", props.detail.enrollmentRequirements);
@@ -69,7 +73,6 @@ export function renderSectionDetail(
     );
   }
 
-  wrap.appendChild(buildFooter(doc, props.fetchedAt, props.onRefresh));
   return wrap;
 }
 
@@ -116,6 +119,42 @@ function buildStatsGrid(doc: Document, detail: SeatsNotesSuccess): HTMLElement {
   appendStat(doc, stats, "Wait cap", detail.waitListCapacity);
   appendStat(doc, stats, "Wait total", detail.waitListTotal);
   return stats;
+}
+
+// Wraps the seat-stats grid with a small toolbar above it carrying the
+// "Refresh seats" action button + the relative-time stamp. Keeps the refresh
+// affordance adjacent to the seat info it refreshes (no more bottom footer
+// detached from the stats).
+function buildStatsSection(
+  doc: Document,
+  detail: SeatsNotesSuccess,
+  fetchedAt: number,
+  onRefresh: () => void
+): HTMLElement {
+  const section = el(doc, "div", { class: "bc-cs-detail-stats-section" });
+
+  const refresh = createActionButton({
+    doc,
+    label: "Refresh seats",
+    loadingLabel: "Refreshing…",
+    className: "bc-cs-detail-refresh",
+    onClick: async () => {
+      onRefresh();
+    }
+  });
+  const stamp = el(doc, "span", {
+    class: "bc-cs-detail-stamp",
+    text: `Loaded ${formatRelativeTime(fetchedAt)}`,
+    attrs: { title: new Date(fetchedAt).toLocaleString() }
+  });
+  section.appendChild(
+    el(doc, "div", { class: "bc-cs-detail-stats-bar" }, [refresh.element, stamp])
+  );
+
+  const stats = buildStatsGrid(doc, detail);
+  if (stats.children.length > 0) section.appendChild(stats);
+
+  return section;
 }
 
 function buildFooter(

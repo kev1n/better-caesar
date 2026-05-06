@@ -37,6 +37,7 @@ import {
   renderSectionDetailLoading,
   type SectionDetailData
 } from "../views/section-detail";
+import { paintButtonLoading } from "../views/section-row";
 
 export type SectionDetailContext = {
   /** Pre-resolved CAESAR live data for the course (memory-cache hit
@@ -57,17 +58,6 @@ export interface SectionDetailController {
     li: HTMLLIElement,
     button: HTMLButtonElement
   ): Promise<void>;
-  /**
-   * Force-refresh every detail row currently mounted under `card` against
-   * the supplied search result. Used by the per-course refresh flow, which
-   * already pulled fresh CAESAR data and now wants any open detail panels
-   * to reflect it. No-op when `result` doesn't match the course.
-   */
-  refreshOpenPanels(
-    row: ResultRow,
-    card: HTMLElement,
-    result: CaesarSearchResult
-  ): void;
 }
 
 export type SectionDetailDeps = {
@@ -87,6 +77,15 @@ export type SectionDetailDeps = {
     row: ResultRow,
     card: HTMLElement | null
   ): Promise<CaesarSearchResult | null>;
+  /**
+   * Sync read of the live-data store's in-memory mirror. Used for the
+   * cache-warm fast path: when both this and the seats-notes cache hit, we
+   * can render the panel without any "Loading…" flicker or PS credit. The
+   * results-renderer pre-warms this mirror from disk on card render, so it
+   * hits on the first click after a page refresh as long as the catalog
+   * disk cache is fresh.
+   */
+  peekLiveData(row: ResultRow): CaesarSearchResult | null;
 };
 
 export function createSectionDetailController(
@@ -122,12 +121,40 @@ export function createSectionDetailController(
       // queue a fresh ensureLiveData + lookupClass round-trip.
       if (button.dataset.state === "loading") return;
 
+      // Cache-warm fast path: if both the catalog and seats-notes caches
+      // are already populated, render the panel synchronously without any
+      // loading flicker and without consuming a PS credit. The user can
+      // hit the inline Refresh button inside the panel for fresh data.
+      const cachedLive = deps.peekLiveData(row);
+      if (cachedLive) {
+        const matchingGroup = matchCaesarGroup(cachedLive.groups, row.course.catalog);
+        const caesar = matchingGroup
+          ? matchCaesarSection(matchingGroup, section.section, section.component)
+          : null;
+        const cachedSeats = caesar ? readSeatsNotesCache(caesar.classNumber) : null;
+        if (caesar && cachedSeats?.result) {
+          const bareCatalog = bareCatalogNumber(row.course.catalog);
+          detailRow = doc.createElement("li");
+          detailRow.className = "bc-cs-detail-row";
+          li.parentElement?.insertBefore(detailRow, li.nextSibling);
+          renderRow(deps, detailRow, caesar, cachedSeats.result, cachedSeats.fetchedAt, () => {
+            if (!deps.consumePsCredit("refresh-detail")) return;
+            void fetchAndRender(detailRow!, caesar, bareCatalog);
+          });
+          button.dataset.expanded = "true";
+          button.dataset.state = "expanded";
+          button.disabled = false;
+          button.textContent = "Hide";
+          return;
+        }
+      }
+
       // Lock the UI synchronously *before* the first await so a fast
       // re-click is filtered both by the guard above and by the browser's
       // disabled-button click filter.
       button.dataset.state = "loading";
       button.disabled = true;
-      button.textContent = "Loading…";
+      paintButtonLoading(doc, button, "Loading…");
 
       // Restore the button when the expand bails out (credit exhaustion,
       // missing data, network failure). The success path overrides this
@@ -205,22 +232,6 @@ export function createSectionDetailController(
             durationMs: 5000
           });
         }
-      }
-    },
-
-    refreshOpenPanels(row, card, result) {
-      const matchingGroup = matchCaesarGroup(result.groups, row.course.catalog);
-      if (!matchingGroup) return;
-      const detailRows = card.querySelectorAll<HTMLLIElement>("li.bc-cs-detail-row");
-      for (const detailRow of Array.from(detailRows)) {
-        const sectionLi = detailRow.previousElementSibling;
-        if (!(sectionLi instanceof HTMLLIElement)) continue;
-        const sectionNumber = sectionLi.dataset.sectionNumber ?? "";
-        const component = sectionLi.dataset.component ?? "";
-        const caesar = matchCaesarSection(matchingGroup, sectionNumber, component);
-        if (!caesar) continue;
-        const bareCatalog = bareCatalogNumber(row.course.catalog);
-        void fetchAndRender(detailRow, caesar, bareCatalog);
       }
     }
   };

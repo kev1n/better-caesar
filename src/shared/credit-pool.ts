@@ -130,22 +130,32 @@ export function defineCreditPool(config: CreditPoolConfig): CreditPoolApi {
 
   function persist(): void {
     if (typeof chrome === "undefined" || !chrome.storage?.local) return;
-    void chrome.storage.local
-      .set({ [config.key]: memory })
-      .catch((err: unknown) => logQuiet(`credit-pool.${config.name}.persist`, err));
+    // chrome APIs throw synchronously (not as a rejecting Promise) when the
+    // extension context is invalidated, so the inner .catch can't see them.
+    try {
+      void chrome.storage.local
+        .set({ [config.key]: memory })
+        .catch((err: unknown) => logQuiet(`credit-pool.${config.name}.persist`, err));
+    } catch (err) {
+      logQuiet(`credit-pool.${config.name}.persist`, err);
+    }
   }
 
   function notifyConsumed(remaining: number, owner: string | undefined): void {
     if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) return;
-    void chrome.runtime
-      .sendMessage({
-        type: "credit-used",
-        pool: config.name.toLowerCase(),
-        remaining,
-        cap: config.cap,
-        owner
-      })
-      .catch(() => undefined);
+    try {
+      void chrome.runtime
+        .sendMessage({
+          type: "credit-used",
+          pool: config.name.toLowerCase(),
+          remaining,
+          cap: config.cap,
+          owner
+        })
+        .catch(() => undefined);
+    } catch {
+      // Extension context invalidated mid-session — drop the broadcast.
+    }
   }
 
   function stateFromMemory(now: number): CreditPoolState {

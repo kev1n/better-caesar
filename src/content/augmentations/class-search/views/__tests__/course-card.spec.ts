@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { CaesarSearchResult } from "../../caesar-search";
 import type { PaperCourse } from "../../paper-data";
@@ -71,8 +71,7 @@ describe("renderCourseCard", () => {
     const card = renderCourseCard(doc, {
       row: makeRow(),
       planEntry: makePlanEntry(),
-      sectionRows: [],
-      onRefresh: vi.fn()
+      sectionRows: []
     });
     expect(card.classList.contains("bc-cs-course")).toBe(true);
     expect(card.querySelector(".bc-cs-course-id")?.textContent).toBe("COMP_SCI 111");
@@ -88,8 +87,7 @@ describe("renderCourseCard", () => {
     const card = renderCourseCard(doc, {
       row: makeRow(),
       planEntry: makePlanEntry({ distros: "2", disciplines: "B" }),
-      sectionRows: [],
-      onRefresh: vi.fn()
+      sectionRows: []
     });
     const tags = Array.from(card.querySelectorAll<HTMLElement>(".bc-cs-tag"));
     const kinds = tags.map((t) => t.dataset.kind);
@@ -102,28 +100,12 @@ describe("renderCourseCard", () => {
     expect(discTag?.textContent).toContain("Disc B");
   });
 
-  it("hides the refresh button by default and calls onRefresh on click", () => {
-    const doc = fresh();
-    const onRefresh = vi.fn();
-    const card = renderCourseCard(doc, {
-      row: makeRow(),
-      planEntry: makePlanEntry(),
-      sectionRows: [],
-      onRefresh
-    });
-    const refreshBtn = card.querySelector<HTMLButtonElement>(".bc-cs-refresh-btn");
-    expect(refreshBtn?.style.display).toBe("none");
-    refreshBtn?.click();
-    expect(onRefresh).toHaveBeenCalledTimes(1);
-  });
-
   it("renders the description block when planEntry.description is present", () => {
     const doc = fresh();
     const card = renderCourseCard(doc, {
       row: makeRow(),
       planEntry: makePlanEntry({ description: "Hello world" }),
-      sectionRows: [],
-      onRefresh: vi.fn()
+      sectionRows: []
     });
     expect(card.querySelector(".bc-cs-course-desc")?.textContent).toBe("Hello world");
   });
@@ -137,8 +119,7 @@ describe("renderCourseCard", () => {
     const card = renderCourseCard(doc, {
       row: makeRow(),
       planEntry: null,
-      sectionRows: [liA, liB],
-      onRefresh: vi.fn()
+      sectionRows: [liA, liB]
     });
     const list = card.querySelector(".bc-cs-section-list");
     expect(list?.children.length).toBe(2);
@@ -151,8 +132,7 @@ describe("renderCourseCard", () => {
     const card = renderCourseCard(doc, {
       row: makeRow(),
       planEntry: null,
-      sectionRows: [],
-      onRefresh: vi.fn()
+      sectionRows: []
     });
     expect(card.querySelector(".bc-cs-course-units")?.textContent).toBe("");
     expect(card.querySelector(".bc-cs-course-desc")).toBeNull();
@@ -176,20 +156,11 @@ describe("applyLiveDataToCard", () => {
     const card = renderCourseCard(doc, {
       row: makeRow(),
       planEntry: makePlanEntry(),
-      sectionRows: [sectionLi as HTMLLIElement],
-      onRefresh: vi.fn()
+      sectionRows: [sectionLi as HTMLLIElement]
     });
     doc.body.appendChild(card);
     return { doc, card };
   }
-
-  it("reveals the refresh button when live data lands", () => {
-    const { card } = buildCard();
-    const refreshBtn = card.querySelector<HTMLButtonElement>(".bc-cs-refresh-btn");
-    expect(refreshBtn?.style.display).toBe("none");
-    applyLiveDataToCard(card, makeSearchResult(), "111-0");
-    expect(refreshBtn?.style.display).toBe("");
-  });
 
   it("paints a status pill in the live cell of matching sections", () => {
     const { card } = buildCard();

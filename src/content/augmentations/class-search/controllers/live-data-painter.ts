@@ -1,15 +1,12 @@
 // Live-data painter: bridges the LiveDataStore (memory → disk → fetch) to
-// the rendered course-card DOM. Handles three flows:
+// the rendered course-card DOM. Handles two flows:
 //
 //   • `ensureLiveData` — read-through resolver. The store does the heavy
 //     lifting; this thin wrapper paints results onto the card and toasts
 //     on hard errors so callers can stay focused on their action.
-//   • `refreshLiveData` — explicit user-initiated refresh: spinner the
-//     button, bypass both caches, repaint, then push the change into any
-//     open detail panels via the section-detail controller.
 //   • `applyLiveDataToCard` — direct paint helper used during initial card
 //     render when a memory-cache hit is available, plus from inside the
-//     refresh + cart-add flows.
+//     cart-add flow.
 //
 // Extracted from augmentation.ts (Wave 5g). The painter is a thin façade
 // that owns no mount-scoped state — every dependency (store, recovery,
@@ -23,7 +20,6 @@ import { showToast } from "../../../../shared/toast";
 
 import {
   isCaesarAuthRequiredError,
-  matchCaesarGroup,
   searchCaesarCatalog,
   type CaesarSearchResult
 } from "../caesar-search";
@@ -48,15 +44,12 @@ export interface LiveDataPainter {
     options?: { force?: boolean }
   ): Promise<CaesarSearchResult | null>;
   /**
-   * Force-refresh the per-course catalog data. Spinners the button while
-   * fetching, repaints the card, and asks the section-detail controller
-   * to refresh any open detail rows on the same card.
+   * Synchronous read-through of the live-data store's in-memory mirror.
+   * Returns null when nothing is cached. The results-renderer pre-warms
+   * the mirror from disk during card render, so this hits on first click
+   * after a page refresh as long as the catalog disk cache is fresh.
    */
-  refreshLiveData(
-    row: ResultRow,
-    card: HTMLElement,
-    button: HTMLButtonElement
-  ): Promise<void>;
+  peekLiveData(row: ResultRow): CaesarSearchResult | null;
   /**
    * Paint live CAESAR data onto an already-mounted card. Re-evaluates
    * cart-cache state for every section row whose status pill changed,
@@ -79,12 +72,6 @@ export type LiveDataPainterDeps = {
    * number so badges reflect any cache hits the signature-only match
    * missed. */
   applyCartStateBySigKey(button: HTMLButtonElement): void;
-  /** Update any open detail panels under `card` against the new result. */
-  refreshOpenDetailPanels(
-    row: ResultRow,
-    card: HTMLElement,
-    result: CaesarSearchResult
-  ): void;
 };
 
 export function createLiveDataPainter(deps: LiveDataPainterDeps): LiveDataPainter {
@@ -118,35 +105,14 @@ export function createLiveDataPainter(deps: LiveDataPainterDeps): LiveDataPainte
     }
   }
 
-  async function refreshLiveData(
-    row: ResultRow,
-    card: HTMLElement,
-    button: HTMLButtonElement
-  ): Promise<void> {
-    button.disabled = true;
-    button.dataset.state = "loading";
-    button.classList.add("is-spinning");
-
-    const result = await ensureLiveData(row, card, { force: true });
-
-    button.disabled = false;
-    button.classList.remove("is-spinning");
-    button.dataset.state = result ? "ready" : "error";
-
-    if (!result) return;
-
-    // Refresh any open detail panels in this card so seat counts also
-    // update — the per-section seats-notes cache is keyed on classNumber
-    // and outlives the catalog cache, so we explicitly invalidate the
-    // sections we know about and re-render their open panels.
-    const matchingGroup = matchCaesarGroup(result.groups, row.course.catalog);
-    if (matchingGroup) {
-      deps.refreshOpenDetailPanels(row, card, result);
-    }
-    showToast("Refreshed seat status from CAESAR.", { tone: "success", durationMs: 3000 });
+  function peekLiveData(row: ResultRow): CaesarSearchResult | null {
+    const key = deps.liveCacheKey(row);
+    const cache = deps.liveData.get(key);
+    if (!cache || cache.status !== "ready" || !cache.result) return null;
+    return cache.result;
   }
 
-  return { ensureLiveData, refreshLiveData, applyLiveDataToCard };
+  return { ensureLiveData, peekLiveData, applyLiveDataToCard };
 }
 
 /** Build the live-cache key the store uses for a `(termId, row)` pair. */

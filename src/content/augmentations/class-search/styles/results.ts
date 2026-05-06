@@ -1,5 +1,5 @@
 // Results column: empty state, my-classes summary cards (shown when query is
-// blank), and the course-card surface (head, tags, refresh button, desc).
+// blank), and the course-card surface (head, tags, desc).
 export function resultsStyles(): string {
   return `
     /* ── Results ────────────────────────────────────────────────────────── */
@@ -187,41 +187,6 @@ export function resultsStyles(): string {
     .bc-cs-tag[data-kind="open"]       { background: var(--bc-color-success-bg); color: var(--bc-color-success); }
     .bc-cs-tag[data-kind="closed"]     { background: var(--bc-color-danger-bg); color: var(--bc-color-danger); }
     .bc-cs-tag[data-kind="wait"]       { background: var(--bc-color-warn-bg); color: var(--bc-color-warn); }
-
-    /* Refresh button: small icon-only at the right end of the tags row.
-       Hidden by inline display:none until live data first paints, so a
-       cold card stays uncluttered. */
-    .bc-cs-refresh-btn {
-      margin-left: auto;
-      width: 24px;
-      height: 24px;
-      padding: 0;
-      border: 1px solid var(--bc-color-border-divider);
-      border-radius: 50%;
-      background: transparent;
-      color: var(--bc-color-text-muted);
-      font-size: 13px;
-      line-height: 1;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: color var(--bc-tx-fast), border-color var(--bc-tx-fast), background-color var(--bc-tx-fast), transform var(--bc-tx-fast);
-    }
-    .bc-cs-refresh-btn:hover {
-      color: var(--bc-color-text);
-      border-color: var(--bc-color-border-strong);
-      background: var(--bc-color-surface-hover);
-    }
-    .bc-cs-refresh-btn[data-state="loading"],
-    .bc-cs-refresh-btn.is-spinning {
-      cursor: progress;
-      animation: bc-cs-spin 0.9s linear infinite;
-    }
-    @keyframes bc-cs-spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
 
     .bc-cs-course-desc {
       font-size: var(--bc-font-12);

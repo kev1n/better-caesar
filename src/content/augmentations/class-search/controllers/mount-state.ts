@@ -90,27 +90,17 @@ export function createMountState(deps: MountStateDeps): MountedState {
     cartButtons
   });
 
-  // Forward-ref holder: detailController and liveDataPainter cross-depend
-  // (painter's refresh asks the detail controller to re-paint open
-  // detail panels). Resolve by closing over a holder that's filled
-  // immediately after both are constructed.
-  const detailControllerRef: { c: ReturnType<typeof createSectionDetailController> | null } = {
-    c: null
-  };
   const liveDataPainter = createLiveDataPainter({
     liveData,
     liveCacheKey,
-    applyCartStateBySigKey: (button) => cartCachePainter.applyBySigKey(button),
-    refreshOpenDetailPanels: (row, card, result) => {
-      detailControllerRef.c?.refreshOpenPanels(row, card, result);
-    }
+    applyCartStateBySigKey: (button) => cartCachePainter.applyBySigKey(button)
   });
   const detailController = createSectionDetailController({
     doc,
     consumePsCredit: deps.consumePsCredit,
-    ensureLiveData: (row, card) => liveDataPainter.ensureLiveData(row, card)
+    ensureLiveData: (row, card) => liveDataPainter.ensureLiveData(row, card),
+    peekLiveData: (row) => liveDataPainter.peekLiveData(row)
   });
-  detailControllerRef.c = detailController;
 
   // searchOrchestrator's onSearchReady → resultsRenderer.render. Since
   // the renderer needs the orchestrator (for `getActiveTermCourses`),
@@ -134,7 +124,6 @@ export function createMountState(deps: MountStateDeps): MountedState {
     liveDataPainter,
     cartCachePainter,
     detailController,
-    consumePsCredit: deps.consumePsCredit,
     handleAdd: (row, section, button) => {
       if (stateRef.state) deps.handleAdd(stateRef.state, row, section, button);
     }

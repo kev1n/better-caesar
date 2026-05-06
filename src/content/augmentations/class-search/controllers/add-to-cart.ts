@@ -27,6 +27,7 @@ import type { ResultRow } from "../types";
 import type { showToast as ShowToastFn } from "../../../../shared/toast";
 import type { AuthRecovery } from "../auth-recovery";
 import { withAuthRecovery } from "../auth-recovery";
+import { paintButtonLoading } from "../views/section-row";
 
 export type AddToCartContext = {
   /** Term id (STRM). */
@@ -132,7 +133,7 @@ export function createAddToCartController(deps: AddToCartDeps): AddToCartControl
       }
 
       if (!deps.consumeCredit("related-pick")) return;
-      button.textContent = "Adding…";
+      paintButtonLoading(button.ownerDocument, button, "Adding…");
 
       let continued: CartFlowResult;
       try {
@@ -316,7 +317,7 @@ export function createAddToCartController(deps: AddToCartDeps): AddToCartControl
       // disabled-button click filter.
       button.disabled = true;
       button.dataset.state = "loading";
-      button.textContent = "Loading…";
+      paintButtonLoading(button.ownerDocument, button, "Loading…");
 
       // Outer try/catch — the section-row's <button> is NOT a
       // `createActionButton` instance (the registry needs to mutate the raw
@@ -338,7 +339,7 @@ export function createAddToCartController(deps: AddToCartDeps): AddToCartControl
           return;
         }
 
-        button.textContent = "Adding…";
+        paintButtonLoading(button.ownerDocument, button, "Adding…");
 
         const result = await withAuthRecovery(deps.authRecovery, isCaesarAuthRequiredError, () =>
           deps.addSectionToCart({

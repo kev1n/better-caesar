@@ -1,5 +1,5 @@
 // Course card: header (subject / catalog / units / title), distro/discipline
-// tag pills, refresh button, description, and the section list.
+// tag pills, description, and the section list.
 //
 // Pure render. The card receives a list of pre-built section row elements
 // so the section-row view can stay independent — the augmentation supplies
@@ -26,9 +26,6 @@ export type CourseCardProps = {
   /** Pre-built section row elements (one per section). The view appends them
    *  in order — section-row.ts is the canonical builder. */
   sectionRows: HTMLLIElement[];
-  /** User-clicked refresh of CAESAR live data. The view manages the spinner
-   *  affordance after dispatch; the augmentation handles the actual fetch. */
-  onRefresh(): void;
 };
 
 export function renderCourseCard(
@@ -59,18 +56,14 @@ export function renderCourseCard(
 }
 
 // Paint live CAESAR data onto a course card that's already in the DOM.
-// Reveals the refresh affordance and updates each section row's live cell
-// with a status pill. Returns the section LIs whose status pill changed so
-// callers can re-evaluate cart-cache state on freshly-resolved class
-// numbers.
+// Updates each section row's live cell with a status pill. Returns the
+// section LIs whose status pill changed so callers can re-evaluate
+// cart-cache state on freshly-resolved class numbers.
 export function applyLiveDataToCard(
   card: HTMLElement,
   result: CaesarSearchResult,
   wantCatalog: string
 ): HTMLLIElement[] {
-  const refreshBtn = card.querySelector<HTMLButtonElement>(".bc-cs-refresh-btn");
-  if (refreshBtn) refreshBtn.style.display = "";
-
   const matchingGroup = matchCaesarGroup(result.groups, wantCatalog);
   const sectionLis = card.querySelectorAll<HTMLLIElement>("li.bc-cs-section");
   const touched: HTMLLIElement[] = [];
@@ -162,28 +155,6 @@ function buildTags(doc: Document, props: CourseCardProps): HTMLElement {
       );
     }
   }
-
-  // Refresh button — hidden until live data is loaded. Lets the user
-  // bypass the 15-min catalog cache when they want fresher seat status.
-  const refreshBtn = el(doc, "button", {
-    class: "bc-cs-refresh-btn",
-    text: "↻",
-    attrs: {
-      type: "button",
-      title: "Refresh seat status from CAESAR",
-      "aria-label": "Refresh seat status from CAESAR"
-    },
-    dataset: { role: "refresh-live" },
-    style: { display: "none" },
-    on: {
-      click: () => {
-        // Spinner state managed by the caller via dataset transitions —
-        // see ClassSearchAugmentation.refreshLiveData.
-        props.onRefresh();
-      }
-    }
-  });
-  tags.appendChild(refreshBtn);
 
   return tags;
 }

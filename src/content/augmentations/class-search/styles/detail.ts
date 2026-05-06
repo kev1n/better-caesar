@@ -23,6 +23,20 @@ export function detailStyles(): string {
       color: var(--bc-color-text);
       font-weight: var(--bc-fw-bold);
     }
+    /* Section wrapper that pairs the stats grid with the "Refresh seats" +
+       timestamp toolbar above it, so the refresh control sits next to the
+       seat info it refreshes (used to live in a detached bottom footer). */
+    .bc-cs-detail-stats-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .bc-cs-detail-stats-bar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
     .bc-cs-detail-stats {
       display: flex;
       flex-wrap: wrap;
