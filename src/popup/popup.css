@@ -451,6 +451,28 @@ body::after {
   transform: none;
 }
 
+.feedback-link {
+  display: block;
+  margin-top: 12px;
+  padding: 10px 12px;
+  font-family: var(--bc-font-display);
+  font-size: var(--bc-font-13);
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-decoration: none;
+  color: var(--bc-color-accent-on);
+  background: var(--bc-color-accent);
+  border: 1.5px solid var(--bc-color-text);
+  border-radius: var(--bc-radius-sm);
+  box-shadow: 2px 2px 0 var(--bc-color-text);
+  transition: transform var(--bc-tx-base) var(--bc-easing), box-shadow var(--bc-tx-base) var(--bc-easing);
+}
+
+.feedback-link:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--bc-color-text);
+}
+
 .schedule {
   margin-top: 14px;
   padding: 12px;
