@@ -61,7 +61,17 @@ function buildManifestForTarget(baseManifest, target) {
   manifest.browser_specific_settings = {
     gecko: {
       id: "pencil@local.dev",
-      strict_min_version: "128.0"
+      strict_min_version: "128.0",
+      // AMO data-collection disclosure (required as of 2025). The
+      // extension stores everything locally via chrome.storage.local and
+      // makes no requests to any extension-operator-controlled endpoint
+      // — every remote fetch is either the user's own CAESAR / Bluera /
+      // NU-SSO session (the user is already there) or a public paper.nu
+      // CDN that returns the same data to everyone. Nothing about the
+      // user is uploaded anywhere, so the correct disclosure is "none".
+      data_collection_permissions: {
+        required: ["none"]
+      }
     }
   };
 
