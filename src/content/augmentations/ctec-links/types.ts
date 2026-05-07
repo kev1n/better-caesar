@@ -14,6 +14,7 @@ export type CtecLinkEntry = {
 export type CtecLinkData =
   | { state: "found"; entries: CtecLinkEntry[]; totalCount: number; incomplete: boolean; hasMore: boolean }
   | { state: "auth-required"; loginUrl: string }
+  | { state: "no-access" }
   | { state: "not-found" }
   | { state: "error"; message: string };
 

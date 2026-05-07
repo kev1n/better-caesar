@@ -1,3 +1,4 @@
+import { getCtecAccessStatus, isCtecAccessDenied } from "../../ctec-index/access";
 import { normalizeSearch } from "../../ctec-index/helpers";
 import { readSubjectIndex, writeSubjectIndex } from "../../ctec-index/storage";
 import type {
@@ -73,12 +74,14 @@ export type CtecCourseAnalytics = {
 export type CtecReportAggregateResult =
   | { state: "found"; aggregate: CtecReportAggregate }
   | { state: "auth-required"; loginUrl: string }
+  | { state: "no-access" }
   | { state: "not-found" }
   | { state: "error"; message: string };
 
 export type CtecCourseAnalyticsResult =
   | { state: "found"; analytics: CtecCourseAnalytics }
   | { state: "auth-required"; loginUrl: string }
+  | { state: "no-access" }
   | { state: "not-found" }
   | { state: "error"; message: string };
 
@@ -90,6 +93,7 @@ type FetchCtecReportAggregateOptions = {
 type EnsureReportEntriesResult =
   | { state: "found"; entries: CtecIndexedEntry[] }
   | { state: "auth-required"; loginUrl: string }
+  | { state: "no-access" }
   | { state: "not-found" }
   | { state: "error"; message: string };
 
@@ -99,6 +103,7 @@ export async function fetchCtecReportAggregate(
   onProgress?: (message: string) => void,
   options: FetchCtecReportAggregateOptions = {}
 ): Promise<CtecReportAggregateResult> {
+  if (isCtecAccessDenied()) return { state: "no-access" };
   const result = await ensureReportEntries(params, titleHint, onProgress, {
     fetchLimit: options.fetchLimit
   });
@@ -120,6 +125,7 @@ export async function fetchCtecCourseAnalytics(
   fetchLimit?: number,
   forceRefreshLinks?: boolean
 ): Promise<CtecCourseAnalyticsResult> {
+  if (isCtecAccessDenied()) return { state: "no-access" };
   const result = await ensureReportEntries(params, titleHint, onProgress, {
     fetchLimit,
     forceRefreshLinks
@@ -141,6 +147,7 @@ export function getCtecCourseAnalyticsSnapshot(
   titleHint?: string,
   recentAggregateLimit?: number
 ): CtecCourseAnalytics | null {
+  if (getCtecAccessStatus() !== "confirmed") return null;
   const entries = getIndexedEntriesForCourse(params, titleHint);
   if (entries.length === 0) return null;
   return buildCourseAnalytics(
@@ -167,6 +174,12 @@ export function getCachedReportAggregate(
   titleHint: string | undefined,
   recentTerms: number
 ): CtecReportAggregate | null {
+  // Cached data only renders once access is verified. While the status is
+  // "unknown" we fall through to null, which makes the chip show its
+  // Load CTEC button instead of cached aggregates that were populated by
+  // an earlier extension version (or before we shipped the access gate).
+  // The user's click drives a real probe and either confirms or denies.
+  if (getCtecAccessStatus() !== "confirmed") return null;
   const entries = sortEntries(getIndexedEntriesForCourse(params, titleHint));
   if (entries.length === 0) return null;
 
@@ -185,6 +198,7 @@ export function hasCachedReportAggregate(
   titleHint: string | undefined,
   recentTerms: number
 ): boolean {
+  if (getCtecAccessStatus() !== "confirmed") return false;
   const entries = sortEntries(getIndexedEntriesForCourse(params, titleHint));
   if (entries.length === 0) return false;
   const window = entries.slice(0, recentTerms);

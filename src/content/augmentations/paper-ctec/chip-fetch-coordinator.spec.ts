@@ -99,6 +99,7 @@ function makeDeps(
     ctecErrorToastMessage: "ctec error",
     attachCartButton: vi.fn(),
     isCustomScheduleCard: vi.fn().mockReturnValue(false),
+    isCtecAccessDenied: vi.fn().mockReturnValue(false),
     openAuthModal: vi.fn(),
     openAnalyticsModal: vi.fn(),
     renderIdle: vi.fn(),
@@ -167,6 +168,26 @@ describe("createChipFetchCoordinator — syncTargets", () => {
     const coord = createChipFetchCoordinator(deps);
     coord.syncTargets([makeTarget()]);
     expect(deps.attachCartButton).not.toHaveBeenCalled();
+  });
+
+  it("renders the no-access pill and skips Load CTEC when access is denied", () => {
+    const deps = makeDeps({
+      isCtecAccessDenied: vi.fn().mockReturnValue(true)
+    });
+    const coord = createChipFetchCoordinator(deps);
+    coord.syncTargets([makeTarget()]);
+    // Cart button still wires up — independent of CTEC.
+    expect(deps.attachCartButton).toHaveBeenCalledTimes(1);
+    expect(deps.renderIdle).not.toHaveBeenCalled();
+    expect(deps.renderWidget).toHaveBeenCalledTimes(1);
+    expect(deps.renderWidget).toHaveBeenCalledWith(
+      expect.anything(),
+      { state: "no-access" },
+      expect.any(Function),
+      undefined,
+      undefined
+    );
+    expect(deps.fetchAggregate).not.toHaveBeenCalled();
   });
 });
 

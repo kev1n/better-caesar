@@ -4,6 +4,15 @@ import {
   subscribe as subscribeCartCache
 } from "../../cart-cache";
 import type { Augmentation } from "../../framework";
+import { CTEC_AUTH_URL } from "../ctec-links/constants";
+import { ModalController } from "../paper-ctec/modal-controller";
+import { STYLE_ID as PAPER_CTEC_STYLE_ID } from "../paper-ctec/constants";
+import { ANALYTICS_MODAL_ID as PAPER_CTEC_MODAL_ID } from "../paper-ctec/constants";
+import { injectStyles as injectPaperCtecStyles } from "../paper-ctec/ui";
+import type {
+  PaperCtecAnalyticsState,
+  PaperCtecWidgetData
+} from "../paper-ctec/types";
 import {
   initStorage as initSeatsNotesStorage,
   formatPsCreditsWarning,
@@ -31,6 +40,10 @@ import {
   type RelatedPickerController
 } from "./controllers/related-picker";
 import { initCatalogCache } from "./catalog-cache";
+import {
+  createCtecCoordinator,
+  type CtecCoordinator
+} from "./ctec/coordinator";
 import {
   getDataMapInfo,
   getPlanCourses,
@@ -99,6 +112,52 @@ export class ClassSearchAugmentation implements Augmentation {
     cartUrl: CART_URL
   });
 
+  // Per-key CTEC fetch + repaint coordinator. Shared across mount cycles
+  // so the resolved map survives navigations away from / back to the
+  // search page within a single content-script load. The Analytics-button
+  // click on the chip routes through `modal.openModal`; an auth-required
+  // chip opens CAESAR (which proxies the same SSO).
+  private readonly ctecCoordinator: CtecCoordinator = createCtecCoordinator({
+    openAnalyticsModal: (source) => this.modal.openModal(source),
+    openAuthLogin: () => window.open(CTEC_AUTH_URL, "_blank")
+  });
+
+  // CTEC-analytics modal — same component paper-ctec uses, instantiated
+  // here so class-search section-row chips can open it with no new
+  // rendering surface. Maps are SEPARATE from paper-ctec's: shared
+  // resolved/inFlight maps would short-circuit cross-augmentation
+  // fetches. The underlying subject-index cache (read by
+  // getCtecCourseAnalyticsSnapshot inside the modal) IS shared, so
+  // fetches in either surface warm both.
+  private readonly modalState = {
+    resolved: new Map<string, PaperCtecWidgetData>(),
+    inFlight: new Map<string, Promise<PaperCtecWidgetData>>(),
+    analyticsResolved: new Map<string, PaperCtecAnalyticsState>(),
+    analyticsInFlight: new Map<string, Promise<PaperCtecAnalyticsState>>(),
+    loadingMessages: new Map<string, { message: string; updatedAt: number }>()
+  };
+
+  private readonly modal: ModalController = new ModalController(
+    this.modalState,
+    {
+      generation: () => 0,
+      isAwaitingRetry: () => false,
+      markAwaitingRetry: () => undefined,
+      setProgress: (key, message) => {
+        this.modalState.loadingMessages.set(key, {
+          message,
+          updatedAt: Date.now()
+        });
+      },
+      syncStatusBar: () => undefined,
+      syncSideCard: () => undefined,
+      // Background-refresh path: when a modal-driven refresh discovers
+      // newly-published CTECs, the modal pushes the fresh widget data
+      // back through here so the section-row chip updates too.
+      renderForKey: (key, data) => this.ctecCoordinator.renderForKey(key, data)
+    }
+  );
+
   constructor() {
     void initSeatsNotesStorage().then(() => pruneEmptySeatsCache());
     void pruneStalePaperCaches();
@@ -109,6 +168,20 @@ export class ClassSearchAugmentation implements Augmentation {
   cleanup(doc: Document = document): void {
     this.unmount(doc);
     this.authRecovery.dispose();
+    this.modal.closeModal();
+    this.modal.invalidate();
+    this.ctecCoordinator.stop();
+    this.modalState.resolved.clear();
+    this.modalState.inFlight.clear();
+    this.modalState.analyticsResolved.clear();
+    this.modalState.analyticsInFlight.clear();
+    this.modalState.loadingMessages.clear();
+    // The paper-ctec stylesheet is injected by `mount()` for the chip
+    // visuals; tear it down here too so cleanup leaves the page
+    // indistinguishable from the never-augmented state. The page-id
+    // constants come from the paper-ctec module so we don't fork them.
+    doc.getElementById(PAPER_CTEC_STYLE_ID)?.remove();
+    doc.getElementById(PAPER_CTEC_MODAL_ID)?.remove();
   }
 
   run(doc: Document = document): void {
@@ -131,6 +204,11 @@ export class ClassSearchAugmentation implements Augmentation {
     this.mountInProgress = true;
     try {
       ensureStyles(doc);
+      // Pulls in the chip / modal / button / chart styles that the
+      // section-row CTEC widget and ModalController both depend on. Safe
+      // to call on CAESAR — the schedule-grid-scoped rules don't match
+      // anything here, and the function is idempotent on STYLE_ID.
+      injectPaperCtecStyles();
 
       const placeholder = ensureRoot(doc);
       placeholder.innerHTML = "";
@@ -167,6 +245,7 @@ export class ClassSearchAugmentation implements Augmentation {
         subjects,
         planCourses,
         authRecovery: this.authRecovery,
+        ctecCoordinator: this.ctecCoordinator,
         consumePsCredit: (owner) => this.consumePsCredit(owner),
         handleAdd: (s, row, section, button) => void this.handleAdd(s, row, section, button)
       });

@@ -9,8 +9,9 @@ export function sectionRowsStyles(): string {
       padding: 0;
     }
     .bc-cs-section {
+      position: relative;
       display: grid;
-      grid-template-columns: 80px 64px minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 1fr) auto;
+      grid-template-columns: 80px 64px minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr) auto;
       gap: 10px;
       align-items: center;
       padding: 10px 16px;
@@ -139,6 +140,98 @@ export function sectionRowsStyles(): string {
       opacity: 0.75;
       animation: bc-cs-spin 0.7s linear infinite;
       flex: 0 0 auto;
+    }
+
+    /* ── Per-section CTEC chip cell ─────────────────────────────────────
+       Rendered by ctec/view.ts. The chip sub-elements (.bc-paper-ctec-chip,
+       .bc-paper-ctec-chip-label, etc.) come from paper-ctec's stylesheet,
+       which class-search injects on mount so the visual language matches
+       the paper.nu schedule-card chips exactly. */
+    .bc-cs-section-ctec {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      font-size: var(--bc-font-11);
+    }
+    .bc-cs-ctec-summary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+    .bc-cs-ctec-message {
+      color: var(--bc-color-text-muted);
+      font-size: var(--bc-font-11);
+    }
+    .bc-cs-ctec-spinner {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: var(--bc-radius-circle);
+      border: 1.5px solid var(--bc-color-accent-fill-24);
+      border-top-color: var(--bc-color-accent-soft);
+      animation: bc-cs-spin 0.9s linear infinite;
+      flex: 0 0 auto;
+    }
+    .bc-cs-ctec-load-btn {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      border-radius: var(--bc-radius-pill);
+      border: 1px solid var(--bc-color-accent-border-45);
+      background: var(--bc-color-accent-surface-soft);
+      color: var(--bc-color-accent);
+      font: inherit;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-wide);
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: var(--bc-shadow-button);
+      transition: background var(--bc-tx-fast), border-color var(--bc-tx-fast),
+                  box-shadow var(--bc-tx-fast), transform var(--bc-tx-fast);
+    }
+    .bc-cs-ctec-load-btn:hover {
+      background: var(--bc-color-accent-surface-tile);
+      border-color: var(--bc-color-accent);
+      box-shadow: var(--bc-shadow-button-hover);
+      transform: translateY(-1px);
+    }
+    .bc-cs-ctec-load-btn:active {
+      transform: translateY(0);
+      box-shadow: var(--bc-shadow-button);
+    }
+    .bc-cs-ctec-load-btn svg {
+      width: 11px;
+      height: 11px;
+      stroke-width: 1.8;
+      flex: 0 0 auto;
+    }
+    .bc-cs-ctec-analytics-btn {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: var(--bc-radius-pill);
+      border: 1px solid var(--bc-color-accent-border-45);
+      background: var(--bc-color-accent-soft);
+      color: var(--bc-color-accent-soft-on);
+      font: inherit;
+      font-size: var(--bc-font-10);
+      font-weight: var(--bc-fw-bold);
+      letter-spacing: var(--bc-ls-widest);
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: var(--bc-shadow-button);
+      transition: background var(--bc-tx-fast), border-color var(--bc-tx-fast),
+                  box-shadow var(--bc-tx-fast);
+    }
+    .bc-cs-ctec-analytics-btn:hover {
+      background: var(--bc-color-accent-soft-hover);
+      box-shadow: var(--bc-shadow-button-hover);
     }
   `;
 }

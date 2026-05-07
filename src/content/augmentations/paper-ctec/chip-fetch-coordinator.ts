@@ -95,6 +95,10 @@ export type ChipFetchCoordinatorDeps = {
   attachCartButton(target: PaperCtecTarget): void;
   /** True for paper.nu user-created custom blocks (no instructor → no cart). */
   isCustomScheduleCard(card: HTMLElement): boolean;
+  /** Sticky "this NetID lacks CTEC access" gate. When true the coordinator
+   *  short-circuits every chip to a no-access pill — no Load CTEC button,
+   *  no fetch, no analytics. The cart button still renders. */
+  isCtecAccessDenied(): boolean;
   /** Auth modal opener — rendered chip widgets call this on Login button. */
   openAuthModal(): void;
   /** Open the analytics modal for this chip. */
@@ -279,6 +283,7 @@ export function createChipFetchCoordinator(
   function kickTargetFetch(target: PaperCtecTarget): void {
     if (inFlight.has(target.key)) return;
     if (resolved.has(target.key)) return;
+    if (deps.isCtecAccessDenied()) return;
 
     const credit = deps.ctecCreditPool.tryConsume("paper-ctec-chip-fetch");
     if (!credit.allowed) {
@@ -330,6 +335,20 @@ export function createChipFetchCoordinator(
       // to anything in CAESAR.
       if (!deps.isCustomScheduleCard(target.card)) {
         deps.attachCartButton(target);
+      }
+
+      // Sticky no-access gate: render the muted pill once and skip every
+      // CTEC code path (no Load button, no fetch, no analytics anchor).
+      // Cart wiring above is preserved.
+      if (deps.isCtecAccessDenied()) {
+        deps.renderWidget(
+          target.widget,
+          { state: "no-access" },
+          () => deps.openAuthModal(),
+          undefined,
+          undefined
+        );
+        continue;
       }
 
       const getPreviewData = previewDataCallbackFor(target.key);

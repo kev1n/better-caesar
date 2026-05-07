@@ -6,6 +6,7 @@ import type { ResultsRenderer } from "./controllers/results-renderer";
 import type { SearchOrchestrator } from "./controllers/search-orchestrator";
 import type { SectionDetailController } from "./controllers/section-detail-controller";
 import type { TabController } from "./controllers/tab-controller";
+import type { CtecCoordinator } from "./ctec/coordinator";
 import type { LiveDataStore } from "./live-data-store";
 import type {
   DataMapInfo,
@@ -105,6 +106,10 @@ export type MountedState = {
   cartCachePainter: CartCachePainter;
   // Inline section-detail panel orchestrator. Owns toggle / fetch + render.
   detailController: SectionDetailController;
+  // Per-section CTEC chip + analytics-modal coordinator. Owns the
+  // resolved/inFlight maps and routes Analytics clicks into the shared
+  // ModalController instance held by the augmentation.
+  ctecCoordinator: CtecCoordinator;
   // Course-card + section-row composer. Routes click events back into the
   // controllers above and writes results into `resultsEl`.
   resultsRenderer: ResultsRenderer;

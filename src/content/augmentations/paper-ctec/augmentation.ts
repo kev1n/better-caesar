@@ -9,6 +9,7 @@ import { getRecentAggregationTerms, isFeatureEnabled } from "../../settings";
 import { resolveChipSection, addChipSectionToCart } from "./cart-flow";
 import { ctecCreditPool, psCreditPool } from "../../../shared/credit-pool";
 import { showToast } from "../../../shared/toast";
+import { isCtecAccessDenied } from "../../ctec-index/access";
 import { CTEC_ERROR_TOAST_MESSAGE } from "../ctec-links/rate-limit";
 import {
   fetchCtecReportAggregate,
@@ -157,6 +158,7 @@ export class PaperCtecAugmentation implements Augmentation {
         void this.chipCart.seedCartStateFromCache(chip);
       },
       isCustomScheduleCard,
+      isCtecAccessDenied,
       openAuthModal: () => this.openAuthModal(),
       openAnalyticsModal: (source) => this.modal.openModal(source),
       renderIdle,

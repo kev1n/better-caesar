@@ -11,6 +11,7 @@
 
 import type { AuthRecovery } from "../auth-recovery";
 import { createCartButtonRegistry } from "../cart-button-registry";
+import type { CtecCoordinator } from "../ctec/coordinator";
 import { applyFilters, buildCatalogIndex } from "../filter";
 import type {
   DataMapInfo,
@@ -49,6 +50,13 @@ export type MountStateDeps = {
   planCourses: PaperCourse[];
   /** SSO popup re-auth recovery, shared across mount cycles. */
   authRecovery: AuthRecovery;
+  /** Pre-built CTEC coordinator, shared across mount cycles so resolved
+   *  state persists when the user navigates away from and back to the
+   *  search page (the section index module's in-memory cache survives
+   *  too, but the coordinator's resolved map is what powers no-flicker
+   *  re-renders). The augmentation owns the singleton; mount-state just
+   *  wires it through to the results-renderer. */
+  ctecCoordinator: CtecCoordinator;
   /** PS credit gate. Returns true on success, false (and toasts) when the
    *  budget is exhausted. */
   consumePsCredit(owner: string): boolean;
@@ -125,6 +133,7 @@ export function createMountState(deps: MountStateDeps): MountedState {
     liveDataPainter,
     cartCachePainter,
     detailController,
+    ctecCoordinator: deps.ctecCoordinator,
     handleAdd: (row, section, button) => {
       if (stateRef.state) deps.handleAdd(stateRef.state, row, section, button);
     }
@@ -162,6 +171,7 @@ export function createMountState(deps: MountStateDeps): MountedState {
     liveDataPainter,
     cartCachePainter,
     detailController,
+    ctecCoordinator: deps.ctecCoordinator,
     resultsRenderer,
     cartUnsubscribe: null
   };

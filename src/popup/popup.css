@@ -413,6 +413,36 @@ body::after {
   border-color: var(--bc-color-accent);
 }
 
+.ctec-access-pill {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: var(--bc-font-12);
+  font-weight: var(--bc-fw-bold);
+  letter-spacing: var(--bc-ls-caps-wide);
+  text-transform: uppercase;
+  border: 1.5px solid;
+  white-space: nowrap;
+}
+
+.ctec-access-pill--ok {
+  background: var(--bc-color-gate-ok-bg);
+  border-color: var(--bc-color-gate-ok-border);
+  color: var(--bc-color-gate-ok-text);
+}
+
+.ctec-access-pill--warn {
+  background: var(--bc-color-gate-warn-bg);
+  border-color: var(--bc-color-gate-warn-border);
+  color: var(--bc-color-gate-warn-text);
+}
+
+.ctec-access-pill--muted {
+  background: var(--bc-color-bg-app);
+  border-color: var(--bc-color-border-strong);
+  color: var(--bc-color-text-muted);
+}
+
 .actions {
   margin-top: 12px;
 }

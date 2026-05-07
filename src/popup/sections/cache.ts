@@ -1,5 +1,6 @@
 import { bindActionButton } from "../../content/framework";
 import { CART_CACHE_STORAGE_KEY } from "../../content/cart-cache/types";
+import { CTEC_ACCESS_STORAGE_KEY } from "../../content/ctec-index/access-shared";
 import { CTEC_INDEX_STORAGE_KEY } from "../../content/ctec-index/storage";
 import {
   NAME_FETCH_FAILED_AT_KEY,
@@ -48,8 +49,11 @@ export function initCacheButtons(): void {
     containerId: "clear-ctec-cache",
     buttonText: "Clear CTEC cache",
     cleanup: async () => {
+      // Also clear the sticky "no CTEC access" flag so a reauthorized
+      // student gets a fresh probe on the next CTEC click.
       await chrome.storage.local.remove([
         CTEC_INDEX_STORAGE_KEY,
+        CTEC_ACCESS_STORAGE_KEY,
         PAPER_CTEC_MODAL_CACHE_KEY
       ]);
     }

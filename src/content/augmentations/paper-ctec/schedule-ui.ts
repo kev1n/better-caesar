@@ -137,6 +137,15 @@ function buildWidgetSummary(
     return makeChip("spark", "No CTEC", "is-muted");
   }
 
+  if (data.state === "no-access") {
+    return makeChip(
+      "lock",
+      "No CTEC access",
+      "is-muted",
+      "Northwestern has not authorized this NetID to view CTECs."
+    );
+  }
+
   if (data.state === "auth-required") {
     return makeAuthChipTemplate(onAuthChipClick);
   }
@@ -164,7 +173,7 @@ function buildWidgetSummary(
       "spark",
       "CTEC detail",
       "is-muted",
-      "Matching CTEC reports were found, but the compact card does not have Global, Hours, Challenge, or Interest summary metrics for this course."
+      "Matching CTEC reports were found, but the compact card does not have Rating, Hours, Challenge, or Interest summary metrics for this course."
     );
   }
 

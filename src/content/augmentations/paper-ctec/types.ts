@@ -12,6 +12,7 @@ export type PaperCtecTarget = {
 export type PaperCtecWidgetData =
   | { state: "found"; aggregate: CtecReportAggregate }
   | { state: "auth-required"; loginUrl: string }
+  | { state: "no-access" }
   | { state: "not-found" }
   | { state: "error"; message: string };
 
@@ -32,6 +33,7 @@ export type PaperCtecStatusBarData = {
 export type PaperCtecAnalyticsState =
   | { state: "found"; analytics: CtecCourseAnalytics }
   | { state: "auth-required"; loginUrl: string }
+  | { state: "no-access" }
   | { state: "not-found" }
   | { state: "error"; message: string };
 

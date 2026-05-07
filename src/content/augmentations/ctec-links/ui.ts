@@ -91,6 +91,23 @@ export const CTEC_LINKS_STYLES = `
     .bc-ctec-fetch:hover { background: var(--bc-color-accent); color: var(--bc-color-accent-on); }
   `;
 
+export function renderNoAccess(container: HTMLElement): void {
+  container.innerHTML = "";
+  const root = document.createElement("div");
+  root.className = "bc-ctec-widget";
+  root.appendChild(buildNoAccessMessage());
+  container.appendChild(root);
+}
+
+function buildNoAccessMessage(): HTMLElement {
+  const msg = document.createElement("div");
+  msg.className = "bc-ctec-muted";
+  msg.textContent = "No CTEC access";
+  msg.title =
+    "Northwestern has not authorized this NetID to view CTECs. Complete CTECs in the next collection period to restore access.";
+  return msg;
+}
+
 export function renderFetchButton(container: HTMLElement, onFetch: () => void): void {
   container.innerHTML = "";
   // Load CTEC is a one-shot trigger: the runtime swaps the cell to the
@@ -217,6 +234,10 @@ export function renderCtecLinksWidget(
       msg.className = "bc-ctec-muted";
       msg.textContent = "No CTECs";
       root.appendChild(msg);
+      break;
+    }
+    case "no-access": {
+      root.appendChild(buildNoAccessMessage());
       break;
     }
     case "auth-required": {

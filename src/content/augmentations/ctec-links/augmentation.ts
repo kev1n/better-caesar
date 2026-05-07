@@ -16,6 +16,7 @@ import {
   PAGE_ID,
   STYLE_ID
 } from "./constants";
+import { isCtecAccessDenied } from "../../ctec-index/access";
 import { fetchCtecLinks, getCtecLinksFromCache } from "./fetcher";
 import { extractInstructorFromRow, extractSubjectAndCatalog } from "./helpers";
 import {
@@ -29,7 +30,8 @@ import {
   CTEC_LINKS_STYLES,
   renderCtecLinksWidget,
   renderFetchButton,
-  renderLoading
+  renderLoading,
+  renderNoAccess
 } from "./ui";
 
 export class CtecLinksAugmentation implements Augmentation {
@@ -69,6 +71,10 @@ export class CtecLinksAugmentation implements Augmentation {
     render: {
       idle: (ctx, controls) => {
         const cell = ctx.cells[0]!;
+        if (isCtecAccessDenied()) {
+          renderNoAccess(cell);
+          return;
+        }
         const params = this.paramsByKey.get(ctx.key);
         const cached = params ? getCtecLinksFromCache(params) : null;
         if (cached) {

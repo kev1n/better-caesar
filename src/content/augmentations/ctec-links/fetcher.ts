@@ -13,6 +13,15 @@ import {
 } from "../../peoplesoft/params";
 import { extractPostUrl } from "../../peoplesoft/parsers";
 import { resolveActionUrl } from "../../peoplesoft/shared";
+import {
+  extractPeopleSoftPageId,
+  getCtecAccessStatus,
+  isCtecAccessDenied,
+  isCtecUnauthorizedHtml,
+  markCtecAccessDenied
+} from "../../ctec-index/access";
+import { probeCtecAccess } from "../../ctec-index/access-probe";
+import { logDebug } from "../../../shared/log";
 import { readSubjectIndex, writeSubjectIndex } from "../../ctec-index/storage";
 import type {
   CtecCourseDiscoveryState,
@@ -92,6 +101,29 @@ async function fetchCtecLinksInternal(
   forceRefresh: boolean,
   onProgress?: (msg: string) => void
 ): Promise<CtecLinkData> {
+  // Sticky no-access short-circuit. Once a CTEC fetch in this session (or
+  // a prior one — the flag persists in chrome.storage.local) lands on the
+  // NW_CTEC_MSG_FL "you are not authorized" panel, every later call
+  // returns no-access without touching the network. Cleared from the
+  // popup's "Clear CTEC cache" button.
+  logDebug("ctec-fetch", "fetchCtecLinksInternal start", {
+    params,
+    forceRefresh,
+    accessStatus: getCtecAccessStatus()
+  });
+  if (isCtecAccessDenied()) return { state: "no-access" };
+
+  // Upfront probe: hit the NU Manage Classes navigation page CAESAR's
+  // own UI walks through. Its rendered body contains the literal "You
+  // are not authorized to access CTECs" copy for any deauthorized
+  // NetID — a far more reliable signal than inferring from the actual
+  // subject-results URL response. Sticky-cached, so subsequent Load
+  // CTEC clicks don't re-probe.
+  if (getCtecAccessStatus() === "unknown") {
+    await probeCtecAccess();
+    if (isCtecAccessDenied()) return { state: "no-access" };
+  }
+
   // Wrap the core in the shared silent-recovery cascade. Inner code throws
   // `CaesarAuthRequiredError` whenever PeopleSoft hands us an SSO page; the
   // wrapper retries through Layer 1 (background fetch to landing page) then
@@ -104,6 +136,9 @@ async function fetchCtecLinksInternal(
       isCaesarAuthRequiredError
     );
   } catch (error) {
+    if (isCtecAccessDeniedError(error)) {
+      return { state: "no-access" };
+    }
     if (isCaesarAuthRequiredError(error)) {
       return { state: "auth-required", loginUrl: CTEC_AUTH_URL };
     }
@@ -118,6 +153,16 @@ async function fetchCtecLinksCore(
 ): Promise<CtecLinkData> {
   const { subject, catalogNumber, instructor } = params;
 
+  // Cache-only short-circuits are only safe once we've actually verified
+  // CTEC access for this NetID. While status is "unknown" we force a real
+  // network probe — `fetchCourseEntries` either lands on the unauthorized
+  // message panel (markCtecAccessDenied) or the real subject-results page
+  // (markCtecAccessConfirmed). Preexisting users who already have a
+  // populated subject index would otherwise short-circuit forever and
+  // never confirm — the popup's CTEC-access pill would be stuck on "not
+  // checked yet" while CTEC widgets happily render cached data.
+  const accessConfirmed = getCtecAccessStatus() === "confirmed";
+
   // Sentinel-only short-circuit: previously confirmed not-found in the CTEC
   // catalog. forceRefresh bypasses to allow re-checking.
   const cachedIndex = readSubjectIndex(subject);
@@ -130,6 +175,7 @@ async function fetchCtecLinksCore(
     (e) => e.actionId !== NOT_FOUND_ACTION_ID
   );
   if (
+    accessConfirmed &&
     !forceRefresh &&
     cachedCourseEntries.length > 0 &&
     realCached.length === 0
@@ -151,6 +197,7 @@ async function fetchCtecLinksCore(
     buildCourseStateKey(catalogNumber, instructor)
   ];
   if (
+    accessConfirmed &&
     !forceRefresh &&
     courseStateRecorded &&
     cachedPending === 0 &&
@@ -241,8 +288,13 @@ async function fetchCtecLinksCore(
 }
 
 // Synchronous cache-only lookup. Returns data if the subject index exists and
-// has matching entries for this course; null if a fetch is required.
+// has matching entries for this course; null if a fetch is required. Gates
+// on the access flag — denied → no-access, anything but confirmed → null
+// so the caller has to drive a real network probe before any cached data
+// is shown.
 export function getCtecLinksFromCache(params: CtecLinkParams): CtecLinkData | null {
+  if (isCtecAccessDenied()) return { state: "no-access" };
+  if (getCtecAccessStatus() !== "confirmed") return null;
   const { subject, catalogNumber, instructor } = params;
   const cachedIndex = readSubjectIndex(subject);
   if (!cachedIndex) return null;
@@ -360,6 +412,11 @@ async function fetchCourseEntries(
     return { type: "error", message: e instanceof Error ? e.message : "Failed to load CTEC page." };
   }
 
+  logCtecResponse("subject-results GET", resultsUrl, html);
+
+  if (detectAndMarkUnauthorized(html, "subject-results GET")) {
+    throw new CtecAccessDeniedError();
+  }
   if (isAuthResponse(html)) throw new CaesarAuthRequiredError(CTEC_AUTH_URL);
 
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -393,6 +450,11 @@ async function fetchCourseEntries(
     return { type: "error", message: e instanceof Error ? e.message : "Failed to load course." };
   }
 
+  logCtecResponse("course POST", actionUrl, courseResponse);
+
+  if (detectAndMarkUnauthorized(courseResponse, "course POST")) {
+    throw new CtecAccessDeniedError();
+  }
   if (isAuthResponse(courseResponse)) throw new CaesarAuthRequiredError(CTEC_AUTH_URL);
 
   const allClassRows = collectClassRowsFromText(courseResponse);
@@ -454,6 +516,9 @@ async function fetchCourseEntries(
       continue;
     }
 
+    if (detectAndMarkUnauthorized(classResponse, "class POST")) {
+      throw new CtecAccessDeniedError();
+    }
     if (isAuthResponse(classResponse)) throw new CaesarAuthRequiredError(CTEC_AUTH_URL);
 
     const blueraUrl = extractBlueraUrl(classResponse);
@@ -473,4 +538,43 @@ async function fetchCourseEntries(
 
 function isUnauthorizedStatus(status: number): boolean {
   return status === 401 || status === 403;
+}
+
+// Marker error for "your NetID lost CTEC access." Distinct from
+// `CaesarAuthRequiredError` (which means "session expired, sign in again")
+// — silent SSO can't recover from this one, since the user is already
+// authenticated; CTEC just refuses to serve them. Caught at the top of
+// `fetchCtecLinksInternal` and converted to `{ state: "no-access" }`.
+export class CtecAccessDeniedError extends Error {
+  constructor() {
+    super("Northwestern has not authorized this NetID to view CTECs.");
+    this.name = "CtecAccessDeniedError";
+  }
+}
+
+export function isCtecAccessDeniedError(error: unknown): error is CtecAccessDeniedError {
+  return error instanceof CtecAccessDeniedError;
+}
+
+// Detects the unauthorized-message panel CAESAR returns and persists the
+// sticky flag on the way out, so callers up the stack can short-circuit
+// without re-checking the body. The `source` string is purely for the
+// debug log so we can tell which fetch step (subject GET / course POST /
+// class POST) tripped the marker.
+function detectAndMarkUnauthorized(html: string, source: string): boolean {
+  if (!isCtecUnauthorizedHtml(html)) return false;
+  markCtecAccessDenied(`fetcher.ts: ${source}`);
+  return true;
+}
+
+// Single-line response trace at every CTEC step. Gated by `bc-debug`
+// (logDebug is a no-op without it). Helps diagnose "why did access flip
+// the wrong way" without dumping multi-KB bodies into the console.
+function logCtecResponse(label: string, url: string, html: string): void {
+  logDebug("ctec-fetch", label, {
+    url,
+    bodyLength: html.length,
+    pageId: extractPeopleSoftPageId(html),
+    isUnauthorized: isCtecUnauthorizedHtml(html)
+  });
 }

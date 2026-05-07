@@ -13,6 +13,8 @@ import { readTermCart } from "../../../cart-cache";
 import { bareCatalogNumber } from "../catalog-format";
 import { readCatalogCache } from "../catalog-cache";
 import type { CartButtonRegistry } from "../cart-button-registry";
+import type { CtecCoordinator } from "../ctec/coordinator";
+import { buildCtecSectionIdentity } from "../ctec/identity";
 import type { LiveDataStore } from "../live-data-store";
 import type { PaperCourse, PaperSection, PaperTermCourse } from "../paper-data";
 import type { ResultRow, SearchFilters } from "../types";
@@ -50,6 +52,7 @@ export type ResultsRendererDeps = {
   liveDataPainter: LiveDataPainter;
   cartCachePainter: CartCachePainter;
   detailController: SectionDetailController;
+  ctecCoordinator: CtecCoordinator;
 
   /** Click → cart-add wizard for `(row, section)`'s Add button. */
   handleAdd(
@@ -145,6 +148,11 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
         deps.cartButtons.register(sigKey, button);
         deps.cartCachePainter.applyForSection(row, section, button);
       },
+      registerCtecHost: (host) => {
+        const identity = buildCtecSectionIdentity(row.course, section);
+        if (!identity) return;
+        deps.ctecCoordinator.register(host, identity);
+      },
       onAddToCart: () => {
         if (!liRef.el) return;
         const addBtn = liRef.el.querySelector<HTMLButtonElement>(".bc-cs-add");
@@ -185,6 +193,7 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
     resultsEl.appendChild(
       renderMyClassesView(doc, {
         paperCourses: courses ?? [],
+        catalogIndex: deps.catalogIndex,
         enrolled,
         inCart
       })

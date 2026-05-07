@@ -7,6 +7,7 @@
 
 import { ACTION_BUTTON_MARKER_ATTR } from "../../../framework";
 import { el } from "../../../framework/dom";
+import { CTEC_HOST_CLASS } from "../ctec/view";
 import {
   formatInstructors,
   formatMeetingPattern,
@@ -25,6 +26,11 @@ export type SectionRowProps = {
    *  the initial cart-cache state and wire the registry. Skipped when
    *  `showActions` is false (no Add button gets built). */
   registerAddButton(button: HTMLButtonElement, sigKey: string): void;
+  /** Called with the freshly-built CTEC host element so the augmentation
+   *  can bind it to the CtecCoordinator. Skipped when `showActions` is
+   *  false (related-component rows mirror their LEC's CTEC) or when the
+   *  section has no instructor (CTEC needs an instructor to match). */
+  registerCtecHost?(host: HTMLElement): void;
   onAddToCart(): void;
   onToggleDetails(): void;
   /** When false, renders an empty actions cell with no Details / Add
@@ -55,11 +61,26 @@ export function renderSectionRow(
     buildTimeCell(doc, section),
     buildInstructorCell(doc, section),
     buildRoomCell(doc, section),
+    buildCtecCell(doc, props),
     buildLiveCell(doc),
     buildActionsCell(doc, props)
   );
 
   return li;
+}
+
+function buildCtecCell(doc: Document, props: SectionRowProps): HTMLElement {
+  const host = el(doc, "div", {
+    class: `bc-cs-section-ctec ${CTEC_HOST_CLASS}`,
+    dataset: { state: "idle" }
+  });
+  // No CTEC for related-component rows (DIS / LAB sit under their LEC and
+  // we'd be fetching the same instructor twice) or rows where we suppress
+  // actions (same reason).
+  if (props.showActions && props.registerCtecHost) {
+    props.registerCtecHost(host);
+  }
+  return host;
 }
 
 function buildIdCell(doc: Document, section: PaperSection): HTMLElement {

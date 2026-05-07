@@ -4,6 +4,7 @@ import { mountAccessGateModal } from "./access-gate/modal";
 import { augmentationRegistry } from "./augmentations/registry";
 import { initModalCache } from "./augmentations/paper-ctec/modal-cache";
 import { initCartCache, runOpportunisticReconcile } from "./cart-cache";
+import { mountCtecAccessDetector } from "./ctec-index/access-detector";
 import { bootstrapTheme } from "./design";
 import { gateTokensCss } from "./design/tokens";
 import { AugmentationRunner } from "./framework";
@@ -34,6 +35,10 @@ if (/caesar\.ent\.northwestern\.edu/i.test(window.location.host)) {
   // Queue indicator is also CAESAR-only — paper.nu has its own
   // status-bar surface and doesn't drive the PeopleSoft mutex.
   mountTrafficIndicator(document);
+  // Watches for the inline "not authorized to access CTECs" panel CAESAR
+  // shows on the NU Manage Classes / CTEC pages. Self-disconnects once
+  // the access flag flips.
+  mountCtecAccessDetector(document);
 }
 
 function injectGateTokens(): void {
