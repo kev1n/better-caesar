@@ -1,6 +1,10 @@
-// Per-section expanded detail panel: header (section label · time · room),
-// seat stats grid, class attributes / enrollment requirements / notes blocks,
-// and a footer with relative timestamp + Refresh button.
+// Per-section expanded detail panel: seat stats grid, class attributes /
+// enrollment requirements / notes blocks, and a footer with relative
+// timestamp + Refresh button.
+//
+// The duplicate "section · time · room" header that used to live at the
+// top was dropped — the section row already shows that info one line up,
+// and re-rendering it inside the detail panel was visual noise.
 //
 // Pure render. The seats-notes parser produces the success shape used here;
 // the caller owns the fetch / cache and passes the result + fetched-at + a
@@ -12,15 +16,6 @@ import { createActionButton } from "../../../framework";
 import { el } from "../../../framework/dom";
 import type { SeatsNotesResult, SeatsNotesSuccess } from "../../seats-notes/types";
 
-export type SectionDetailHeader = {
-  /** "1-LEC" — section + component. */
-  sectionLabel: string;
-  /** "MoWeFr 11:00am – 11:50am". */
-  daysTime: string;
-  /** "Tech Lecture Room L168". */
-  room: string;
-};
-
 // Re-exported under a friendlier alias so callers don't need to reach into
 // seats-notes types — the section-detail view is the only consumer in
 // class-search and treating `SectionDetailData = SeatsNotesResult` keeps a
@@ -28,7 +23,6 @@ export type SectionDetailHeader = {
 export type SectionDetailData = SeatsNotesResult;
 
 export type SectionDetailProps = {
-  header: SectionDetailHeader;
   detail: SectionDetailData;
   fetchedAt: number;
   onRefresh(): void;
@@ -39,7 +33,6 @@ export function renderSectionDetail(
   props: SectionDetailProps
 ): HTMLElement {
   const wrap = el(doc, "div", { class: "bc-cs-detail" });
-  wrap.appendChild(buildHeader(doc, props.header));
 
   if (!props.detail.ok) {
     wrap.appendChild(
@@ -102,17 +95,6 @@ export function renderSectionDetailError(
 
 // ── Internals ──────────────────────────────────────────────────────────────
 
-function buildHeader(doc: Document, header: SectionDetailHeader): HTMLElement {
-  const headerBits: string[] = [];
-  if (header.sectionLabel) headerBits.push(`<strong>${escapeHtml(header.sectionLabel)}</strong>`);
-  if (header.daysTime) headerBits.push(escapeHtml(header.daysTime));
-  if (header.room) headerBits.push(escapeHtml(header.room));
-  return el(doc, "div", {
-    class: "bc-cs-detail-header",
-    html: headerBits.join(" · ")
-  });
-}
-
 function buildStatsGrid(doc: Document, detail: SeatsNotesSuccess): HTMLElement {
   const stats = el(doc, "div", { class: "bc-cs-detail-stats" });
   appendStat(doc, stats, "Capacity", detail.classCapacity);
@@ -156,7 +138,121 @@ function buildStatsSection(
   const stats = buildStatsGrid(doc, detail);
   if (stats.children.length > 0) section.appendChild(stats);
 
+  const bar = buildCapacityBar(doc, detail);
+  if (bar) section.appendChild(bar);
+
   return section;
+}
+
+// Horizontal availability viz: bar width = capacity, left segment (grey) =
+// filled seats, right segment = available seats colored by enrollment
+// pressure. Same five-tone gradient (open → room → tight → warn → full)
+// the seats-notes shopping-cart cards use, so a class that's tight in the
+// cart reads as tight here too.
+function buildCapacityBar(
+  doc: Document,
+  detail: SeatsNotesSuccess
+): HTMLElement | null {
+  const capacity = parseSeatNumber(detail.classCapacity);
+  if (capacity === null || capacity <= 0) return null;
+
+  const explicitAvailable = parseSeatNumber(detail.availableSeats);
+  const enrolled = parseSeatNumber(detail.enrollmentTotal);
+
+  let used: number;
+  let available: number;
+  if (explicitAvailable !== null) {
+    available = clamp(explicitAvailable, 0, capacity);
+    used = capacity - available;
+  } else if (enrolled !== null) {
+    used = clamp(enrolled, 0, capacity);
+    available = capacity - used;
+  } else {
+    return null;
+  }
+
+  const occupancy = used / capacity;
+  const tone = pressureTone(occupancy);
+  const usedPct = (used / capacity) * 100;
+  const availPct = 100 - usedPct;
+
+  const bar = el(doc, "div", {
+    class: "bc-cs-capacity-bar",
+    attrs: {
+      role: "img",
+      "aria-label": `${available} of ${capacity} seats available`
+    }
+  });
+  // Available (colored) on the LEFT so the bar reads like a "seats left"
+  // counter — the colored portion is what's up for grabs, draining toward
+  // the right (filled, muted grey) as enrollment grows.
+  bar.appendChild(
+    el(doc, "div", {
+      class: "bc-cs-capacity-avail",
+      style: {
+        width: `${availPct}%`,
+        background: tone.background,
+        borderRightColor: tone.border
+      }
+    })
+  );
+  bar.appendChild(
+    el(doc, "div", {
+      class: "bc-cs-capacity-used",
+      style: { width: `${usedPct}%` }
+    })
+  );
+
+  const label = el(doc, "div", {
+    class: "bc-cs-capacity-legend",
+    text: `${available} of ${capacity} seats left`
+  });
+
+  return el(doc, "div", { class: "bc-cs-capacity" }, [bar, label]);
+}
+
+function parseSeatNumber(input: string | null): number | null {
+  if (!input) return null;
+  const parsed = Number.parseFloat(input.replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function pressureTone(occupancy: number): { background: string; border: string } {
+  // Mirrors occupancyToTone() in seats-notes/ui.ts so the cart cards and
+  // the class-search detail bar render with one tone. If you adjust the
+  // thresholds here, mirror them there.
+  if (occupancy >= 0.95) {
+    return {
+      background: "var(--bc-color-seat-full-bg)",
+      border: "var(--bc-color-seat-full-border)"
+    };
+  }
+  if (occupancy >= 0.8) {
+    return {
+      background: "var(--bc-color-seat-warn-bg)",
+      border: "var(--bc-color-seat-warn-border)"
+    };
+  }
+  if (occupancy >= 0.6) {
+    return {
+      background: "var(--bc-color-seat-tight-bg)",
+      border: "var(--bc-color-seat-tight-border)"
+    };
+  }
+  if (occupancy >= 0.35) {
+    return {
+      background: "var(--bc-color-seat-room-bg)",
+      border: "var(--bc-color-seat-room-border)"
+    };
+  }
+  return {
+    background: "var(--bc-color-seat-open-bg)",
+    border: "var(--bc-color-seat-open-border)"
+  };
 }
 
 function buildFooter(
@@ -240,11 +336,3 @@ function formatRelativeTime(timestamp: number): string {
   return `${deltaDay}d ago`;
 }
 
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}

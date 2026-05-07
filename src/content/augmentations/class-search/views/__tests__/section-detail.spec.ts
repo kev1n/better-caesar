@@ -28,31 +28,22 @@ function makeSuccess(overrides: Partial<SeatsNotesSuccess> = {}): SeatsNotesSucc
   };
 }
 
-const HEADER = {
-  sectionLabel: "20-LEC",
-  daysTime: "MoWeFr 11:00am – 11:50am",
-  room: "Tech L168"
-};
-
 describe("renderSectionDetail — success", () => {
-  it("renders the header bits joined with the dot separator", () => {
+  it("does not render a duplicated section/time/room header", () => {
     const doc = fresh();
     const wrap = renderSectionDetail(doc, {
-      header: HEADER,
       detail: makeSuccess(),
       fetchedAt: Date.now(),
       onRefresh: vi.fn()
     });
-    const header = wrap.querySelector<HTMLElement>(".bc-cs-detail-header");
-    expect(header?.querySelector("strong")?.textContent).toBe("20-LEC");
-    expect(header?.textContent).toContain("MoWeFr 11:00am – 11:50am");
-    expect(header?.textContent).toContain("Tech L168");
+    // The section row above the panel already shows section label, time,
+    // and room — re-rendering them inside the panel was visual noise.
+    expect(wrap.querySelector(".bc-cs-detail-header")).toBeNull();
   });
 
   it("renders all stat cells with values + labels", () => {
     const doc = fresh();
     const wrap = renderSectionDetail(doc, {
-      header: HEADER,
       detail: makeSuccess(),
       fetchedAt: Date.now(),
       onRefresh: vi.fn()
@@ -68,7 +59,6 @@ describe("renderSectionDetail — success", () => {
   it("renders class notes / attributes / requirements blocks", () => {
     const doc = fresh();
     const wrap = renderSectionDetail(doc, {
-      header: HEADER,
       detail: makeSuccess(),
       fetchedAt: Date.now(),
       onRefresh: vi.fn()
@@ -87,7 +77,6 @@ describe("renderSectionDetail — success", () => {
   it("skips empty stats and blocks when their values are null", () => {
     const doc = fresh();
     const wrap = renderSectionDetail(doc, {
-      header: HEADER,
       detail: makeSuccess({
         classCapacity: null,
         availableSeats: null,
@@ -123,7 +112,6 @@ describe("renderSectionDetail — success", () => {
       classNotes: null
     };
     const wrap = renderSectionDetail(doc, {
-      header: HEADER,
       detail,
       fetchedAt: Date.now(),
       onRefresh: vi.fn()
@@ -136,7 +124,6 @@ describe("renderSectionDetail — success", () => {
   it("renders a stats-bar with the relative timestamp + 'Refresh seats' button (no bottom footer)", () => {
     const doc = fresh();
     const wrap = renderSectionDetail(doc, {
-      header: HEADER,
       detail: makeSuccess(),
       fetchedAt: Date.now(),
       onRefresh: vi.fn()
@@ -152,7 +139,6 @@ describe("renderSectionDetail — success", () => {
     const doc = fresh();
     const onRefresh = vi.fn();
     const wrap = renderSectionDetail(doc, {
-      header: HEADER,
       detail: makeSuccess(),
       fetchedAt: Date.now(),
       onRefresh
@@ -170,7 +156,6 @@ describe("renderSectionDetail — failure", () => {
     const doc = fresh();
     const detail: SeatsNotesResult = { ok: false, error: "boom" };
     const wrap = renderSectionDetail(doc, {
-      header: HEADER,
       detail,
       fetchedAt: Date.now(),
       onRefresh: vi.fn()

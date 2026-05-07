@@ -114,13 +114,34 @@ export function buildCatalogIndex(courses: PaperCourse[]): Map<string, PaperCour
   return map;
 }
 
+// paper.nu encoding (verified at paper.nu/src/utility/Constants.ts):
+// each character in meeting_days[i] is a zero-indexed day:
+//   0 = Mo, 1 = Tu, 2 = We, 3 = Th, 4 = Fr
+// E.g. "024" → "MoWeFr", "13" → "TuTh", "3" → "Th".
+const DAY_LABELS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+
+export function formatMeetingDays(raw: string): string {
+  let out = "";
+  for (const ch of raw) {
+    const idx = Number(ch);
+    if (Number.isInteger(idx) && idx >= 0 && idx < DAY_LABELS.length) {
+      out += DAY_LABELS[idx];
+    } else {
+      // Non-digit (e.g. legacy "MoWeFr" payloads or unexpected glyphs):
+      // pass through verbatim so we don't regress old data.
+      out += ch;
+    }
+  }
+  return out;
+}
+
 export function formatMeetingPattern(section: PaperSection, index: number): string {
   const days = section.meeting_days[index] ?? null;
   const start = section.start_time[index] ?? null;
   const end = section.end_time[index] ?? null;
   if (!days && !start && !end) return "TBA";
 
-  const dayLabel = days ?? "—";
+  const dayLabel = days ? formatMeetingDays(days) : "—";
   if (!start || !end) return dayLabel;
   return `${dayLabel} ${formatTime(start)}–${formatTime(end)}`;
 }

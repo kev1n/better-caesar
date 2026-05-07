@@ -25,14 +25,6 @@ export function detailStyles(): string {
     .bc-cs-detail-loading-label {
       line-height: 1.3;
     }
-    .bc-cs-detail-header {
-      font-size: var(--bc-font-12);
-      color: var(--bc-color-text-muted);
-    }
-    .bc-cs-detail-header strong {
-      color: var(--bc-color-text);
-      font-weight: var(--bc-fw-bold);
-    }
     /* Section wrapper that pairs the stats grid with the "Refresh seats" +
        timestamp toolbar above it, so the refresh control sits next to the
        seat info it refreshes (used to live in a detached bottom footer). */
@@ -75,6 +67,43 @@ export function detailStyles(): string {
       text-transform: uppercase;
       color: var(--bc-color-text-muted);
       font-weight: var(--bc-fw-bold);
+    }
+    /* Capacity availability bar — total width = capacity. Reads like a
+       "seats left" counter: left segment = available seats (colored by
+       the same enrollment-pressure tones the seats-notes shopping-cart
+       cards use, draining as the class fills); right segment = filled
+       seats (neutral grey). */
+    .bc-cs-capacity {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .bc-cs-capacity-bar {
+      display: flex;
+      width: 100%;
+      height: 10px;
+      border-radius: var(--bc-radius-pill);
+      overflow: hidden;
+      background: var(--bc-color-surface-soft);
+      border: 1px solid var(--bc-color-border-divider);
+    }
+    .bc-cs-capacity-avail {
+      flex: 0 0 auto;
+      border-right: 1px solid;
+      transition: width var(--bc-tx-fast), background-color var(--bc-tx-fast);
+    }
+    .bc-cs-capacity-used {
+      /* Neutral grey — disabled-bg leans purple in the default theme and
+         beige in the pencil theme; border-strong is a true neutral muted
+         grey/beige in every theme and reads cleanly as "used up". */
+      background: var(--bc-color-border-strong);
+      flex: 0 0 auto;
+      transition: width var(--bc-tx-fast);
+    }
+    .bc-cs-capacity-legend {
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-text-muted);
+      font-variant-numeric: tabular-nums;
     }
     .bc-cs-detail-block-label {
       font-size: var(--bc-font-10);

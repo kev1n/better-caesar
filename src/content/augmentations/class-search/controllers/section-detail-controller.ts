@@ -358,13 +358,12 @@ function renderRow(
   onRefresh: () => void
 ): void {
   detailRow.innerHTML = "";
+  // `caesar` is still threaded through for the cache write upstream — the
+  // detail view itself no longer paints a header (the section row already
+  // shows section label / time / room one line up).
+  void caesar;
   detailRow.appendChild(
     renderSectionDetail(deps.doc, {
-      header: {
-        sectionLabel: caesar.sectionLabel,
-        daysTime: caesar.daysTime,
-        room: caesar.room
-      },
       detail: result,
       fetchedAt,
       onRefresh

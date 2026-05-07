@@ -75,9 +75,16 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
     // SEM-only or DIS-only courses) keep their buttons.
     const hasLecture = row.sections.some((s) => s.component === "LEC");
 
+    // De-dupe CTEC chips within a course card: when two sections share
+    // the same instructor (and therefore the same CTEC identity), we
+    // only mount the chip on the first row. Subsequent rows leave the
+    // CTEC cell empty so the user doesn't see the same Load CTEC /
+    // Rating / Analytics affordance twice for what is, for CTEC's
+    // purposes, the same offering.
+    const seenCtecKeys = new Set<string>();
     const builtSections: { section: PaperSection; li: HTMLLIElement }[] = [];
     for (const section of row.sections) {
-      const li = buildSectionRow(row, section, hasLecture);
+      const li = buildSectionRow(row, section, hasLecture, seenCtecKeys);
       builtSections.push({ section, li });
     }
 
@@ -124,7 +131,8 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
   function buildSectionRow(
     row: ResultRow,
     section: PaperSection,
-    hasLecture: boolean
+    hasLecture: boolean,
+    seenCtecKeys: Set<string>
   ): HTMLLIElement {
     const sigKey = deps.cartButtons.encodeSigKey({
       termId: deps.filters.termId,
@@ -151,6 +159,12 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
       registerCtecHost: (host) => {
         const identity = buildCtecSectionIdentity(row.course, section);
         if (!identity) return;
+        // First-seen wins: if another row in this card already mounted
+        // the chip for this CTEC key (same instructor, same course),
+        // leave this row's CTEC cell blank rather than duplicate the
+        // Load button / Rating tile / Analytics chip.
+        if (seenCtecKeys.has(identity.key)) return;
+        seenCtecKeys.add(identity.key);
         deps.ctecCoordinator.register(host, identity);
       },
       onAddToCart: () => {
