@@ -57,7 +57,7 @@ export const HeaderSection: Section<HeaderSectionProps> = {
       </div>
       ${input.refreshFlash ? renderRefreshFlash(input.refreshFlash, callbacks) : ""}
       ${input.data
-        ? html`${renderDisclaimer()}${renderTabs(state, callbacks, input.data)}`
+        ? html`${renderDisclaimer(input)}${renderTabs(state, callbacks, input.data)}`
         : ""}
     </header>`;
   }
@@ -137,18 +137,40 @@ function renderActions(
   </div>`;
 }
 
-// Persistent header note clarifying what trend deltas mean and the project's
-// stance on instructor comparisons. Sits between the identity row and tabs
-// so users see it on every analytics view.
-function renderDisclaimer(): TemplateResult {
-  return html`<div class="bc-paper-ctec-modal-disclaimer">
+// Persistent scope banner sitting between the identity row and tabs. The
+// analytics view aggregates *only* the sections of this exact course taught
+// by this exact professor — no cross-professor or cross-course mixing — and
+// users were misreading trend deltas as comparing different instructors.
+// This banner makes the scope unmissable on every tab.
+function renderDisclaimer(input: AnalyticsModalInput): TemplateResult {
+  const instructor = input.identity.instructor.trim();
+  const code = `${input.identity.subject} ${input.identity.catalog}`;
+  const termCount = input.data?.terms.length ?? 0;
+  const termLabel = termCount === 1 ? "term" : "terms";
+  const subject = instructor || "this professor";
+
+  return html`<div
+    class="bc-paper-ctec-modal-disclaimer"
+    role="note"
+    aria-label="Data scope"
+  >
     <span class="bc-paper-ctec-modal-disclaimer-icon" aria-hidden="true">i</span>
     <span class="bc-paper-ctec-modal-disclaimer-text">
-      <strong
-        >We only compare this professor to past times they taught this same class.</strong
+      <strong class="bc-paper-ctec-modal-disclaimer-headline">
+        Showing only ${instructor
+          ? html`<span class="bc-paper-ctec-modal-disclaimer-name">${instructor}</span>`
+          : "this professor"}'s ${code} data
+        ${termCount > 0
+          ? html` · <span class="bc-paper-ctec-modal-disclaimer-count"
+              >${termCount} ${termLabel}</span
+            >`
+          : ""}
+      </strong>
+      <span class="bc-paper-ctec-modal-disclaimer-detail"
+        >No other professors are mixed in. Every chart, average, trend, and
+        “vs recent term” number on this page is computed from
+        ${subject}'s own past sections of ${code} — nothing else.</span
       >
-      Every trend and “vs recent term” number is just this professor's earlier
-      sections of this exact course.
     </span>
   </div>`;
 }

@@ -54,8 +54,7 @@ export function modalChartStyles(): string {
     }
     /* Phone: let the inner card grids wrap so 3-card groups (Quality)
        break to two rows instead of cramming. Tighten card padding and
-       value font-size so the pill + sparkline still fit on ~140px wide
-       columns. */
+       value font-size so the pill still fits on ~140px wide columns. */
     @media ${maxWidth("sm")} {
       .bc-paper-ctec-modal-kpi-group-cards {
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -229,8 +228,157 @@ export function modalChartStyles(): string {
       padding: 16px 20px 18px;
       background: var(--bc-color-bg);
     }
+    /* Make the averages card fill the global grid row's full height so it
+       lines up with the distribution card on the right. The grid already
+       stretches its row, but we need the wrapper → card → body chain to
+       all be flex columns with flex:1 so the bars list actually receives
+       that height and distributes its rows into it. */
     .bc-paper-ctec-modal-global-section {
-      margin-bottom: 28px;
+      margin-bottom: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .bc-paper-ctec-modal-global-section > .bc-paper-ctec-modal-card-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .bc-paper-ctec-modal-global-section .bc-paper-ctec-modal-card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Side-by-side layout for the Global view: averages bars on the left,
+       workload distribution on the right. Falls back to a single column on
+       narrow screens (matching the rest of the modal's xxl breakpoint). */
+    .bc-paper-ctec-modal-global-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 14px;
+      margin-bottom: 20px;
+      align-items: stretch;
+    }
+    .bc-paper-ctec-modal-global-grid > * { min-width: 0; }
+    @media ${maxWidth("xxl")} {
+      .bc-paper-ctec-modal-global-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    /* Per-metric horizontal bar list shown in the Global view in place of
+       the old Term × Metric heatmap. Each row: [label] [grey track w/
+       primary-color fill, dotted gridlines at every integer, terminator
+       arrow above the fill end] [value / scale]. */
+    .bc-paper-ctec-modal-global-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+    }
+    /* The six component-metric bars distribute themselves over whatever
+       vertical space is left in the card after the global headline row.
+       space-between pins the first/last bars to the edges and spreads the
+       others evenly between, which scales nicely with the matching card's
+       (workload distribution) height. */
+    .bc-paper-ctec-modal-global-bars-rest {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding-top: 8px;
+      border-top: 1px solid var(--bc-color-border);
+      flex: 1;
+      justify-content: space-between;
+    }
+    .bc-paper-ctec-modal-global-bar {
+      display: grid;
+      grid-template-columns: 108px 1fr 60px;
+      align-items: center;
+      gap: 10px;
+    }
+    .bc-paper-ctec-modal-global-bar.is-global {
+      grid-template-columns: 108px 1fr 60px;
+    }
+    .bc-paper-ctec-modal-global-bar-label {
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: var(--bc-ls-caps);
+      white-space: nowrap;
+    }
+    .bc-paper-ctec-modal-global-bar.is-global .bc-paper-ctec-modal-global-bar-label {
+      color: var(--bc-color-accent);
+      font-weight: var(--bc-fw-extrabold);
+      font-size: var(--bc-font-13);
+    }
+    /* Wrapper so the terminator arrow can sit just above the track without
+       being clipped by it. padding-top reserves exactly the arrow's height
+       (5px) so the arrow tip lands flush against the track's top edge. */
+    .bc-paper-ctec-modal-global-bar-chart {
+      position: relative;
+      padding-top: 5px;
+    }
+    .bc-paper-ctec-modal-global-bar-track {
+      position: relative;
+      width: 100%;
+      height: 10px;
+      background: var(--bc-color-surface-hover);
+      border-radius: var(--bc-radius-pill);
+    }
+    .bc-paper-ctec-modal-global-bar.is-global .bc-paper-ctec-modal-global-bar-track {
+      height: 16px;
+    }
+    .bc-paper-ctec-modal-global-bar-tick {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      border-left: 1px dashed var(--bc-color-border-strong);
+      pointer-events: none;
+      z-index: 1;
+    }
+    .bc-paper-ctec-modal-global-bar-fill {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      background: var(--bc-color-accent);
+      border-radius: var(--bc-radius-pill);
+      z-index: 0;
+    }
+    /* Downward-pointing triangle anchored flush against the top edge of
+       the track at the fill's right edge — calls attention to where the
+       bar terminates. CSS triangle so edges stay sharp at any DPR. Color
+       intentionally distinct from the accent fill so the marker reads
+       above the bar instead of blending into it. */
+    .bc-paper-ctec-modal-global-bar-arrow {
+      position: absolute;
+      bottom: 100%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid var(--bc-color-text);
+      pointer-events: none;
+      z-index: 2;
+    }
+    .bc-paper-ctec-modal-global-bar-value {
+      font-size: var(--bc-font-11);
+      font-weight: var(--bc-fw-bold);
+      color: var(--bc-color-text);
+      font-family: ui-monospace, monospace;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .bc-paper-ctec-modal-global-bar.is-global .bc-paper-ctec-modal-global-bar-value {
+      font-size: var(--bc-font-15);
+      color: var(--bc-color-accent);
+    }
+    .bc-paper-ctec-modal-global-bar-scale {
+      margin-left: 2px;
+      font-size: var(--bc-font-9);
+      font-weight: var(--bc-fw-regular);
+      color: var(--bc-color-text-subtle);
     }
     .bc-paper-ctec-modal-card-head {
       display: flex;
@@ -330,6 +478,95 @@ export function modalChartStyles(): string {
       width: 100%;
     }
     .bc-paper-ctec-chart-histogram-error {
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-danger-text-pill);
+      background: var(--bc-color-danger-bg-pill);
+      padding: 4px 8px;
+      border-radius: var(--bc-radius-sm);
+      text-align: center;
+      max-width: 100%;
+      word-break: break-word;
+      font-family: ui-monospace, monospace;
+    }
+    /* Horizontal-bar rating distribution. One row per rating value (6 → 1
+       top to bottom): [label] [grey track w/ accent fill] [count]. Bar
+       width is scaled to the row with the highest count so the shape of
+       the distribution is the focus rather than the absolute response
+       volume (which the footer carries instead). */
+    .bc-paper-ctec-chart-horizontal {
+      width: 100%;
+    }
+    .bc-paper-ctec-chart-horizontal-loading {
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-text-subtle);
+      padding: 24px 0;
+      text-align: center;
+    }
+    .bc-paper-ctec-chart-horizontal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .bc-paper-ctec-chart-horizontal-row {
+      display: grid;
+      grid-template-columns: 22px 1fr 36px;
+      align-items: center;
+      gap: 10px;
+    }
+    .bc-paper-ctec-chart-horizontal-label {
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-bold);
+      color: var(--bc-color-text-muted);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .bc-paper-ctec-chart-horizontal-track {
+      position: relative;
+      width: 100%;
+      height: 14px;
+      background: var(--bc-color-surface-hover);
+      border-radius: var(--bc-radius-pill);
+      overflow: hidden;
+    }
+    .bc-paper-ctec-chart-horizontal-fill {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      background: var(--bc-color-accent);
+      border-radius: var(--bc-radius-pill);
+      min-width: 0;
+    }
+    .bc-paper-ctec-chart-horizontal-value {
+      font-size: var(--bc-font-12);
+      font-weight: var(--bc-fw-semibold);
+      color: var(--bc-color-text);
+      font-family: ui-monospace, monospace;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .bc-paper-ctec-chart-horizontal-total {
+      margin-top: 8px;
+      font-size: var(--bc-font-10);
+      letter-spacing: var(--bc-ls-caps);
+      text-transform: uppercase;
+      color: var(--bc-color-text-subtle);
+      text-align: right;
+    }
+    .bc-paper-ctec-chart-horizontal-fallback-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+    }
+    .bc-paper-ctec-chart-horizontal-fallback {
+      max-width: 100%;
+      max-height: 160px;
+      width: auto;
+      display: block;
+    }
+    .bc-paper-ctec-chart-horizontal-error {
       font-size: var(--bc-font-11);
       color: var(--bc-color-danger-text-pill);
       background: var(--bc-color-danger-bg-pill);

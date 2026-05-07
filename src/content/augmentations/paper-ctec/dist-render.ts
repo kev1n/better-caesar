@@ -7,6 +7,7 @@
 // calls renderMetricDistribution and stays focused on layout.
 
 import { renderChartHistogram } from "./chart-histogram";
+import { renderHorizontalBars } from "./horizontal-bars";
 import type { ModalMetricKind, ModalTerm } from "./modal-data";
 
 const HOURS_HISTOGRAM_LABELS = [
@@ -20,8 +21,6 @@ const HOURS_HISTOGRAM_LABELS = [
 
 // Bucket midpoints for the hours histogram, used to position the mean pill.
 const HOURS_HISTOGRAM_VALUES = [3, 5.5, 9.5, 13.5, 17.5, 22] as const;
-
-const RATING_HISTOGRAM_VALUES = [1, 2, 3, 4, 5, 6] as const;
 
 export type RenderMetricDistributionOptions = {
   doc: Document;
@@ -75,26 +74,37 @@ export function renderMetricDistribution(
   const chart = term.charts[metric];
   if (chart) {
     const responseCount = term.metricResponseCounts?.[metric] ?? 0;
-    const mean = term.metrics?.[metric];
     const isHours = metric === "hours";
-    return renderChartHistogram({
+    if (isHours) {
+      const mean = term.metrics?.[metric];
+      return renderChartHistogram({
+        doc,
+        imageUrl: chart.imageUrl,
+        alt: chart.alt ?? altLabel,
+        total: responseCount,
+        kind: metric,
+        rowLabels: HOURS_HISTOGRAM_LABELS,
+        rowValues: HOURS_HISTOGRAM_VALUES,
+        mean: typeof mean === "number" ? mean : undefined,
+        meanLabel: primaryLabel,
+        secondaryMean:
+          typeof historicalMean === "number" && Number.isFinite(historicalMean)
+            ? historicalMean
+            : undefined,
+        secondaryLabel: historicalLabel,
+        secondaryCounts: historicalCounts,
+        secondaryTotal: historicalTotal,
+        xAxisTitle: "HOURS PER WEEK",
+        preExtractedCounts: chart.counts,
+        className
+      });
+    }
+    return renderHorizontalBars({
       doc,
       imageUrl: chart.imageUrl,
       alt: chart.alt ?? altLabel,
       total: responseCount,
       kind: metric,
-      rowLabels: isHours ? HOURS_HISTOGRAM_LABELS : undefined,
-      rowValues: isHours ? HOURS_HISTOGRAM_VALUES : RATING_HISTOGRAM_VALUES,
-      mean: typeof mean === "number" ? mean : undefined,
-      meanLabel: primaryLabel,
-      secondaryMean:
-        typeof historicalMean === "number" && Number.isFinite(historicalMean)
-          ? historicalMean
-          : undefined,
-      secondaryLabel: historicalLabel,
-      secondaryCounts: historicalCounts,
-      secondaryTotal: historicalTotal,
-      xAxisTitle: isHours ? "HOURS PER WEEK" : "RATING",
       preExtractedCounts: chart.counts,
       className
     });

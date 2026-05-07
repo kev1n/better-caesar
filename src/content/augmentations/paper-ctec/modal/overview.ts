@@ -1,4 +1,4 @@
-import { html, svg, type SVGTemplateResult, type TemplateResult } from "lit-html";
+import { html, type TemplateResult } from "lit-html";
 
 import {
   renderHoursDensity,
@@ -24,7 +24,9 @@ import { bandLabelFor } from "./band-labels";
 import { renderDistChart, renderTrendChart } from "./charts";
 import { abbrTerm } from "../term-format";
 import { cardTemplate, pickSelectedTerm } from "./common";
-import { renderHeatmap } from "./heatmap";
+// Heatmap kept around but unused — renderGlobalSection now shows
+// vertical-bar averages instead of the term × metric heatmap.
+// import { renderHeatmap } from "./heatmap";
 import type { Section } from "./section";
 import type {
   AnalyticsModalCallbacks,
@@ -54,27 +56,15 @@ function recentMean(
   }).mean;
 }
 
-function trendValuesFor(
-  trendTerms: ModalTerm[],
-  kind: ModalMetricKind
-): number[] {
-  const out: number[] = [];
-  for (const term of trendTerms) {
-    const v = term.metrics[kind];
-    if (typeof v === "number") out.push(v);
-  }
-  return out;
-}
-
 // Suffix shown next to the KPI pill. Hidden in stars mode (the stars
 // already convey the scale) and in percent mode (the "/ 6" denominator
 // is meaningless when the value is a percent).
 function kpiUnitText(kind: ModalMetricKind | "global"): string {
-  if (kind === "hours") return "h/wk avg";
+  if (kind === "hours") return "h/wk";
   if (isStarMode()) return "";
-  if (isRatingPercentMode()) return "avg";
+  if (isRatingPercentMode()) return "";
   const max = kind === "global" ? 6 : MODAL_METRIC_SCALES[kind];
-  return `/ ${max} avg`;
+  return `/ ${max}`;
 }
 
 // Value portion of a KPI as a chip-style pill. Pure template so lit-html
@@ -174,10 +164,12 @@ export const OverviewSection: Section<OverviewSectionProps> = {
       ${renderKpiScopeNote(data, recent)}
       ${renderKpiStrip(data, state, callbacks, recent)}
       ${state.activeMetric === "global"
-        ? html`${renderGlobalSection(doc, data, state, callbacks)}${renderWorkloadCard(
-            doc,
-            data
-          )}`
+        ? html`<div class="bc-paper-ctec-modal-global-grid">
+            ${renderGlobalSection(doc, data, state, callbacks)}${renderWorkloadCard(
+              doc,
+              data
+            )}
+          </div>`
         : renderMetricSection(doc, data, state, state.activeMetric)}
     </div>`;
   }
@@ -208,22 +200,107 @@ function renderMetricSection(
   </div>`;
 }
 
-// Global body: just the heatmap. The cross-metric "stacked" and
-// "trend lines" charts that used to live here were dropped — the heatmap
-// already carries the per-term × per-metric shape they were trying to
-// show, in a denser form.
+// Global body: per-metric horizontal bars showing each metric's average
+// across every loaded term. Global on top, then the six component metrics.
+// Each bar's track represents the metric's full scale (6 for ratings,
+// 20 for hours) shown in grey, with the actual mean filled in the primary
+// accent color.
+//
+// Heatmap kept available via the heatmap module / re-export but no longer
+// rendered here. Old call:
+//   ${cardTemplate("Term × Metric heatmap",
+//     "Shading scaled within these terms only",
+//     renderHeatmap(doc, data, state, callbacks))}
 function renderGlobalSection(
-  doc: Document,
+  _doc: Document,
   data: ModalDisplayData,
-  state: AnalyticsModalState,
-  callbacks: AnalyticsModalCallbacks
+  _state: AnalyticsModalState,
+  _callbacks: AnalyticsModalCallbacks
 ): TemplateResult {
   return html`<div class="bc-paper-ctec-modal-global-section">
     ${cardTemplate(
-      "Term × Metric heatmap",
-      "Shading scaled within these terms only",
-      renderHeatmap(doc, data, state, callbacks)
+      "Averages across all terms",
+      `${data.terms.length} ${data.terms.length === 1 ? "term" : "terms"}`,
+      renderGlobalBars(data)
     )}
+  </div>`;
+}
+
+const GLOBAL_BAR_METRICS: ReadonlyArray<ModalMetricKind> = [
+  "instruction",
+  "course",
+  "learned",
+  "challenging",
+  "stimulating",
+  "hours"
+];
+
+function renderGlobalBars(data: ModalDisplayData): TemplateResult {
+  const globalMean = computeGlobalMean(data.terms);
+  return html`<div class="bc-paper-ctec-modal-global-bars">
+    ${renderGlobalBarRow("Global", globalMean, 6, "global")}
+    <div class="bc-paper-ctec-modal-global-bars-rest">
+      ${GLOBAL_BAR_METRICS.map((kind) =>
+        renderGlobalBarRow(
+          MODAL_METRIC_LABELS[kind],
+          data.metrics[kind].mean,
+          MODAL_METRIC_SCALES[kind],
+          kind
+        )
+      )}
+    </div>
+  </div>`;
+}
+
+function renderGlobalBarRow(
+  label: string,
+  value: number,
+  scale: number,
+  kind: ModalMetricKind | "global"
+): TemplateResult {
+  const pct =
+    scale > 0 && value > 0 ? Math.min(100, (value / scale) * 100) : 0;
+  const isHours = kind === "hours";
+  const display =
+    value > 0
+      ? isHours
+        ? `${value.toFixed(1)}h`
+        : value.toFixed(2)
+      : "—";
+  const isGlobal = kind === "global";
+  const className = `bc-paper-ctec-modal-global-bar${
+    isGlobal ? " is-global" : ""
+  }`;
+  // Dotted gridlines at every integer between 0 and scale (excluding the
+  // endpoints, which are drawn by the track outline itself).
+  const tickPositions: number[] = [];
+  for (let i = 1; i < scale; i++) tickPositions.push((i / scale) * 100);
+  return html`<div class=${className}>
+    <div class="bc-paper-ctec-modal-global-bar-label">${label}</div>
+    <div class="bc-paper-ctec-modal-global-bar-chart">
+      <div class="bc-paper-ctec-modal-global-bar-track">
+        ${tickPositions.map(
+          (pos) =>
+            html`<span
+              class="bc-paper-ctec-modal-global-bar-tick"
+              style=${`left: ${pos}%`}
+            ></span>`
+        )}
+        <div
+          class="bc-paper-ctec-modal-global-bar-fill"
+          style=${`width: ${pct}%`}
+        ></div>
+        ${value > 0
+          ? html`<span
+              class="bc-paper-ctec-modal-global-bar-arrow"
+              style=${`left: ${pct}%`}
+            ></span>`
+          : ""}
+      </div>
+    </div>
+    <div class="bc-paper-ctec-modal-global-bar-value">
+      ${display}<span class="bc-paper-ctec-modal-global-bar-scale">/${scale}</span>
+    </div>
   </div>`;
 }
 
@@ -352,7 +429,6 @@ function renderKpiCard(
   callbacks: AnalyticsModalCallbacks,
   recent: number
 ): TemplateResult {
-  const trend = trendValuesFor(data.trendTerms, kind);
   const meanValue = recentMean(data.terms, kind, recent);
   const isActive = state.activeMetric === kind;
   const className = `bc-paper-ctec-modal-kpi${isActive ? " is-active" : ""}`;
@@ -370,7 +446,7 @@ function renderKpiCard(
   ><div class="bc-paper-ctec-modal-kpi-top"><span
         class="bc-paper-ctec-modal-kpi-label"
         >${MODAL_METRIC_LABELS[kind]}</span
-      >${trend.length >= 2 ? sparklineTemplate(trend, 80, 20, kind) : ""}</div
+      ></div
     ><div class="bc-paper-ctec-modal-kpi-value"
       >${kpiPillTemplate(meanValue, kind)}${
         unitText
@@ -384,8 +460,7 @@ function renderKpiCard(
 
 // "Global" KPI card. Value is the avg of the Instruction / Course / Learned
 // mean ratings across the most-recent N terms (matches the chip
-// aggregation), plus a sparkline of the same per-term average so the trend
-// is visible at a glance. Clicking switches the body to the global view.
+// aggregation). Clicking switches the body to the global view.
 function renderGlobalKpiCard(
   data: ModalDisplayData,
   state: AnalyticsModalState,
@@ -408,9 +483,6 @@ function renderGlobalKpiCard(
     components.length > 0
       ? components.reduce((sum, v) => sum + v, 0) / components.length
       : 0;
-  const trend = data.trendTerms
-    .map((term) => computeGlobalMean([term]))
-    .filter((value) => value > 0);
 
   const className = `bc-paper-ctec-modal-kpi is-global${isActive ? " is-active" : ""}`;
   const unitText = kpiUnitText("global");
@@ -437,7 +509,7 @@ function renderGlobalKpiCard(
             >${GLOBAL_KPI_TOOLTIP}</span
           ></span
         ></span
-      >${trend.length >= 2 ? sparklineTemplate(trend, 80, 20, "global") : ""}</div
+      ></div
     ><div class="bc-paper-ctec-modal-kpi-value"
       >${kpiPillTemplate(overallMean, "global")}${
         unitText
@@ -447,54 +519,6 @@ function renderGlobalKpiCard(
     >${
       band ? html`<span class="bc-paper-ctec-modal-kpi-band">${band}</span>` : ""
     }</button>`;
-}
-
-// Padded scale: shows trend shape without faking magnitude. A 5.0 → 5.2
-// trend sits in the upper region rather than filling the whole chart.
-// The padding (1 rating unit, 4 hours) leaves visible breathing room
-// above and below the line, clamped to the metric's natural bounds.
-function sparklineTemplate(
-  values: number[],
-  width: number,
-  height: number,
-  kind: ModalMetricKind | "global"
-): SVGTemplateResult {
-  const isHours = kind === "hours";
-  const scaleMin = isHours ? 0 : 1;
-  const scaleMax = isHours ? 20 : 6;
-  const padding = isHours ? 4 : 1;
-  const dataMin = Math.min(...values);
-  const dataMax = Math.max(...values);
-  const yMin = Math.max(scaleMin, Math.floor(dataMin) - padding);
-  const yMax = Math.min(scaleMax, Math.ceil(dataMax) + padding);
-  const span = yMax - yMin || 1;
-
-  const xAt = (i: number) => (i / Math.max(1, values.length - 1)) * width;
-  const yAt = (v: number) =>
-    height - 1 - ((v - yMin) / span) * (height - 2);
-
-  const points = values.map((v, i) => `${xAt(i)},${yAt(v)}`).join(" ");
-  const lastIdx = values.length - 1;
-  const lastX = xAt(lastIdx);
-  const lastY = yAt(values[lastIdx]!);
-
-  return svg`<svg
-    width=${width}
-    height=${height}
-    class="bc-paper-ctec-modal-sparkline"
-  ><polyline
-      fill="none"
-      style="stroke: var(--bc-color-accent)"
-      stroke-width="1.5"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      points=${points}
-    ></polyline><circle
-      cx=${lastX}
-      cy=${lastY}
-      r="2"
-      style="fill: var(--bc-color-accent)"
-    ></circle></svg>`;
 }
 
 // Backwards-compat for callers still on the imperative entry point.
