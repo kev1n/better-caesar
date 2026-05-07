@@ -4,15 +4,16 @@
 //   • confirmed — we've reached a real CTEC results panel for this NetID.
 //   • denied — CAESAR routed us to the NW_CTEC_MSG_FL "not authorized"
 //     message page. Every CTEC code path short-circuits while this is
-//     set; the popup's Clear CTEC cache button wipes it so a reauthorized
-//     student can re-probe.
-//   • unknown — neither has happened yet (or the cache was cleared).
+//     set; auto-expires after ACCESS_VERDICT_TTL_MS, and the popup's
+//     "Clear CTEC cache" button wipes it immediately on demand.
+//   • unknown — neither has happened yet (or the cached verdict expired
+//     / was cleared).
 //
 // The status is read-only here — the row exists so the user can see why
 // CTEC widgets are absent / muted on CAESAR + paper.nu.
 
 import {
-  CONFIRMED_TTL_MS,
+  ACCESS_VERDICT_TTL_MS,
   CTEC_ACCESS_STORAGE_KEY,
   type CtecAccessStatus
 } from "../../content/ctec-index/access-shared";
@@ -78,11 +79,12 @@ function parseStatus(raw: unknown): CtecAccessStatus {
   if (!raw || typeof raw !== "object") return "unknown";
   const candidate = raw as { kind?: unknown; deniedAt?: unknown; confirmedAt?: unknown };
   if (candidate.kind === "denied" && typeof candidate.deniedAt === "number") {
-    return "denied";
+    const age = Date.now() - candidate.deniedAt;
+    return age > ACCESS_VERDICT_TTL_MS ? "unknown" : "denied";
   }
   if (candidate.kind === "confirmed" && typeof candidate.confirmedAt === "number") {
     const age = Date.now() - candidate.confirmedAt;
-    return age > CONFIRMED_TTL_MS ? "unknown" : "confirmed";
+    return age > ACCESS_VERDICT_TTL_MS ? "unknown" : "confirmed";
   }
   return "unknown";
 }

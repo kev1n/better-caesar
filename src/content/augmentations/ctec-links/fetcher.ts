@@ -154,13 +154,15 @@ async function fetchCtecLinksCore(
   const { subject, catalogNumber, instructor } = params;
 
   // Cache-only short-circuits are only safe once we've actually verified
-  // CTEC access for this NetID. While status is "unknown" we force a real
-  // network probe — `fetchCourseEntries` either lands on the unauthorized
-  // message panel (markCtecAccessDenied) or the real subject-results page
-  // (markCtecAccessConfirmed). Preexisting users who already have a
-  // populated subject index would otherwise short-circuit forever and
-  // never confirm — the popup's CTEC-access pill would be stuck on "not
-  // checked yet" while CTEC widgets happily render cached data.
+  // CTEC access for this NetID. The upfront `probeCtecAccess()` call in
+  // `fetchCtecLinksInternal` flips status to denied or confirmed when it
+  // sees a positive marker (unauthorized panel vs. authorized
+  // disclaimer); ambiguous responses leave it "unknown" by design — we
+  // err on the side of caution rather than confirming on absence of
+  // denial. Preexisting users who already have a populated subject index
+  // would otherwise short-circuit forever and never confirm — the
+  // popup's CTEC-access pill would be stuck on "not checked yet" while
+  // CTEC widgets happily render cached data.
   const accessConfirmed = getCtecAccessStatus() === "confirmed";
 
   // Sentinel-only short-circuit: previously confirmed not-found in the CTEC

@@ -7,11 +7,12 @@
 
 export const CTEC_ACCESS_STORAGE_KEY = "better-caesar:ctec-no-access:v2";
 
-// Auto-expire a "confirmed" verdict after this long. Northwestern can
-// revoke CTEC access at any time (failure to complete prior CTECs in the
-// last collection period), so a confirmed flag has a real shelf life.
-// "denied" never expires — it's sticky until the popup's "Clear CTEC
-// cache" button wipes the flag.
-export const CONFIRMED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Auto-expire any access verdict after this long, applied symmetrically
+// to "confirmed" and "denied". Northwestern can flip access either way
+// at any time (revoke for skipped prior-period CTECs, restore once those
+// are completed), so neither verdict deserves to be sticky indefinitely.
+// After the TTL the next Load CTEC click re-probes; the popup's "Clear
+// CTEC cache" button is still the immediate-reset escape hatch.
+export const ACCESS_VERDICT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type CtecAccessStatus = "denied" | "confirmed" | "unknown";
