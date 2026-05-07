@@ -7,7 +7,12 @@ import type { ModalCommentTone, ModalDisplayData, ModalMetricKind } from "../mod
 export const COMMENTS_PAGE_SIZE = 50;
 
 export type ModalCommentSentimentFilter = "all" | ModalCommentTone;
-export type ModalCommentSort = "recent" | "longest" | "shortest";
+export type ModalCommentSort =
+  | "recent"
+  | "longest"
+  | "shortest"
+  | "mostPositive"
+  | "mostCritical";
 export type ModalTab = "overview" | "comments" | "terms";
 
 // Active selection in the overview KPI strip. A specific metric kind shows

@@ -53,11 +53,19 @@ export function modalCommentStyles(): string {
     .bc-paper-ctec-modal-rail-btn:hover:not(.is-active) {
       background: var(--bc-color-surface-hover);
     }
-    .bc-paper-ctec-modal-rail-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: var(--bc-radius-circle);
-      grid-column: auto;
+    .bc-paper-ctec-modal-rail-bar-wrap {
+      grid-column: 1 / -1;
+      width: 100%;
+      height: 6px;
+      border-radius: var(--bc-radius-pill);
+      background: var(--bc-color-chart-trend-axis);
+      overflow: hidden;
+    }
+    .bc-paper-ctec-modal-rail-bar {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      min-width: 2px;
     }
     .bc-paper-ctec-modal-rail-label {
       font-size: var(--bc-font-12);
@@ -241,46 +249,17 @@ export function modalCommentStyles(): string {
       border-radius: var(--bc-radius-xl);
       padding: 14px 18px 16px;
     }
-    .bc-paper-ctec-modal-comment-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .bc-paper-ctec-modal-comment-meta-left {
+    .bc-paper-ctec-modal-comment-footer {
       display: flex;
       align-items: center;
-      gap: 10px;
       flex-wrap: wrap;
-    }
-    .bc-paper-ctec-modal-comment-meter {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .bc-paper-ctec-modal-comment-meter-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: var(--bc-radius-circle);
-      background: var(--bc-color-text-subtle);
-      opacity: 0.35;
-    }
-    .bc-paper-ctec-modal-comment-meter-dot.is-on {
-      opacity: 1;
+      gap: 6px;
+      margin-top: 10px;
     }
     .bc-paper-ctec-modal-comment-term {
-      font-size: var(--bc-font-12);
-      color: var(--bc-color-text-muted);
-    }
-    .bc-paper-ctec-modal-comment-term strong {
-      color: var(--bc-color-text);
-    }
-    .bc-paper-ctec-modal-comment-length {
-      font-size: var(--bc-font-10);
+      font-size: var(--bc-font-11);
       color: var(--bc-color-text-subtle);
-      font-family: ui-monospace, monospace;
+      font-weight: var(--bc-fw-regular);
     }
     .bc-paper-ctec-modal-comment-prompt {
       font-size: var(--bc-font-11);
@@ -313,12 +292,6 @@ export function modalCommentStyles(): string {
       font-weight: var(--bc-fw-semibold);
       padding: 6px 0 0;
       font-family: inherit;
-    }
-    .bc-paper-ctec-modal-comment-themes {
-      display: flex;
-      gap: 5px;
-      margin-top: 10px;
-      flex-wrap: wrap;
     }
     .bc-paper-ctec-modal-comment-theme {
       font-size: var(--bc-font-10);

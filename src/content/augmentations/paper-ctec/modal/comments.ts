@@ -21,17 +21,6 @@ export type CommentsSectionProps = {
   callbacks: AnalyticsModalCallbacks;
 };
 
-// 3-dot spectrum: position carries direction. Critical = leftmost dot,
-// neutral = center, positive = rightmost; mixed lights both ends to read
-// as "split feelings." Replaces the per-card POSITIVE/CRITICAL/MIXED/
-// NEUTRAL pill — the rail filter still uses the words.
-const TONE_METER_PATTERN: Record<ModalCommentTone, [boolean, boolean, boolean]> = {
-  neg: [true, false, false],
-  neu: [false, true, false],
-  pos: [false, false, true],
-  mix: [true, false, true]
-};
-
 // Comments tab: rail of filter buttons (sentiment + frequent topics + term)
 // alongside a main panel with search/sort toolbar, active filter chips,
 // count, and the filtered comment-card list.
@@ -77,31 +66,37 @@ function renderCommentsRail(
     key: ModalCommentSentimentFilter;
     label: string;
     count: number;
-    dot: string;
+    color: string;
   }> = [
-    { key: "all", label: "All", count: termFiltered.length, dot: "var(--bc-color-sentiment-all-dot)" },
-    { key: "pos", label: "Positive", count: sentimentCounts.pos, dot: "var(--bc-color-sentiment-pos-fg)" },
-    { key: "mix", label: "Mixed", count: sentimentCounts.mix, dot: "var(--bc-color-sentiment-mix-fg)" },
-    { key: "neu", label: "Neutral", count: sentimentCounts.neu, dot: "var(--bc-color-sentiment-neu-fg)" },
-    { key: "neg", label: "Critical", count: sentimentCounts.neg, dot: "var(--bc-color-sentiment-neg-fg)" }
+    { key: "all", label: "All", count: termFiltered.length, color: "var(--bc-color-sentiment-all-dot)" },
+    { key: "pos", label: "Positive", count: sentimentCounts.pos, color: "var(--bc-color-sentiment-pos-fg)" },
+    { key: "mix", label: "Mixed", count: sentimentCounts.mix, color: "var(--bc-color-sentiment-mix-fg)" },
+    { key: "neu", label: "Neutral", count: sentimentCounts.neu, color: "var(--bc-color-sentiment-neu-fg)" },
+    { key: "neg", label: "Critical", count: sentimentCounts.neg, color: "var(--bc-color-sentiment-neg-fg)" }
   ];
 
+  const allCount = Math.max(termFiltered.length, 1);
   const allTerms = Array.from(new Set(data.comments.map((c) => c.term)));
 
   return html`<aside class="bc-paper-ctec-modal-rail">
     ${railHeader("Sentiment")}
-    ${sentimentRows.map((row) =>
-      railButton(
+    ${sentimentRows.map((row) => {
+      const ratio = row.key === "all" ? 1 : row.count / allCount;
+      return railButton(
         row.label,
         row.count,
         state.commentsSentimentFilter === row.key,
         () => callbacks.onCommentsSentimentChange(row.key),
-        html`<span
-          class="bc-paper-ctec-modal-rail-dot"
-          style=${`background: ${row.dot}`}
-        ></span>`
-      )
-    )}
+        undefined,
+        html`<span class="bc-paper-ctec-modal-rail-bar-wrap"
+          ><span
+            class="bc-paper-ctec-modal-rail-bar"
+            style=${`width: ${Math.max(ratio * 100, 4)}%; background: ${row.color}`}
+          ></span
+        ></span>`,
+        true
+      );
+    })}
     ${railHeader("Frequent topics")}
     ${railButton(
       "All topics",
@@ -300,6 +295,8 @@ function renderCommentsMain(
           }}
         >
           <option value="recent" ?selected=${state.commentsSortBy === "recent"}>Most recent</option>
+          <option value="mostPositive" ?selected=${state.commentsSortBy === "mostPositive"}>Most positive</option>
+          <option value="mostCritical" ?selected=${state.commentsSortBy === "mostCritical"}>Most critical</option>
           <option value="longest" ?selected=${state.commentsSortBy === "longest"}>Longest</option>
           <option value="shortest" ?selected=${state.commentsSortBy === "shortest"}>Shortest</option>
         </select>
@@ -371,6 +368,12 @@ function renderCommentList(
     filtered = [...filtered].sort((a, b) => b.length - a.length);
   } else if (state.commentsSortBy === "shortest") {
     filtered = [...filtered].sort((a, b) => a.length - b.length);
+  } else if (state.commentsSortBy === "mostPositive") {
+    const w: Record<ModalCommentTone, number> = { pos: 3, mix: 2, neu: 1, neg: 0 };
+    filtered = [...filtered].sort((a, b) => w[b.tone] - w[a.tone]);
+  } else if (state.commentsSortBy === "mostCritical") {
+    const w: Record<ModalCommentTone, number> = { neg: 3, mix: 2, neu: 1, pos: 0 };
+    filtered = [...filtered].sort((a, b) => w[b.tone] - w[a.tone]);
   }
 
   const visibleCount = Math.min(filtered.length, state.commentsVisibleCount);
@@ -461,40 +464,6 @@ function renderCommentCard(
   card.className = "bc-paper-ctec-modal-comment-card";
   card.style.borderLeftColor = tone.color;
 
-  const meta = doc.createElement("div");
-  meta.className = "bc-paper-ctec-modal-comment-meta";
-
-  const left = doc.createElement("div");
-  left.className = "bc-paper-ctec-modal-comment-meta-left";
-  const meter = doc.createElement("span");
-  meter.className = "bc-paper-ctec-modal-comment-meter";
-  meter.title = tone.label;
-  meter.setAttribute("aria-label", `Sentiment: ${tone.label}`);
-  for (const filled of TONE_METER_PATTERN[comment.tone]) {
-    const dot = doc.createElement("span");
-    dot.className = "bc-paper-ctec-modal-comment-meter-dot";
-    if (filled) {
-      dot.classList.add("is-on");
-      dot.style.background = tone.color;
-    }
-    meter.append(dot);
-  }
-  left.append(meter);
-
-  const term = doc.createElement("span");
-  term.className = "bc-paper-ctec-modal-comment-term";
-  const termStrong = doc.createElement("strong");
-  termStrong.textContent = comment.term;
-  term.append(termStrong, doc.createTextNode(` · ${comment.instructor}`));
-  left.append(term);
-  meta.append(left);
-
-  const length = doc.createElement("span");
-  length.className = "bc-paper-ctec-modal-comment-length";
-  length.textContent = `${comment.length} chars`;
-  meta.append(length);
-  card.append(meta);
-
   if (!isHiddenPrompt(comment.prompt)) {
     const prompt = doc.createElement("div");
     prompt.className = "bc-paper-ctec-modal-comment-prompt";
@@ -529,19 +498,24 @@ function renderCommentCard(
     }
   });
 
-  if (comment.topics.length > 0) {
-    const topics = doc.createElement("div");
-    topics.className = "bc-paper-ctec-modal-comment-themes";
-    for (const topic of comment.topics) {
-      const chip = doc.createElement("span");
-      chip.className = `bc-paper-ctec-modal-comment-theme${
-        activeTopic === topic ? " is-active" : ""
-      }`;
-      chip.textContent = topic;
-      topics.append(chip);
-    }
-    card.append(topics);
+  const footer = doc.createElement("div");
+  footer.className = "bc-paper-ctec-modal-comment-footer";
+
+  const term = doc.createElement("span");
+  term.className = "bc-paper-ctec-modal-comment-term";
+  term.textContent = comment.term;
+  footer.append(term);
+
+  for (const topic of comment.topics) {
+    const chip = doc.createElement("span");
+    chip.className = `bc-paper-ctec-modal-comment-theme${
+      activeTopic === topic ? " is-active" : ""
+    }`;
+    chip.textContent = topic;
+    footer.append(chip);
   }
+
+  card.append(footer);
 
   return card;
 }
