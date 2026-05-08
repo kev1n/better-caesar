@@ -535,13 +535,24 @@ export function applyComboVisibility(
   }
 
   // Pass 2: stamp visibility, layout, and pin button per mapped card.
+  // Pin appears on only the FIRST card per section we encounter (one
+  // section can render multiple cards — different meeting patterns or
+  // different days). Mirrors paper-ctec's "canonical card" pattern so
+  // a 3-day course doesn't sprout 3 pin buttons.
+  const sectionsWithPin = new Set<string>();
   for (const [card, sectionId] of cardMap) {
     if (activeIds.has(sectionId)) {
       card.removeAttribute(REAL_CARD_HIDE_ATTR);
       widenCardToFull(card);
       const section = pool.byId.get(sectionId);
-      if (section) {
+      if (!section) continue;
+      if (sectionsWithPin.has(sectionId)) {
+        // Non-canonical card for this section — strip any stale pin so
+        // only the canonical card shows it.
+        removePinButton(card);
+      } else {
         ensurePinButton(card, section, pinnedSectionIds.has(sectionId));
+        sectionsWithPin.add(sectionId);
       }
     } else {
       card.setAttribute(REAL_CARD_HIDE_ATTR, "1");
@@ -931,12 +942,19 @@ export function attachZoneDragHandlers(
           ZONE_PREVIEW_CLASS
         );
         segment.style.pointerEvents = "none";
+        // Same stitching contract as committed zones — CSS strips
+        // interior borders/radii so multi-day previews read as one box.
+        segment.setAttribute("data-leftmost", String(day === startDay));
+        segment.setAttribute("data-rightmost", String(day === endDay));
         state.previewSegments.set(day, segment);
         state.previewAnchors.set(day, { hourCellIdx: startCellIdx });
         continue;
       }
 
-      // Same anchor — just resize.
+      // Same anchor — just resize, and refresh leftmost/rightmost in
+      // case the drag's day range expanded/shrunk past this segment.
+      existing.setAttribute("data-leftmost", String(day === startDay));
+      existing.setAttribute("data-rightmost", String(day === endDay));
       const startDif = startMinInHour / 60;
       const endDif = duration / 60;
       const hoursSpanned = Math.floor(

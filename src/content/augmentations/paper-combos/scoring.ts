@@ -10,7 +10,8 @@ export type SortMode =
   | "late-start"
   | "early-start"
   | "fewest-days"
-  | "most-credits";
+  | "most-credits"
+  | "least-credits";
 
 export const DEFAULT_SORT_MODE: SortMode = "rating";
 
@@ -20,7 +21,8 @@ export const SORT_MODE_LABELS: Record<SortMode, string> = {
   "late-start": "Latest start (sleep in)",
   "early-start": "Earliest start",
   "fewest-days": "Fewest days on campus",
-  "most-credits": "Most credits"
+  "most-credits": "Most credits",
+  "least-credits": "Fewest credits"
 };
 
 // Pulls the cached CTEC instructor-rating mean for one section, or null
@@ -137,6 +139,9 @@ function compareForMode(
       case "most-credits":
         primary = totalCredits(b) - totalCredits(a);
         break;
+      case "least-credits":
+        primary = totalCredits(a) - totalCredits(b);
+        break;
     }
     if (primary !== 0) return primary;
     if (b.score !== a.score) return b.score - a.score;
@@ -166,6 +171,7 @@ export function isSortMode(value: string): value is SortMode {
     value === "late-start" ||
     value === "early-start" ||
     value === "fewest-days" ||
-    value === "most-credits"
+    value === "most-credits" ||
+    value === "least-credits"
   );
 }

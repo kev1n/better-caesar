@@ -129,15 +129,17 @@ export function enumerateCombinations(
     };
   }
 
-  // Apply the min-credits floor BEFORE the "highest credits class wins"
-  // reduction. Otherwise a low-credit combo could win the class and then
-  // get filtered, leaving an empty result even though valid combos at a
-  // higher credit total exist.
-  const aboveFloor = all.combinations.filter(
+  // Return EVERY combo whose total credits land in the [min, max] window.
+  // Earlier versions filtered down to the highest-credit class only,
+  // but that hid the very combos a user wants when they widen the range
+  // (lowering min from 3 to 2 should *add* 2-credit options, not no-op
+  // because the 5-credit class still dominates). Sort modes still drive
+  // the cycle order, so the "best" surfaces first regardless.
+  const inWindow = all.combinations.filter(
     (c) => c.totalUnits + FLOAT_EPS >= requestedMinCredits
   );
 
-  if (aboveFloor.length === 0) {
+  if (inWindow.length === 0) {
     return {
       combinations: [],
       truncated: all.truncated,
@@ -148,22 +150,16 @@ export function enumerateCombinations(
     };
   }
 
-  // Keep only the combos that maximize total credits — those are the
-  // user's best schedules under the budget. Smaller combos are valid but
-  // strictly dominated and would just clutter the cycle list.
-  let bestCredits = 0;
-  for (const combo of aboveFloor) {
-    if (combo.totalUnits > bestCredits) bestCredits = combo.totalUnits;
+  let highest = 0;
+  for (const combo of inWindow) {
+    if (combo.totalUnits > highest) highest = combo.totalUnits;
   }
-  const filtered = aboveFloor.filter(
-    (c) => Math.abs(c.totalUnits - bestCredits) < FLOAT_EPS
-  );
 
   return {
-    combinations: filtered,
+    combinations: inWindow,
     truncated: all.truncated,
     conflictingPins: false,
-    effectiveCredits: bestCredits,
+    effectiveCredits: highest,
     requestedCredits,
     requestedMinCredits
   };

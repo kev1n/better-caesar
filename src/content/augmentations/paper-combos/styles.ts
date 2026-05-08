@@ -329,7 +329,8 @@ const CSS = `
 /* Drag preview while the user is creating a zone — semi-transparent
  * accent fill with a dashed border so it reads as "in progress" until
  * mouseup commits it. pointer-events:none so the mousemove handler
- * still gets coordinates from the underlying day column. */
+ * still gets coordinates from the underlying day column. Multi-day
+ * previews stitch the same way committed zones do (no interior seams). */
 .bc-paper-combos-zone-preview {
   background: var(--bc-color-accent-surface-soft);
   border: 1px dashed var(--bc-color-accent);
@@ -338,10 +339,24 @@ const CSS = `
   z-index: 11;
 }
 
+.bc-paper-combos-zone-preview[data-leftmost="false"] {
+  border-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.bc-paper-combos-zone-preview[data-rightmost="false"] {
+  border-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 /* Persisted zones: dimmer fill + diagonal stripes so they read as
  * "this time slot is off-limits" without competing with paper.nu's
- * actual class cards. Hover reveals the X button. */
+ * actual class cards. Hover signals "click to remove" via a fade
+ * overlay across the whole zone. */
 .bc-paper-combos-zone {
+  position: relative;
   background: var(--bc-color-accent-surface-soft);
   background-image: repeating-linear-gradient(
     45deg,
@@ -354,10 +369,7 @@ const CSS = `
   border-radius: var(--bc-radius-sm);
   z-index: 11;
   cursor: pointer;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 2px 4px;
+  padding: 4px 4px 4px 6px;
   font-size: 0.65rem;
   color: var(--bc-color-accent);
   font-weight: var(--bc-fw-semibold);
@@ -365,8 +377,30 @@ const CSS = `
   transition: background var(--bc-tx-fast) var(--bc-easing);
 }
 
-.bc-paper-combos-zone:hover {
-  background-color: var(--bc-color-accent-surface-tile);
+/* Click-to-remove affordance: full-zone overlay that fades in on hover
+ * with a "Click to remove" label. pointer-events:none so the click
+ * still hits the underlying zone (which the drag handler already
+ * routes to onZoneRemove). */
+.bc-paper-combos-zone::after {
+  content: "Click to remove";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bc-color-accent);
+  color: var(--bc-color-accent-on);
+  font-size: 0.7rem;
+  font-weight: var(--bc-fw-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--bc-ls-wide);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--bc-tx-fast) var(--bc-easing);
+}
+
+.bc-paper-combos-zone:hover::after {
+  opacity: 0.92;
 }
 
 /* Multi-day zones render as one segment per day. The leftmost/rightmost
@@ -386,10 +420,11 @@ const CSS = `
 
 .bc-paper-combos-zone-label {
   pointer-events: none;
-  flex: 1;
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  padding-right: 22px; /* leave room for the X button at top-right */
 }
 
 /* X button: two crossed pseudo-element bars instead of the × glyph.
@@ -398,8 +433,10 @@ const CSS = `
  * Pseudo-bars are pixel-precise: each is a 1.5px-tall rod centered on
  * the button's geometric middle and rotated ±45°. */
 .bc-paper-combos-zone-remove {
-  flex-shrink: 0;
-  position: relative;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 12;
   width: 16px;
   height: 16px;
   padding: 0;

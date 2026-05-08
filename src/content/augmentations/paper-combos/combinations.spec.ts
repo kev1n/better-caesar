@@ -98,6 +98,7 @@ describe("enumerateCombinations", () => {
     const b2 = makeSection("B2", "B", [block(1, 11, 0, 12, 0)]);
     const result = enumerateCombinations(pool([a1, a2, b1, b2]), {
       maxCredits: 2,
+      minCredits: 2,
       pinnedSectionIds: new Set()
     });
     expect(result.combinations).toHaveLength(4);
@@ -112,6 +113,7 @@ describe("enumerateCombinations", () => {
     const b2 = makeSection("B2", "B", [block(0, 11, 0, 12, 0)]);
     const result = enumerateCombinations(pool([a1, b1, b2]), {
       maxCredits: 2,
+      minCredits: 2,
       pinnedSectionIds: new Set()
     });
     expect(result.combinations).toHaveLength(1);
@@ -135,6 +137,7 @@ describe("enumerateCombinations", () => {
     const b1 = makeSection("B1", "B", [block(1, 9, 0, 10, 0)]);
     const result = enumerateCombinations(pool([a1, a2, b1]), {
       maxCredits: 2,
+      minCredits: 2,
       pinnedSectionIds: new Set(["A1"])
     });
     expect(result.combinations).toHaveLength(1);
@@ -143,11 +146,13 @@ describe("enumerateCombinations", () => {
 
   it("returns combos at the highest reachable credit total when budget caps the schedule", () => {
     // 3 unit-1 courses, max=2 credits → only 2-credit combos, none of all 3.
+    // min=max=2 keeps the assertion precise to "exactly 2 credits".
     const a = makeSection("A1", "A", [block(0, 9, 0, 10, 0)]);
     const b = makeSection("B1", "B", [block(0, 11, 0, 12, 0)]);
     const c = makeSection("C1", "C", [block(0, 13, 0, 14, 0)]);
     const result = enumerateCombinations(pool([a, b, c]), {
       maxCredits: 2,
+      minCredits: 2,
       pinnedSectionIds: new Set()
     });
     expect(result.combinations).toHaveLength(3);
@@ -156,13 +161,14 @@ describe("enumerateCombinations", () => {
   });
 
   it("falls back to a smaller credit total when the requested budget can't be packed", () => {
-    // 3 courses, A and B conflict. No 3-credit combo fits — fallback is
-    // 2-credit, namely {A,C} and {B,C}.
+    // 3 courses, A and B conflict. No 3-credit combo fits — at the 2-credit
+    // floor we still get {A,C} and {B,C}. min=max=2 narrows to those two.
     const a = makeSection("A1", "A", [block(0, 9, 0, 10, 0)]);
     const b = makeSection("B1", "B", [block(0, 9, 30, 10, 30)]);
     const c = makeSection("C1", "C", [block(0, 13, 0, 14, 0)]);
     const result = enumerateCombinations(pool([a, b, c]), {
       maxCredits: 3,
+      minCredits: 2,
       pinnedSectionIds: new Set()
     });
     expect(result.combinations).toHaveLength(2);
@@ -175,16 +181,15 @@ describe("enumerateCombinations", () => {
   });
 
   it("filters out combos that exceed the credit budget", () => {
-    // A and B are 1-unit each, C is 2-unit. Max=2 credits.
-    // Valid combos: {A}, {B}, {C}, {A,B} all fit. {A,B,C}=4 too much.
+    // A and B are 1-unit each, C is 2-unit. min=max=2.
+    // {A,B,C}=4 exceeds max; {A,B} and {C} both hit exactly 2.
     const a = makeSection("A1", "A", [block(0, 9, 0, 10, 0)]);
     const b = makeSection("B1", "B", [block(1, 9, 0, 10, 0)]);
     const c = makeSection("C1", "C", [block(2, 9, 0, 10, 0)]);
     const result = enumerateCombinations(
       pool([a, b, c], { A: 1, B: 1, C: 2 }),
-      { maxCredits: 2, pinnedSectionIds: new Set() }
+      { maxCredits: 2, minCredits: 2, pinnedSectionIds: new Set() }
     );
-    // Highest reachable = 2 credits (either {A,B} or {C}).
     expect(result.effectiveCredits).toBe(2);
     const ids = result.combinations
       .map((cb) => cb.sectionIds.slice().sort().join(","))
@@ -192,11 +197,11 @@ describe("enumerateCombinations", () => {
     expect(ids).toEqual(["A1,B1", "C1"]);
   });
 
-  it("filters out combos below the min-credits floor before picking the best class", () => {
+  it("returns every combo in the [min, max] credits window", () => {
     // 3 unit-1 courses, all non-conflicting. minCredits=2, maxCredits=3
-    // means 1-credit combos drop out; the {A,B,C} 3-credit combo is the
-    // sole survivor since the post-filter "highest credits" reduction
-    // beats the 2-credit pairs.
+    // means the 1-credit single-course combos drop out, but every 2- and
+    // 3-credit combo in the window is returned: {A,B}, {A,C}, {B,C},
+    // and {A,B,C}. The cycle UI then sorts by the active sort mode.
     const a = makeSection("A1", "A", [block(0, 9, 0, 10, 0)]);
     const b = makeSection("B1", "B", [block(0, 11, 0, 12, 0)]);
     const c = makeSection("C1", "C", [block(0, 13, 0, 14, 0)]);
@@ -205,8 +210,11 @@ describe("enumerateCombinations", () => {
       minCredits: 2,
       pinnedSectionIds: new Set()
     });
-    expect(result.combinations).toHaveLength(1);
-    expect(result.combinations[0].sectionIds.slice().sort()).toEqual(["A1", "B1", "C1"]);
+    expect(result.combinations).toHaveLength(4);
+    const ids = result.combinations
+      .map((c) => c.sectionIds.slice().sort().join(","))
+      .sort();
+    expect(ids).toEqual(["A1,B1", "A1,B1,C1", "A1,C1", "B1,C1"]);
     expect(result.effectiveCredits).toBe(3);
     expect(result.requestedMinCredits).toBe(2);
   });
