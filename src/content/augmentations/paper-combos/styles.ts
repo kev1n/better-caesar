@@ -261,8 +261,14 @@ const CSS = `
   text-overflow: ellipsis;
 }
 
+/* X button: two crossed pseudo-element bars instead of the × glyph.
+ * The glyph version had visible vertical drift in most fonts (× sits
+ * slightly above the baseline) and looked off-center in a 16px circle.
+ * Pseudo-bars are pixel-precise: each is a 1.5px-tall rod centered on
+ * the button's geometric middle and rotated ±45°. */
 .bc-paper-combos-zone-remove {
   flex-shrink: 0;
+  position: relative;
   width: 16px;
   height: 16px;
   padding: 0;
@@ -270,13 +276,29 @@ const CSS = `
   border-radius: var(--bc-radius-circle);
   background: var(--bc-color-accent);
   color: var(--bc-color-accent-on);
-  font-size: 12px;
-  font-weight: var(--bc-fw-bold);
-  line-height: 1;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 0;
+  line-height: 0;
+}
+
+.bc-paper-combos-zone-remove::before,
+.bc-paper-combos-zone-remove::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 1.5px;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+.bc-paper-combos-zone-remove::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.bc-paper-combos-zone-remove::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .bc-paper-combos-zone-remove:hover {

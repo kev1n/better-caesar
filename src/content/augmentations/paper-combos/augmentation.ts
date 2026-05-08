@@ -471,7 +471,7 @@ export class PaperCombosAugmentation implements Augmentation {
       ? `${currentCombo.sectionIds.join(",")}/${currentCombo.score.toFixed(3)}/${currentCombo.ratedCount}`
       : "-";
     const zoneSig = this.zones
-      .map((z) => `${z.id}@${z.day}:${z.startMin}-${z.endMin}`)
+      .map((z) => `${z.id}@${z.startDay}-${z.endDay}:${z.startMin}-${z.endMin}`)
       .sort()
       .join(",");
     return [

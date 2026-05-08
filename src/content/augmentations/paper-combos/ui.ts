@@ -617,7 +617,8 @@ function makeZoneId(): string {
 
 export type DragZone = {
   id: string;
-  day: number;
+  startDay: number;
+  endDay: number;
   startMin: number;
   endMin: number;
 };
@@ -658,10 +659,49 @@ function buildZoneInCell(
   return overlay;
 }
 
-// Render every persisted zone into the right hour cell of its day
-// column. Idempotent — wipes existing zone overlays first, then stamps
-// the live set. Zones outside the visible hour range are silently
-// dropped (they'd be invisible anyway).
+// Mount one segment of a zone (one day's slice) inside that day's
+// start-hour cell. Multi-day zones produce one segment per day —
+// they all share the zone id so a click on any segment removes the
+// whole logical zone.
+function mountZoneSegment(
+  doc: Document,
+  hourCell: HTMLElement,
+  zone: DragZone,
+  startMinInHour: number,
+  duration: number,
+  className: string,
+  showLabel: boolean,
+  showRemove: boolean
+): HTMLElement {
+  const overlay = buildZoneInCell(doc, hourCell, startMinInHour, duration, className);
+  overlay.setAttribute(ZONE_ID_ATTR, zone.id);
+  if (showLabel) {
+    overlay.appendChild(
+      el(doc, "span", { class: "bc-paper-combos-zone-label" }, [
+        `${formatTime(zone.startMin)} – ${formatTime(zone.endMin)}`
+      ])
+    );
+  }
+  if (showRemove) {
+    overlay.appendChild(
+      el(doc, "button", {
+        class: ZONE_REMOVE_BUTTON_CLASS,
+        attrs: {
+          type: "button",
+          "aria-label": "Remove blocked time",
+          [ZONE_ID_ATTR]: zone.id
+        }
+      })
+    );
+  }
+  return overlay;
+}
+
+// Render every persisted zone into the right hour cell of every day
+// it covers. Idempotent — wipes existing zone overlays first, then
+// stamps the live set. Multi-day zones become one segment per day,
+// all sharing the zone id; the time label appears on the leftmost
+// segment, the X remove button on the rightmost.
 export function renderZones(
   doc: Document,
   grid: HTMLElement,
@@ -679,62 +719,76 @@ export function renderZones(
   const dayColumns = readDayColumns(grid);
 
   for (const zone of zones) {
-    const dayCol = dayColumns[zone.day];
-    if (!dayCol) continue;
-    const cells = getPaperCells(dayCol);
-    const hourCount = cells.length - 1;
-    if (hourCount <= 0) continue;
-    const startCellIdx = Math.floor(zone.startMin / 60) - startHour + 1;
-    if (startCellIdx < 1 || startCellIdx > hourCount) continue;
-    const hourCell = cells[startCellIdx];
-    if (!hourCell) continue;
+    const startDay = Math.max(0, Math.min(4, zone.startDay));
+    const endDay = Math.max(startDay, Math.min(4, zone.endDay));
+    for (let day = startDay; day <= endDay; day++) {
+      const dayCol = dayColumns[day];
+      if (!dayCol) continue;
+      const cells = getPaperCells(dayCol);
+      const hourCount = cells.length - 1;
+      if (hourCount <= 0) continue;
+      const startCellIdx = Math.floor(zone.startMin / 60) - startHour + 1;
+      if (startCellIdx < 1 || startCellIdx > hourCount) continue;
+      const hourCell = cells[startCellIdx];
+      if (!hourCell) continue;
 
-    const startMinInHour = zone.startMin - (startHour + (startCellIdx - 1)) * 60;
-    const duration = zone.endMin - zone.startMin;
-
-    const overlay = buildZoneInCell(
-      doc,
-      hourCell,
-      startMinInHour,
-      duration,
-      ZONE_CLASS
-    );
-    overlay.setAttribute(ZONE_ID_ATTR, zone.id);
-
-    overlay.appendChild(
-      el(doc, "span", { class: "bc-paper-combos-zone-label" }, [
-        `${formatTime(zone.startMin)} – ${formatTime(zone.endMin)}`
-      ])
-    );
-    overlay.appendChild(
-      el(doc, "button", {
-        class: ZONE_REMOVE_BUTTON_CLASS,
-        attrs: {
-          type: "button",
-          "aria-label": "Remove blocked time",
-          [ZONE_ID_ATTR]: zone.id
-        }
-      }, ["×"])
-    );
+      const startMinInHour = zone.startMin - (startHour + (startCellIdx - 1)) * 60;
+      const duration = zone.endMin - zone.startMin;
+      mountZoneSegment(
+        doc,
+        hourCell,
+        zone,
+        startMinInHour,
+        duration,
+        ZONE_CLASS,
+        day === startDay,
+        day === endDay
+      );
+    }
   }
 }
 
 type DragState = {
+  startClientX: number;
   startClientY: number;
   startMin: number;
-  day: number;
-  // The hour cell the preview is currently mounted in. As the drag
-  // crosses hour boundaries, we move the preview into the new anchor
-  // cell so paper.nu's "% inside hour" math keeps working.
-  previewHostCell: HTMLElement | null;
-  preview: HTMLElement | null;
+  startDay: number;
+  // Every preview segment we've spawned so far, keyed by day so we
+  // can selectively remove segments as the drag's day range shrinks.
+  previewSegments: Map<number, HTMLElement>;
+  // (day, hourCellIdx) of each preview's current anchor — when the
+  // anchor changes (e.g. cursor crosses an hour boundary) we re-mount
+  // because paper.nu's positioning model is "% inside this cell".
+  previewAnchors: Map<number, { hourCellIdx: number }>;
   dragged: boolean;
 };
 
+// Find the day-column index whose horizontal extent covers `clientX`,
+// or null if `clientX` is outside the schedule grid's day columns.
+// Used during drag to detect cross-day extension.
+function dayIndexAtX(grid: HTMLElement, clientX: number): number | null {
+  const dayColumns = readDayColumns(grid);
+  for (let i = 0; i < dayColumns.length; i++) {
+    const rect = dayColumns[i].getBoundingClientRect();
+    if (clientX >= rect.left && clientX <= rect.right) return i;
+  }
+  return null;
+}
+
+// Drop every preview segment.
+function clearPreviewSegments(state: DragState): void {
+  for (const segment of state.previewSegments.values()) {
+    segment.remove();
+  }
+  state.previewSegments.clear();
+  state.previewAnchors.clear();
+}
+
 // Attach mousedown to the grid + mousemove/up to the document. On a
-// real drag (cursor moves > 4px), build a preview overlay anchored to
-// the start-hour cell and re-anchor it as the drag crosses hour lines.
-// Mouseup with a final drag distance ≥ 15min commits a zone.
+// real drag (cursor moves > 4px), build preview overlays in every
+// day column the drag covers, re-anchoring each as the cursor crosses
+// hour boundaries. Mouseup with a final drag duration ≥ 15min commits
+// one logical zone spanning all the affected days.
 export function attachZoneDragHandlers(
   doc: Document,
   grid: HTMLElement,
@@ -785,101 +839,140 @@ export function attachZoneDragHandlers(
 
     event.preventDefault();
     drag = {
+      startClientX: event.clientX,
       startClientY: event.clientY,
       startMin,
-      day: dayIdx,
-      previewHostCell: null,
-      preview: null,
+      startDay: dayIdx,
+      previewSegments: new Map(),
+      previewAnchors: new Map(),
       dragged: false
     };
   };
 
-  const updatePreview = (
+  // Render the preview as a set of per-day segments. Every affected
+  // day gets a segment in the appropriate hour cell, sized to the
+  // current drag time range. As the drag's day range or hour anchor
+  // changes, segments are added, removed, or remounted in lockstep.
+  const renderPreviewSegments = (
     state: DragState,
+    startDay: number,
+    endDay: number,
     fromMin: number,
     toMin: number,
-    startHour: number,
-    cells: HTMLElement[]
+    startHour: number
   ): void => {
-    const hourCount = cells.length - 1;
-    const startCellIdx = Math.floor(fromMin / 60) - startHour + 1;
-    if (startCellIdx < 1 || startCellIdx > hourCount) {
-      // Out of visible range — drop the preview entirely until the
-      // cursor comes back.
-      if (state.preview) {
-        state.preview.remove();
-        state.preview = null;
-        state.previewHostCell = null;
-      }
-      return;
-    }
-    const hourCell = cells[startCellIdx];
-    const startMinInHour = fromMin - (startHour + (startCellIdx - 1)) * 60;
+    const dayColumns = readDayColumns(grid);
     const duration = Math.max(0, toMin - fromMin);
 
-    // If the anchor cell changed, rebuild the preview in the new cell
-    // (paper.nu's positioning model means the parent IS the anchor).
-    if (state.previewHostCell !== hourCell) {
-      if (state.preview) state.preview.remove();
-      state.preview = buildZoneInCell(
-        doc,
-        hourCell,
-        startMinInHour,
-        duration,
-        ZONE_PREVIEW_CLASS
-      );
-      state.preview.style.pointerEvents = "none";
-      state.previewHostCell = hourCell;
-      return;
+    // Drop segments for days no longer in the drag range.
+    for (const day of Array.from(state.previewSegments.keys())) {
+      if (day < startDay || day > endDay) {
+        state.previewSegments.get(day)?.remove();
+        state.previewSegments.delete(day);
+        state.previewAnchors.delete(day);
+      }
     }
 
-    const startDif = startMinInHour / 60;
-    const endDif = duration / 60;
-    const hoursSpanned = Math.floor(
-      (startMinInHour + duration) / 60 - Math.floor(startMinInHour / 60)
-    );
-    if (state.preview) {
-      state.preview.style.top = `${startDif * 100}%`;
-      state.preview.style.height = `calc(${endDif * 100}% + ${2 * hoursSpanned}px)`;
+    for (let day = startDay; day <= endDay; day++) {
+      const dayColumn = dayColumns[day];
+      if (!dayColumn) continue;
+      const cells = getPaperCells(dayColumn);
+      const hourCount = cells.length - 1;
+      if (hourCount <= 0) continue;
+      const startCellIdx = Math.floor(fromMin / 60) - startHour + 1;
+      if (startCellIdx < 1 || startCellIdx > hourCount) {
+        state.previewSegments.get(day)?.remove();
+        state.previewSegments.delete(day);
+        state.previewAnchors.delete(day);
+        continue;
+      }
+      const hourCell = cells[startCellIdx];
+      const startMinInHour = fromMin - (startHour + (startCellIdx - 1)) * 60;
+      const anchor = state.previewAnchors.get(day);
+      const existing = state.previewSegments.get(day);
+
+      if (!existing || !anchor || anchor.hourCellIdx !== startCellIdx) {
+        // No segment yet, or anchor cell changed — (re)mount.
+        if (existing) existing.remove();
+        const segment = buildZoneInCell(
+          doc,
+          hourCell,
+          startMinInHour,
+          duration,
+          ZONE_PREVIEW_CLASS
+        );
+        segment.style.pointerEvents = "none";
+        state.previewSegments.set(day, segment);
+        state.previewAnchors.set(day, { hourCellIdx: startCellIdx });
+        continue;
+      }
+
+      // Same anchor — just resize.
+      const startDif = startMinInHour / 60;
+      const endDif = duration / 60;
+      const hoursSpanned = Math.floor(
+        (startMinInHour + duration) / 60 - Math.floor(startMinInHour / 60)
+      );
+      existing.style.top = `${startDif * 100}%`;
+      existing.style.height = `calc(${endDif * 100}% + ${2 * hoursSpanned}px)`;
     }
   };
 
   const onMouseMove = (event: MouseEvent): void => {
     if (!drag) return;
-    const dayColumn = readDayColumns(grid)[drag.day];
-    if (!dayColumn) return;
     const startHour = readGridStartHour(grid);
     if (startHour === null) return;
-    const currentMin = clientYToMinutes(event.clientY, dayColumn, startHour);
+
+    // Y → minutes uses the START day's axis. paper.nu draws every day
+    // column with the same hour range, so reading from any column is
+    // equivalent — we pick the start column for stability.
+    const startDayColumn = readDayColumns(grid)[drag.startDay];
+    if (!startDayColumn) return;
+    const currentMin = clientYToMinutes(event.clientY, startDayColumn, startHour);
     if (currentMin === null) return;
-    if (Math.abs(event.clientY - drag.startClientY) > 4) drag.dragged = true;
+
+    // X → day. When the cursor leaves the grid horizontally, fall back
+    // to the start day so the preview stays anchored.
+    const currentDay = dayIndexAtX(grid, event.clientX) ?? drag.startDay;
+
+    const dx = Math.abs(event.clientX - drag.startClientX);
+    const dy = Math.abs(event.clientY - drag.startClientY);
+    if (dx > 4 || dy > 4) drag.dragged = true;
 
     const fromMin = Math.min(drag.startMin, currentMin);
     const toMin = Math.max(drag.startMin, currentMin);
-    updatePreview(drag, fromMin, toMin, startHour, getPaperCells(dayColumn));
+    const fromDay = Math.min(drag.startDay, currentDay);
+    const toDay = Math.max(drag.startDay, currentDay);
+
+    renderPreviewSegments(drag, fromDay, toDay, fromMin, toMin, startHour);
   };
 
   const onMouseUp = (event: MouseEvent): void => {
     if (!drag) return;
     const captured = drag;
     drag = null;
-    if (captured.preview) captured.preview.remove();
+    clearPreviewSegments(captured);
     if (!captured.dragged) return;
 
-    const dayColumn = readDayColumns(grid)[captured.day];
-    if (!dayColumn) return;
     const startHour = readGridStartHour(grid);
     if (startHour === null) return;
-    const endMin = clientYToMinutes(event.clientY, dayColumn, startHour);
+    const startDayColumn = readDayColumns(grid)[captured.startDay];
+    if (!startDayColumn) return;
+    const endMin = clientYToMinutes(event.clientY, startDayColumn, startHour);
     if (endMin === null) return;
 
     const fromMin = snapMinutes(Math.min(captured.startMin, endMin));
     const toMin = snapMinutes(Math.max(captured.startMin, endMin));
     if (toMin - fromMin < 15) return;
 
+    const currentDay = dayIndexAtX(grid, event.clientX) ?? captured.startDay;
+    const fromDay = Math.max(0, Math.min(4, Math.min(captured.startDay, currentDay)));
+    const toDay = Math.max(0, Math.min(4, Math.max(captured.startDay, currentDay)));
+
     callbacks.onZoneCreate({
       id: makeZoneId(),
-      day: captured.day,
+      startDay: fromDay,
+      endDay: toDay,
       startMin: fromMin,
       endMin: toMin
     });
@@ -893,7 +986,9 @@ export function attachZoneDragHandlers(
     grid.removeEventListener("mousedown", onMouseDown);
     doc.removeEventListener("mousemove", onMouseMove);
     doc.removeEventListener("mouseup", onMouseUp);
-    if (drag?.preview) drag.preview.remove();
-    drag = null;
+    if (drag) {
+      clearPreviewSegments(drag);
+      drag = null;
+    }
   };
 }

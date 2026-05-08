@@ -7,27 +7,62 @@ const SORT_STORAGE_KEY = "better-caesar:paper-combos-sort:v1";
 
 export type ProhibitedZone = {
   id: string;
-  day: number; // 0=Mon..4=Fri
+  // Inclusive day range. A single-day zone has startDay === endDay.
+  startDay: number;
+  endDay: number;
   startMin: number; // minutes from midnight
   endMin: number;
 };
 
+// Persisted shape on disk — accepts both the legacy single-`day` schema
+// and the current `startDay`/`endDay` schema. Older zones get migrated
+// in `normalizeZone` so the in-memory cache is always the new shape.
+type StoredZone = {
+  id: unknown;
+  day?: unknown;
+  startDay?: unknown;
+  endDay?: unknown;
+  startMin: unknown;
+  endMin: unknown;
+};
+
 let zonesCache: ProhibitedZone[] | null = null;
 
-function isValidZone(value: unknown): value is ProhibitedZone {
-  if (!value || typeof value !== "object") return false;
-  const z = value as Record<string, unknown>;
-  return (
-    typeof z.id === "string" &&
-    typeof z.day === "number" &&
-    typeof z.startMin === "number" &&
-    typeof z.endMin === "number" &&
-    z.day >= 0 &&
-    z.day <= 4 &&
-    z.startMin >= 0 &&
-    z.endMin > z.startMin
-  );
+function normalizeZone(value: unknown): ProhibitedZone | null {
+  if (!value || typeof value !== "object") return null;
+  const z = value as StoredZone;
+  if (typeof z.id !== "string") return null;
+  if (typeof z.startMin !== "number" || typeof z.endMin !== "number") return null;
+  if (!(z.endMin > z.startMin) || z.startMin < 0) return null;
+
+  // Pull start/end day from the new schema, or fall back to the legacy
+  // single-day schema. Either way we end up with a [startDay, endDay]
+  // pair that we clamp to the visible Mon–Fri (0–4) range.
+  let startDay: number;
+  let endDay: number;
+  if (typeof z.startDay === "number" && typeof z.endDay === "number") {
+    startDay = z.startDay;
+    endDay = z.endDay;
+  } else if (typeof z.day === "number") {
+    startDay = z.day;
+    endDay = z.day;
+  } else {
+    return null;
+  }
+  if (!Number.isFinite(startDay) || !Number.isFinite(endDay)) return null;
+  startDay = Math.max(0, Math.min(4, Math.floor(startDay)));
+  endDay = Math.max(0, Math.min(4, Math.floor(endDay)));
+  if (endDay < startDay) [startDay, endDay] = [endDay, startDay];
+
+  return {
+    id: z.id,
+    startDay,
+    endDay,
+    startMin: z.startMin,
+    endMin: z.endMin
+  };
 }
+
 
 export async function loadZones(): Promise<ProhibitedZone[]> {
   if (zonesCache) return zonesCache;
@@ -41,7 +76,9 @@ export async function loadZones(): Promise<ProhibitedZone[]> {
       zonesCache = [];
       return zonesCache;
     }
-    zonesCache = raw.filter(isValidZone);
+    zonesCache = raw
+      .map(normalizeZone)
+      .filter((z): z is ProhibitedZone => z !== null);
     return zonesCache;
   } catch (err) {
     logQuiet("paper-combos.zones.load", err);
@@ -71,18 +108,20 @@ export function subscribeZoneChanges(callback: () => void): () => void {
     const change = changes[ZONES_STORAGE_KEY];
     if (!change) return;
     const next = change.newValue;
-    zonesCache = Array.isArray(next) ? next.filter(isValidZone) : [];
+    zonesCache = Array.isArray(next)
+      ? next
+          .map(normalizeZone)
+          .filter((z): z is ProhibitedZone => z !== null)
+      : [];
     callback();
   };
   chrome.storage.onChanged.addListener(listener);
   return () => chrome.storage.onChanged.removeListener(listener);
 }
 
-// Half-open interval overlap: a class ending exactly at the zone start
-// (or starting exactly at the zone end) is NOT a conflict — the class
-// is fully outside the prohibited window. Different from paper.nu's
-// own timesOverlap (which uses `<=` on both sides), but the right call
-// for zones because the user means "no class held *during* this block."
+// Half-open interval overlap on time, inclusive day range. A class ending
+// exactly at the zone start (or starting exactly at the zone end) is NOT
+// a conflict — the class is fully outside the prohibited window.
 export function sectionConflictsWithZones(
   section: ComboSection,
   zones: readonly ProhibitedZone[]
@@ -92,7 +131,7 @@ export function sectionConflictsWithZones(
     const blockStart = block.start.h * 60 + block.start.m;
     const blockEnd = block.end.h * 60 + block.end.m;
     for (const zone of zones) {
-      if (zone.day !== block.day) continue;
+      if (block.day < zone.startDay || block.day > zone.endDay) continue;
       if (blockStart < zone.endMin && zone.startMin < blockEnd) return true;
     }
   }
