@@ -6,7 +6,10 @@
 //
 // Bucket 0: graduating 2027 or earlier (most senior — unlocks first)
 // Bucket 1: graduating 2028
-// Bucket 2: graduating 2029 or later, or unknown grad year (open release)
+// Bucket 2: graduating 2029 or later
+// Unknown grad year is handled in evaluateGate (immediate unlock) so it
+// never reaches this function in practice; the null branch below stays
+// as a defensive default.
 
 export type Bucket = 0 | 1 | 2;
 

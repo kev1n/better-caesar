@@ -76,8 +76,12 @@ function buildGateNode(status: GateStatus): HTMLElement {
   }
 
   card.className = "gate-card gate-card--ok";
-  const reason = status.reason === "code" ? "Unlocked with code" : "Unlocked";
-  card.append(makeGateRow(reason, `Signed in as ${status.lastName}.`));
+  const title = status.reason === "code" ? "Unlocked with code" : "Unlocked";
+  const body =
+    status.reason === "unknown-grad-year"
+      ? `Signed in as ${status.lastName}. We couldn't read your expected graduation year from CAESAR, so we unlocked anyway.`
+      : `Signed in as ${status.lastName}.`;
+  card.append(makeGateRow(title, body));
   if (status.reason === "code") {
     const remove = document.createElement("button");
     remove.className = "gate-link";

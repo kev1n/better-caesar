@@ -15,7 +15,7 @@ import {
 } from "./storage";
 
 export type GateStatus =
-  | { kind: "unlocked"; reason: "bucket" | "code"; lastName: string }
+  | { kind: "unlocked"; reason: "bucket" | "code" | "unknown-grad-year"; lastName: string }
   | {
       kind: "locked-bucket";
       releaseAt: number;
@@ -80,6 +80,14 @@ export async function evaluateGate(): Promise<GateStatus> {
     if (ok) {
       return { kind: "unlocked", reason: "code", lastName: stored.lastName };
     }
+  }
+
+  // We tried (StoredName only gets written after a successful profile fetch,
+  // which runs fetchGradYear in parallel) but the grad-term page failed or
+  // didn't parse. Don't hold the user back — unlock with a distinct reason
+  // so the popup can surface it.
+  if (stored.gradYear === null) {
+    return { kind: "unlocked", reason: "unknown-grad-year", lastName: stored.lastName };
   }
 
   const bucket = bucketForGradYear(stored.gradYear);
