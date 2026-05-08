@@ -1,9 +1,14 @@
 import { logQuiet } from "../../../shared/log";
+import {
+  DEFAULT_MAX_CREDITS,
+  DEFAULT_MIN_CREDITS
+} from "./constants";
 import { DEFAULT_SORT_MODE, isSortMode, type SortMode } from "./scoring";
 import type { ComboSection } from "./types";
 
 const ZONES_STORAGE_KEY = "better-caesar:paper-combos-zones:v1";
 const SORT_STORAGE_KEY = "better-caesar:paper-combos-sort:v1";
+const CREDITS_STORAGE_KEY = "better-caesar:paper-combos-credits:v1";
 
 export type ProhibitedZone = {
   id: string;
@@ -198,6 +203,79 @@ export function subscribeSortChanges(callback: (mode: SortMode) => void): () => 
       typeof next === "string" && isSortMode(next) ? next : DEFAULT_SORT_MODE;
     sortCache = mode;
     callback(mode);
+  };
+  chrome.storage.onChanged.addListener(listener);
+  return () => chrome.storage.onChanged.removeListener(listener);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Credit-budget persistence (min + max). Stored together so a single
+// storage round-trip captures both — they're a paired control on the
+// bar, no reason to split keys.
+
+export type CreditsPrefs = {
+  minCredits: number;
+  maxCredits: number;
+};
+
+let creditsCache: CreditsPrefs | null = null;
+
+function normalizeCredits(value: unknown): CreditsPrefs {
+  const fallback: CreditsPrefs = {
+    minCredits: DEFAULT_MIN_CREDITS,
+    maxCredits: DEFAULT_MAX_CREDITS
+  };
+  if (!value || typeof value !== "object") return fallback;
+  const v = value as Record<string, unknown>;
+  const min =
+    typeof v.minCredits === "number" && Number.isFinite(v.minCredits) && v.minCredits >= 0
+      ? v.minCredits
+      : DEFAULT_MIN_CREDITS;
+  const max =
+    typeof v.maxCredits === "number" && Number.isFinite(v.maxCredits) && v.maxCredits >= 0.5
+      ? v.maxCredits
+      : DEFAULT_MAX_CREDITS;
+  // Floor never above ceiling — silently clamp on read.
+  return { minCredits: Math.min(min, max), maxCredits: max };
+}
+
+export async function loadCredits(): Promise<CreditsPrefs> {
+  if (creditsCache) return creditsCache;
+  try {
+    const result = (await chrome.storage.local.get(CREDITS_STORAGE_KEY)) as Record<
+      string,
+      unknown
+    >;
+    creditsCache = normalizeCredits(result[CREDITS_STORAGE_KEY]);
+    return creditsCache;
+  } catch (err) {
+    logQuiet("paper-combos.credits.load", err);
+    creditsCache = normalizeCredits(null);
+    return creditsCache;
+  }
+}
+
+export async function saveCredits(prefs: CreditsPrefs): Promise<void> {
+  creditsCache = { ...prefs };
+  try {
+    await chrome.storage.local.set({ [CREDITS_STORAGE_KEY]: creditsCache });
+  } catch (err) {
+    logQuiet("paper-combos.credits.save", err);
+  }
+}
+
+export function subscribeCreditsChanges(
+  callback: (prefs: CreditsPrefs) => void
+): () => void {
+  const listener = (
+    changes: Record<string, chrome.storage.StorageChange>,
+    areaName: string
+  ): void => {
+    if (areaName !== "local") return;
+    const change = changes[CREDITS_STORAGE_KEY];
+    if (!change) return;
+    creditsCache = normalizeCredits(change.newValue);
+    callback(creditsCache);
   };
   chrome.storage.onChanged.addListener(listener);
   return () => chrome.storage.onChanged.removeListener(listener);

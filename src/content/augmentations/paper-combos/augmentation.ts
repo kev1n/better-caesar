@@ -36,11 +36,14 @@ import {
   type ZoneDragCallbacks
 } from "./ui";
 import {
+  loadCredits,
   loadSortMode,
   loadZones,
+  saveCredits,
   saveSortMode,
   saveZones,
   sectionConflictsWithZones,
+  subscribeCreditsChanges,
   subscribeSortChanges,
   subscribeZoneChanges,
   type ProhibitedZone
@@ -124,6 +127,8 @@ export class PaperCombosAugmentation implements Augmentation {
   private sortMode: SortMode = DEFAULT_SORT_MODE;
   private sortLoaded = false;
   private sortUnsubscribe: (() => void) | null = null;
+  private creditsLoaded = false;
+  private creditsUnsubscribe: (() => void) | null = null;
   private loading = false;
   // True when the bar (with the on-page toggle) is mounted on the
   // schedule page. Distinct from `featureMounted` — the bar is always
@@ -177,8 +182,13 @@ export class PaperCombosAugmentation implements Augmentation {
       this.sortUnsubscribe();
       this.sortUnsubscribe = null;
     }
+    if (this.creditsUnsubscribe) {
+      this.creditsUnsubscribe();
+      this.creditsUnsubscribe = null;
+    }
     this.zonesLoaded = false;
     this.sortLoaded = false;
+    this.creditsLoaded = false;
     this.barMounted = false;
     this.featureMounted = false;
     this.lastRenderSig = null;
@@ -196,7 +206,27 @@ export class PaperCombosAugmentation implements Augmentation {
     this.attachZoneHandlers(doc, grid);
     this.ensureZonesLoaded(doc, grid);
     this.ensureSortLoaded(doc, grid);
+    this.ensureCreditsLoaded(doc, grid);
     this.featureMounted = true;
+  }
+
+  private ensureCreditsLoaded(doc: Document, grid: HTMLElement): void {
+    if (this.creditsLoaded) return;
+    this.creditsLoaded = true;
+    void loadCredits().then((prefs) => {
+      this.minCredits = prefs.minCredits;
+      this.maxCredits = prefs.maxCredits;
+      this.recomputeCombos();
+      this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
+    });
+    if (!this.creditsUnsubscribe) {
+      this.creditsUnsubscribe = subscribeCreditsChanges((prefs) => {
+        this.minCredits = prefs.minCredits;
+        this.maxCredits = prefs.maxCredits;
+        this.recomputeCombos();
+        this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
+      });
+    }
   }
 
   private ensureZonesLoaded(doc: Document, grid: HTMLElement): void {
@@ -599,6 +629,7 @@ export class PaperCombosAugmentation implements Augmentation {
   private setMax(doc: Document, grid: HTMLElement, value: number): void {
     if (!Number.isFinite(value) || value < 0.5) return;
     this.maxCredits = value;
+    void saveCredits({ minCredits: this.minCredits, maxCredits: this.maxCredits });
     this.recomputeCombos();
     this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
   }
@@ -606,6 +637,7 @@ export class PaperCombosAugmentation implements Augmentation {
   private setMin(doc: Document, grid: HTMLElement, value: number): void {
     if (!Number.isFinite(value) || value < 0) return;
     this.minCredits = value;
+    void saveCredits({ minCredits: this.minCredits, maxCredits: this.maxCredits });
     this.recomputeCombos();
     this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
   }
