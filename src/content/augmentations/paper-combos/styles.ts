@@ -166,6 +166,36 @@ const CSS = `
   text-align: center;
 }
 
+#${TOP_BAR_ID} .bc-paper-combos-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-sort-select {
+  padding: 0.25rem 1.5rem 0.25rem 0.5rem;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 0.6rem) center,
+    calc(100% - 0.4rem) center;
+  background-size: 0.25rem 0.25rem, 0.25rem 0.25rem;
+  background-repeat: no-repeat;
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-sort-select:hover {
+  background-color: var(--bc-color-surface-hover);
+}
+
 #${TOP_BAR_ID} .bc-paper-combos-status {
   width: 100%;
   margin-top: 0.4rem;

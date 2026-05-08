@@ -1,7 +1,9 @@
 import { logQuiet } from "../../../shared/log";
+import { DEFAULT_SORT_MODE, isSortMode, type SortMode } from "./scoring";
 import type { ComboSection } from "./types";
 
 const ZONES_STORAGE_KEY = "better-caesar:paper-combos-zones:v1";
+const SORT_STORAGE_KEY = "better-caesar:paper-combos-sort:v1";
 
 export type ProhibitedZone = {
   id: string;
@@ -107,4 +109,57 @@ export function snapMinutes(minutes: number, snap = 15): number {
 
 export function makeZoneId(): string {
   return `zone-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Sort-mode persistence (also lives in zones.ts since both are
+// chrome.storage.local-backed paper-combos prefs and share the same
+// onChanged subscription pattern.)
+
+let sortCache: SortMode | null = null;
+
+export async function loadSortMode(): Promise<SortMode> {
+  if (sortCache) return sortCache;
+  try {
+    const result = (await chrome.storage.local.get(SORT_STORAGE_KEY)) as Record<
+      string,
+      unknown
+    >;
+    const raw = result[SORT_STORAGE_KEY];
+    if (typeof raw === "string" && isSortMode(raw)) {
+      sortCache = raw;
+      return sortCache;
+    }
+  } catch (err) {
+    logQuiet("paper-combos.sort.load", err);
+  }
+  sortCache = DEFAULT_SORT_MODE;
+  return sortCache;
+}
+
+export async function saveSortMode(mode: SortMode): Promise<void> {
+  sortCache = mode;
+  try {
+    await chrome.storage.local.set({ [SORT_STORAGE_KEY]: mode });
+  } catch (err) {
+    logQuiet("paper-combos.sort.save", err);
+  }
+}
+
+export function subscribeSortChanges(callback: (mode: SortMode) => void): () => void {
+  const listener = (
+    changes: Record<string, chrome.storage.StorageChange>,
+    areaName: string
+  ): void => {
+    if (areaName !== "local") return;
+    const change = changes[SORT_STORAGE_KEY];
+    if (!change) return;
+    const next = change.newValue;
+    const mode =
+      typeof next === "string" && isSortMode(next) ? next : DEFAULT_SORT_MODE;
+    sortCache = mode;
+    callback(mode);
+  };
+  chrome.storage.onChanged.addListener(listener);
+  return () => chrome.storage.onChanged.removeListener(listener);
 }

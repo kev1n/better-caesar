@@ -4,6 +4,25 @@ import { buildInstructorLastNameLabel } from "../paper-ctec/identity";
 import { NEUTRAL_RATING_MIDPOINT } from "./constants";
 import type { ComboSection, Combination } from "./types";
 
+export type SortMode =
+  | "rating"
+  | "early-end"
+  | "late-start"
+  | "early-start"
+  | "fewest-days"
+  | "most-credits";
+
+export const DEFAULT_SORT_MODE: SortMode = "rating";
+
+export const SORT_MODE_LABELS: Record<SortMode, string> = {
+  rating: "Top CTEC rating",
+  "early-end": "Earliest end of day",
+  "late-start": "Latest start (sleep in)",
+  "early-start": "Earliest start",
+  "fewest-days": "Fewest days on campus",
+  "most-credits": "Most credits"
+};
+
 // Pulls the cached CTEC instructor-rating mean for one section, or null
 // when nothing is cached. Mirrors paper-ctec's lookup contract: subject +
 // catalog + last-name-only instructor label, terms-window from the popup
@@ -46,7 +65,7 @@ export function scoreCombination(combo: Combination): {
   return { score: total / combo.sections.length, ratedCount: rated };
 }
 
-function endOfDayMinutes(combo: Combination): number {
+function latestEndMinutes(combo: Combination): number {
   let latest = 0;
   for (const section of combo.sections) {
     for (const block of section.blocks) {
@@ -57,23 +76,96 @@ function endOfDayMinutes(combo: Combination): number {
   return latest;
 }
 
-// Sort: highest score first; ties go to the combo that ends earliest in the
-// day (the "go home sooner" tiebreak feels right for a schedule planner).
-// Final tiebreak: lexicographic over section IDs so the order is stable
-// across renders.
-export function sortCombinations(combos: Combination[]): Combination[] {
+function earliestStartMinutes(combo: Combination): number {
+  let earliest = Number.POSITIVE_INFINITY;
+  for (const section of combo.sections) {
+    for (const block of section.blocks) {
+      const minutes = block.start.h * 60 + block.start.m;
+      if (minutes < earliest) earliest = minutes;
+    }
+  }
+  return Number.isFinite(earliest) ? earliest : 0;
+}
+
+function distinctMeetingDays(combo: Combination): number {
+  const days = new Set<number>();
+  for (const section of combo.sections) {
+    for (const block of section.blocks) {
+      days.add(block.day);
+    }
+  }
+  return days.size;
+}
+
+function totalCredits(combo: Combination): number {
+  return combo.totalUnits;
+}
+
+// Stable lexicographic key — every sort uses this as the final tiebreak
+// so cycling combos never reshuffles within a tie group across renders.
+function stableKey(combo: Combination): string {
+  return combo.sectionIds.slice().sort().join("|");
+}
+
+// Each sort mode returns a comparator. The "rating" sort keeps the
+// original two-level behavior (rating desc, end-of-day asc) so it
+// reads identically to the previous default. New modes apply the
+// requested primary order, then fall back to rating + end-of-day so
+// near-ties still surface high-quality combos.
+function compareForMode(
+  mode: SortMode
+): (a: Combination, b: Combination) => number {
+  return (a, b) => {
+    let primary = 0;
+    switch (mode) {
+      case "rating":
+        primary = b.score - a.score;
+        break;
+      case "early-end":
+        primary = latestEndMinutes(a) - latestEndMinutes(b);
+        break;
+      case "late-start":
+        // Highest earliest-start wins (so the user can sleep in).
+        primary = earliestStartMinutes(b) - earliestStartMinutes(a);
+        break;
+      case "early-start":
+        primary = earliestStartMinutes(a) - earliestStartMinutes(b);
+        break;
+      case "fewest-days":
+        primary = distinctMeetingDays(a) - distinctMeetingDays(b);
+        break;
+      case "most-credits":
+        primary = totalCredits(b) - totalCredits(a);
+        break;
+    }
+    if (primary !== 0) return primary;
+    if (b.score !== a.score) return b.score - a.score;
+    const endA = latestEndMinutes(a);
+    const endB = latestEndMinutes(b);
+    if (endA !== endB) return endA - endB;
+    return stableKey(a).localeCompare(stableKey(b));
+  };
+}
+
+export function sortCombinations(
+  combos: Combination[],
+  mode: SortMode = DEFAULT_SORT_MODE
+): Combination[] {
   const scored = combos.map((combo) => {
     const { score, ratedCount } = scoreCombination(combo);
     return { ...combo, score, ratedCount };
   });
-  scored.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    const endA = endOfDayMinutes(a);
-    const endB = endOfDayMinutes(b);
-    if (endA !== endB) return endA - endB;
-    const keyA = a.sectionIds.join("|");
-    const keyB = b.sectionIds.join("|");
-    return keyA.localeCompare(keyB);
-  });
+  scored.sort(compareForMode(mode));
   return scored;
+}
+
+export function isSortMode(value: string): value is SortMode {
+  return (
+    value === "rating" ||
+    value === "early-end" ||
+    value === "late-start" ||
+    value === "early-start" ||
+    value === "fewest-days" ||
+    value === "most-credits"
+  );
 }

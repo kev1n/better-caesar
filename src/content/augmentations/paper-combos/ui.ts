@@ -10,6 +10,8 @@ import {
   ROOT_ATTR,
   TOP_BAR_ID
 } from "./constants";
+import type { SortMode } from "./scoring";
+import { isSortMode } from "./scoring";
 import type { ComboPool, Combination, ComboSection } from "./types";
 
 const HOUR_LABEL_RE = /^(\d{1,2})\s*(AM|PM)\s*$/i;
@@ -54,6 +56,8 @@ export type TopBarState = {
   ratedCount: number;
   totalSections: number;
   maxCredits: number;
+  sortMode: SortMode;
+  sortLabels: Record<SortMode, string>;
   status?: string;
   truncated: boolean;
   conflictingPins: boolean;
@@ -69,6 +73,7 @@ export type TopBarCallbacks = {
 
 export type TopBarZoneCallbacks = {
   onClearZones(): void;
+  onSortChange(mode: SortMode): void;
 };
 
 // Event delegation pattern: callbacks live on the bar element itself,
@@ -147,10 +152,19 @@ function bindTopBarHandlers(
 
   const onInput = (event: Event): void => {
     const target = event.target;
-    if (!(target instanceof HTMLInputElement)) return;
-    if (target.getAttribute(ACTION_ATTR) !== "max") return;
-    const next = Number.parseFloat(target.value);
-    if (Number.isFinite(next)) callbacks.onMaxChange(next);
+    if (target instanceof HTMLInputElement) {
+      if (target.getAttribute(ACTION_ATTR) !== "max") return;
+      const next = Number.parseFloat(target.value);
+      if (Number.isFinite(next)) callbacks.onMaxChange(next);
+      return;
+    }
+    if (target instanceof HTMLSelectElement) {
+      if (target.getAttribute(ACTION_ATTR) !== "sort") return;
+      const value = target.value;
+      if (isSortMode(value)) {
+        zoneCallbackStore.get(bar)?.onSortChange(value);
+      }
+    }
   };
 
   bar.addEventListener("click", onClick);
@@ -263,8 +277,29 @@ export function renderTopBar(
     maxInput
   ]);
 
+  // Sort dropdown — fires on change so picking an option re-sorts the
+  // combo list immediately. Native <select> for accessibility + zero
+  // custom dropdown code.
+  const sortSelect = doc.createElement("select");
+  sortSelect.className = "bc-paper-combos-sort-select";
+  sortSelect.setAttribute(ACTION_ATTR, "sort");
+  sortSelect.setAttribute("aria-label", "Sort combinations");
+  for (const [value, label] of Object.entries(state.sortLabels)) {
+    const option = doc.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    if (value === state.sortMode) option.selected = true;
+    sortSelect.appendChild(option);
+  }
+
+  const sortControl = el(doc, "label", { class: "bc-paper-combos-sort" }, [
+    "Sort",
+    sortSelect
+  ]);
+
   bar.appendChild(cycle);
   if (rating) bar.appendChild(rating);
+  bar.appendChild(sortControl);
   bar.appendChild(maxControl);
 
   // Clear-zones button only appears when at least one zone exists.

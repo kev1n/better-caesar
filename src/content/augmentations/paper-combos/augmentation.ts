@@ -16,7 +16,12 @@ import {
   TOP_BAR_ID
 } from "./constants";
 import { loadComboPool, type LoadComboPoolResult } from "./data";
-import { sortCombinations } from "./scoring";
+import {
+  DEFAULT_SORT_MODE,
+  SORT_MODE_LABELS,
+  sortCombinations,
+  type SortMode
+} from "./scoring";
 import { injectCombosStyles } from "./styles";
 import type { ComboPool, Combination, ComboSection, CourseGroup } from "./types";
 import {
@@ -30,9 +35,12 @@ import {
   type ZoneDragCallbacks
 } from "./ui";
 import {
+  loadSortMode,
   loadZones,
+  saveSortMode,
   saveZones,
   sectionConflictsWithZones,
+  subscribeSortChanges,
   subscribeZoneChanges,
   type ProhibitedZone
 } from "./zones";
@@ -111,6 +119,9 @@ export class PaperCombosAugmentation implements Augmentation {
   private zones: ProhibitedZone[] = [];
   private zonesLoaded = false;
   private zonesUnsubscribe: (() => void) | null = null;
+  private sortMode: SortMode = DEFAULT_SORT_MODE;
+  private sortLoaded = false;
+  private sortUnsubscribe: (() => void) | null = null;
   private loading = false;
   // True when the bar (with the on-page toggle) is mounted on the
   // schedule page. Distinct from `featureMounted` — the bar is always
@@ -160,7 +171,12 @@ export class PaperCombosAugmentation implements Augmentation {
       this.zonesUnsubscribe();
       this.zonesUnsubscribe = null;
     }
+    if (this.sortUnsubscribe) {
+      this.sortUnsubscribe();
+      this.sortUnsubscribe = null;
+    }
     this.zonesLoaded = false;
+    this.sortLoaded = false;
     this.barMounted = false;
     this.featureMounted = false;
     this.lastRenderSig = null;
@@ -177,6 +193,7 @@ export class PaperCombosAugmentation implements Augmentation {
     this.attachPinClickHandler(doc, grid);
     this.attachZoneHandlers(doc, grid);
     this.ensureZonesLoaded(doc, grid);
+    this.ensureSortLoaded(doc, grid);
     this.featureMounted = true;
   }
 
@@ -190,13 +207,28 @@ export class PaperCombosAugmentation implements Augmentation {
     });
     if (!this.zonesUnsubscribe) {
       this.zonesUnsubscribe = subscribeZoneChanges(() => {
-        // The cache inside zones.ts already updated to the new values;
-        // pull from it via loadZones (returns the cached array).
         void loadZones().then((zones) => {
           this.zones = zones;
           this.recomputeCombos();
           this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
         });
+      });
+    }
+  }
+
+  private ensureSortLoaded(doc: Document, grid: HTMLElement): void {
+    if (this.sortLoaded) return;
+    this.sortLoaded = true;
+    void loadSortMode().then((mode) => {
+      this.sortMode = mode;
+      this.recomputeCombos();
+      this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
+    });
+    if (!this.sortUnsubscribe) {
+      this.sortUnsubscribe = subscribeSortChanges((mode) => {
+        this.sortMode = mode;
+        this.recomputeCombos();
+        this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
       });
     }
   }
@@ -378,7 +410,7 @@ export class PaperCombosAugmentation implements Augmentation {
       pinnedSectionIds
     });
     this.lastEnumerate = result;
-    this.combos = sortCombinations(result.combinations);
+    this.combos = sortCombinations(result.combinations, this.sortMode);
     if (this.cursor >= this.combos.length) this.cursor = 0;
   }
 
@@ -447,6 +479,7 @@ export class PaperCombosAugmentation implements Augmentation {
       poolSig,
       String(this.cursor),
       String(this.maxCredits),
+      this.sortMode,
       pinSig,
       zoneSig,
       String(this.combos.length),
@@ -511,6 +544,8 @@ export class PaperCombosAugmentation implements Augmentation {
       ratedCount: currentCombo?.ratedCount ?? 0,
       totalSections: this.pool?.byId.size ?? 0,
       maxCredits: this.maxCredits,
+      sortMode: this.sortMode,
+      sortLabels: SORT_MODE_LABELS,
       status: enabled
         ? statusFromLoadState(this.lastLoadResult, this.lastEnumerate)
         : undefined,
@@ -521,8 +556,23 @@ export class PaperCombosAugmentation implements Augmentation {
     }, {
       onClearZones: () => {
         void this.clearAllZones(doc, grid);
+      },
+      onSortChange: (mode) => {
+        void this.setSortMode(doc, grid, mode);
       }
     });
+  }
+
+  private async setSortMode(
+    doc: Document,
+    grid: HTMLElement,
+    mode: SortMode
+  ): Promise<void> {
+    if (this.sortMode === mode) return;
+    this.sortMode = mode;
+    await saveSortMode(mode);
+    this.recomputeCombos();
+    this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
   }
 
   private cyclePrev(doc: Document, grid: HTMLElement): void {
