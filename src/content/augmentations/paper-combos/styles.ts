@@ -16,19 +16,29 @@ const REAL_CARD_HIDE_SELECTOR =
 // is enough to land below the status text without being so tall it eats
 // canvas space.
 const CSS = `
+/* Bar layout: two groups separated by an auto-margin spacer. Left is
+ * status (toggle + cycle + rating), right is settings (sort + credits +
+ * clear). On narrow widths the bar wraps but each group stays clustered
+ * so it never feels like a random pile of controls.
+ *
+ * Heights: every interactive control is sized to 28px so they line up
+ * on the same baseline. Doesn't matter how many or what kind — they
+ * all read as one toolbar row. */
 #${TOP_BAR_ID} {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
   align-items: center;
-  padding: 0.5rem 0.7rem;
+  column-gap: 0.5rem;
+  row-gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
   margin: 3.25rem 0 0.6rem 0;
   border-radius: var(--bc-radius-lg);
   background: var(--bc-color-bg);
   border: 1px solid var(--bc-color-border);
   font-family: inherit;
   color: var(--bc-color-text);
-  font-size: 0.875rem;
+  font-size: 0.85rem;
+  line-height: 1.2;
 }
 
 /* Hide native number-input spinner arrows on the bar's number inputs.
@@ -46,6 +56,43 @@ const CSS = `
   margin: 0;
 }
 
+/* Shared interactive surface: every input/select on the bar uses these
+ * styles so they read as a coherent set in both light and dark modes.
+ * Background uses --bc-color-bg-muted (always one tone darker than the
+ * bar surface in either mode), so the controls feel inset. */
+#${TOP_BAR_ID} .bc-paper-combos-input,
+#${TOP_BAR_ID} .bc-paper-combos-sort-select {
+  height: 1.75rem;
+  padding: 0 0.45rem;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-sm);
+  background: var(--bc-color-bg-muted);
+  color: var(--bc-color-text);
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+  transition: border-color var(--bc-tx-fast) var(--bc-easing);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-input:hover,
+#${TOP_BAR_ID} .bc-paper-combos-sort-select:hover {
+  border-color: var(--bc-color-border-strong);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-input:focus-visible,
+#${TOP_BAR_ID} .bc-paper-combos-sort-select:focus-visible {
+  outline: none;
+  border-color: var(--bc-color-accent);
+  box-shadow: 0 0 0 2px var(--bc-color-accent-surface-soft);
+}
+
+/* Spacer pushes the right-side cluster (sort, credits, clear) to the
+ * end of the bar — visually separates "what's showing" from "settings". */
+#${TOP_BAR_ID} .bc-paper-combos-spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* Always-visible feature toggle pill. Its iOS-style track + thumb makes
  * the on/off state obvious from a glance, and it sits to the left of
  * everything else in the bar so it's the first thing users see. */
@@ -53,16 +100,17 @@ const CSS = `
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.2rem 0.55rem 0.2rem 0.3rem;
+  height: 1.75rem;
+  padding: 0 0.65rem 0 0.35rem;
   border: 1px solid var(--bc-color-border);
   border-radius: var(--bc-radius-pill);
-  background: var(--bc-color-bg);
+  background: var(--bc-color-bg-muted);
   color: var(--bc-color-text);
   cursor: pointer;
   font: inherit;
   font-size: 0.8rem;
   font-weight: var(--bc-fw-medium);
-  line-height: 1.2;
+  line-height: 1;
   transition: border-color var(--bc-tx-fast) var(--bc-easing),
               background var(--bc-tx-fast) var(--bc-easing);
 }
@@ -122,16 +170,18 @@ const CSS = `
 #${TOP_BAR_ID} .bc-paper-combos-cycle button {
   cursor: pointer;
   border: 1px solid var(--bc-color-border);
-  background: transparent;
-  border-radius: var(--bc-radius-md);
-  width: 1.5rem;
-  height: 1.5rem;
+  background: var(--bc-color-bg-muted);
+  border-radius: var(--bc-radius-sm);
+  width: 1.75rem;
+  height: 1.75rem;
   font-size: 0.85rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: inherit;
+  color: var(--bc-color-text);
+  transition: border-color var(--bc-tx-fast) var(--bc-easing),
+              background var(--bc-tx-fast) var(--bc-easing);
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-cycle button[disabled] {
@@ -140,89 +190,136 @@ const CSS = `
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-cycle button:not([disabled]):hover {
+  border-color: var(--bc-color-border-strong);
   background: var(--bc-color-surface-hover);
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-counter {
   font-variant-numeric: tabular-nums;
   font-weight: var(--bc-fw-semibold);
-  min-width: 4.5rem;
+  min-width: 4rem;
   text-align: center;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
+  color: var(--bc-color-text);
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-rating {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.15rem 0.5rem;
+  height: 1.75rem;
+  padding: 0 0.5rem;
   background: var(--bc-color-bg-muted);
-  border-radius: var(--bc-radius-md);
-  font-weight: var(--bc-fw-medium);
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-sm);
+  font-weight: var(--bc-fw-semibold);
   font-size: 0.78rem;
   color: var(--bc-color-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-rating[data-rated="0"] {
   opacity: 0.55;
 }
 
-#${TOP_BAR_ID} .bc-paper-combos-max {
+/* Combined Credits range: a single pill with [min] – [max] inputs.
+ * Reads as one logical control instead of two unrelated number boxes. */
+#${TOP_BAR_ID} .bc-paper-combos-credits {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-}
-
-#${TOP_BAR_ID} .bc-paper-combos-max input {
-  width: 3.5rem;
-  padding: 0.25rem 0.4rem;
+  gap: 0.35rem;
+  height: 1.75rem;
+  padding: 0 0.5rem 0 0.55rem;
+  background: var(--bc-color-bg-muted);
   border: 1px solid var(--bc-color-border);
   border-radius: var(--bc-radius-sm);
+  transition: border-color var(--bc-tx-fast) var(--bc-easing);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-credits:hover {
+  border-color: var(--bc-color-border-strong);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-credits:focus-within {
+  border-color: var(--bc-color-accent);
+  box-shadow: 0 0 0 2px var(--bc-color-accent-surface-soft);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-credits-label {
+  font-size: 0.74rem;
+  font-weight: var(--bc-fw-medium);
+  color: var(--bc-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--bc-ls-wide);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-credits input[type="number"] {
+  width: 2.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: none;
   background: transparent;
-  color: inherit;
+  color: var(--bc-color-text);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
+  font-weight: var(--bc-fw-semibold);
+  font-variant-numeric: tabular-nums;
   text-align: center;
+  outline: none;
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-credits-sep {
+  color: var(--bc-color-text-subtle);
+  font-size: 0.85rem;
+  user-select: none;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-sort {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-sort > span:first-child,
+#${TOP_BAR_ID} .bc-paper-combos-sort::before {
+  font-size: 0.74rem;
+  font-weight: var(--bc-fw-medium);
+  color: var(--bc-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--bc-ls-wide);
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-sort-select {
-  padding: 0.25rem 1.5rem 0.25rem 0.5rem;
-  border: 1px solid var(--bc-color-border);
-  border-radius: var(--bc-radius-sm);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
+  padding-right: 1.5rem;
   appearance: none;
   -webkit-appearance: none;
+  cursor: pointer;
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position:
-    calc(100% - 0.6rem) center,
-    calc(100% - 0.4rem) center;
+    calc(100% - 0.65rem) 50%,
+    calc(100% - 0.4rem) 50%;
   background-size: 0.25rem 0.25rem, 0.25rem 0.25rem;
   background-repeat: no-repeat;
+  background-color: var(--bc-color-bg-muted);
 }
 
-#${TOP_BAR_ID} .bc-paper-combos-sort-select:hover {
-  background-color: var(--bc-color-surface-hover);
+/* Native option dropdown: enforce token-based bg/text for browsers that
+ * leak the bar's background (Firefox in particular). */
+#${TOP_BAR_ID} .bc-paper-combos-sort-select option {
+  background: var(--bc-color-bg);
+  color: var(--bc-color-text);
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-status {
-  width: 100%;
-  margin-top: 0.4rem;
+  flex-basis: 100%;
+  margin-top: 0.35rem;
   padding: 0.4rem 0.55rem;
-  border-radius: var(--bc-radius-md);
+  border-radius: var(--bc-radius-sm);
   background: var(--bc-color-bg-muted);
+  border: 1px solid var(--bc-color-border-divider);
   color: var(--bc-color-text-muted);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 [${ROOT_ATTR}] .schedule-grid-cols ${REAL_CARD_HIDE_SELECTOR} {
@@ -353,18 +450,24 @@ const CSS = `
 
 #${TOP_BAR_ID} .bc-paper-combos-clear-zones {
   cursor: pointer;
+  height: 1.75rem;
+  padding: 0 0.6rem;
   border: 1px solid var(--bc-color-accent);
   background: var(--bc-color-accent-surface-soft);
   color: var(--bc-color-accent);
-  border-radius: var(--bc-radius-md);
-  padding: 0.25rem 0.55rem;
+  border-radius: var(--bc-radius-sm);
   font: inherit;
   font-size: 0.78rem;
-  font-weight: var(--bc-fw-medium);
+  font-weight: var(--bc-fw-semibold);
+  line-height: 1;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-clear-zones:hover {
   background: var(--bc-color-accent-surface-tile);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-status {
+  flex-basis: 100%;
 }
 
 /* Pin button: direct child of the card, sibling of paper-ctec's

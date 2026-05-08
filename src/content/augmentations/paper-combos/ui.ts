@@ -313,12 +313,17 @@ export function renderTopBar(
   }
 
   const sortControl = el(doc, "label", { class: "bc-paper-combos-sort" }, [
-    "Sort",
+    el(doc, "span", {}, ["Sort"]),
     sortSelect
   ]);
 
+  // Left cluster: status info (what's currently showing).
   bar.appendChild(cycle);
   if (rating) bar.appendChild(rating);
+  // Auto-margin spacer pushes the right cluster — sort, credits, clear —
+  // to the bar's far end so the toolbar reads as two visual groups.
+  bar.appendChild(el(doc, "span", { class: "bc-paper-combos-spacer" }));
+  // Right cluster: settings + actions.
   bar.appendChild(sortControl);
   bar.appendChild(creditsControl);
 
