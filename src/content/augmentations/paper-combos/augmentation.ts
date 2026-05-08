@@ -268,9 +268,13 @@ export class PaperCombosAugmentation implements Augmentation {
   }
 
   private zoneHandlerDetach: (() => void) | null = null;
+  private zoneHandlerGrid: HTMLElement | null = null;
 
+  // Re-binds when paper.nu swaps the grid element wholesale (e.g. nav
+  // between schedule views). Same pattern as `attachPinClickHandler`.
   private attachZoneHandlers(doc: Document, grid: HTMLElement): void {
-    if (this.zoneHandlerDetach) return;
+    if (this.zoneHandlerGrid === grid && this.zoneHandlerDetach) return;
+    this.detachZoneHandlers();
     const callbacks: ZoneDragCallbacks = {
       onZoneCreate: (zone) => {
         void this.addZone(doc, grid, zone);
@@ -280,6 +284,7 @@ export class PaperCombosAugmentation implements Augmentation {
       }
     };
     this.zoneHandlerDetach = attachZoneDragHandlers(doc, grid, callbacks);
+    this.zoneHandlerGrid = grid;
   }
 
   private detachZoneHandlers(): void {
@@ -287,6 +292,7 @@ export class PaperCombosAugmentation implements Augmentation {
       this.zoneHandlerDetach();
       this.zoneHandlerDetach = null;
     }
+    this.zoneHandlerGrid = null;
   }
 
   private async addZone(
@@ -484,8 +490,10 @@ export class PaperCombosAugmentation implements Augmentation {
 
     // Zones get re-painted unconditionally when the feature is on so they
     // survive paper.nu's React re-renders (which wipe everything inside
-    // day columns). Only sourced from this.zones — read-only here.
+    // day columns). Re-attach the drag handlers too in case paper.nu
+    // swapped the grid element wholesale.
     if (enabled) {
+      this.attachZoneHandlers(doc, grid);
       renderZones(doc, grid, this.zones);
     } else {
       renderZones(doc, grid, []);

@@ -76,9 +76,11 @@ export function subscribeZoneChanges(callback: () => void): () => void {
   return () => chrome.storage.onChanged.removeListener(listener);
 }
 
-// Two minutes-ranges overlap if either's start lies inside the other —
-// using `<=` so back-to-back zones touch but don't double-block. Same
-// inclusive convention paper.nu's own timesOverlap uses for sections.
+// Half-open interval overlap: a class ending exactly at the zone start
+// (or starting exactly at the zone end) is NOT a conflict — the class
+// is fully outside the prohibited window. Different from paper.nu's
+// own timesOverlap (which uses `<=` on both sides), but the right call
+// for zones because the user means "no class held *during* this block."
 export function sectionConflictsWithZones(
   section: ComboSection,
   zones: readonly ProhibitedZone[]
@@ -89,7 +91,7 @@ export function sectionConflictsWithZones(
     const blockEnd = block.end.h * 60 + block.end.m;
     for (const zone of zones) {
       if (zone.day !== block.day) continue;
-      if (blockStart <= zone.endMin && zone.startMin <= blockEnd) return true;
+      if (blockStart < zone.endMin && zone.startMin < blockEnd) return true;
     }
   }
   return false;
