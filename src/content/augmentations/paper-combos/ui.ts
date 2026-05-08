@@ -83,6 +83,12 @@ export type TopBarZoneCallbacks = {
 // re-create children — listeners on the parent survive the churn so the
 // user's clicks always land on a live handler. The bar's children are
 // just markup; their `data-bc-combos-action` attribute drives dispatch.
+//
+// Mount point: inside `.schedule-grid-cols` itself, NOT as a sibling.
+// The CSS positions it absolute over paper.nu's day-label row (Mo Tu
+// We Th Fr) — a strip that's mostly empty whitespace. That reclaims
+// the ~3.5rem of vertical space the bar used to consume above the
+// grid, giving class cards their full canvas.
 export function ensureTopBar(
   doc: Document,
   grid: HTMLElement,
@@ -91,17 +97,14 @@ export function ensureTopBar(
   const existing = doc.getElementById(TOP_BAR_ID);
   if (existing) {
     bindTopBarHandlers(existing, callbacks);
-    if (existing.parentElement !== grid.parentElement) {
-      grid.parentElement?.insertBefore(existing, grid);
+    if (existing.parentElement !== grid) {
+      grid.appendChild(existing);
     }
     return existing;
   }
   const bar = doc.createElement("div");
   bar.id = TOP_BAR_ID;
-  const parent = grid.parentElement;
-  if (parent) {
-    parent.insertBefore(bar, grid);
-  }
+  grid.appendChild(bar);
   bindTopBarHandlers(bar, callbacks);
   return bar;
 }
@@ -288,10 +291,13 @@ export function renderTopBar(
     }
   });
 
-  // Single combined "Min N – Max M" control. Per-input labels make it
-  // unambiguous which side is the floor vs ceiling; the dash between
-  // them ties the two halves into one logical range.
+  // Single combined "Credits  Min N – Max M" control. The outer
+  // CREDITS heading anchors the whole pill; per-input MIN/MAX captions
+  // make it unambiguous which side is floor vs ceiling.
   const creditsControl = el(doc, "div", { class: "bc-paper-combos-credits" }, [
+    el(doc, "span", {
+      class: "bc-paper-combos-credits-heading"
+    }, ["Credits"]),
     el(doc, "label", { class: "bc-paper-combos-credits-pair" }, [
       el(doc, "span", { class: "bc-paper-combos-credits-label" }, ["Min"]),
       minInput

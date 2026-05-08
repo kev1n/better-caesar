@@ -16,23 +16,38 @@ const REAL_CARD_HIDE_SELECTOR =
 // is enough to land below the status text without being so tall it eats
 // canvas space.
 const CSS = `
-/* Bar layout: two groups separated by an auto-margin spacer. Left is
- * status (toggle + cycle + rating), right is settings (sort + credits +
- * clear). On narrow widths the bar wraps but each group stays clustered
- * so it never feels like a random pile of controls.
- *
- * Heights: every interactive control is sized to 28px so they line up
- * on the same baseline. Doesn't matter how many or what kind — they
- * all read as one toolbar row. */
+/* Bar layout: positioned absolute INSIDE the schedule grid, overlaying
+ * the day-label row (Mo Tu We Th Fr). That row is mostly empty
+ * whitespace anyway, so we reclaim it for the bar — and the schedule
+ * grid keeps its full vertical canvas for class cards instead of
+ * losing ~3.5rem to a stacked toolbar above. */
+[${ROOT_ATTR}] .schedule-grid-cols {
+  position: relative;
+}
+
+/* Day-name labels (Mo Tu We Th Fr) hide while the bar is mounted —
+ * the bar covers them anyway, and visibility:hidden keeps the cell
+ * occupying its layout space so paper.nu's hour-grid math (and ours)
+ * stays unchanged. */
+[${ROOT_ATTR}] .schedule-grid-cols > div:not(:first-child) > div:first-child p {
+  visibility: hidden;
+}
+
 #${TOP_BAR_ID} {
+  position: absolute;
+  top: 0;
+  /* Clear the HoursColumn (grid-template-columns starts with 3.2rem),
+   * align with the start of the day-1 column. */
+  left: 3.2rem;
+  right: 0;
+  z-index: 8;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   column-gap: 0.5rem;
-  row-gap: 0.4rem;
-  padding: 0.55rem 0.75rem;
-  margin: 3.25rem 0 0.6rem 0;
-  border-radius: var(--bc-radius-lg);
+  row-gap: 0.35rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--bc-radius-md);
   background: var(--bc-color-bg);
   border: 1px solid var(--bc-color-border);
   font-family: inherit;
@@ -244,10 +259,20 @@ const CSS = `
   box-shadow: 0 0 0 2px var(--bc-color-accent-surface-soft);
 }
 
+#${TOP_BAR_ID} .bc-paper-combos-credits-heading {
+  font-size: 0.7rem;
+  font-weight: var(--bc-fw-semibold);
+  color: var(--bc-color-text);
+  text-transform: uppercase;
+  letter-spacing: var(--bc-ls-wide);
+  user-select: none;
+  margin-right: 0.15rem;
+}
+
 #${TOP_BAR_ID} .bc-paper-combos-credits-pair {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.25rem;
   cursor: text;
 }
 
