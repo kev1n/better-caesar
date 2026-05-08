@@ -144,6 +144,14 @@ function compareForMode(
         break;
     }
     if (primary !== 0) return primary;
+    // Credits-desc tiebreak ahead of rating: when the primary order
+    // doesn't differentiate, prefer the fuller schedule. Without this,
+    // the new [min,max] window surfaced lower-credit combos in front
+    // of higher-credit ones whose primary metric happened to tie.
+    // Safe for the credits-* sort modes too — combos that tie on the
+    // primary credit comparison have equal totalUnits anyway, so this
+    // line is a no-op there.
+    if (b.totalUnits !== a.totalUnits) return b.totalUnits - a.totalUnits;
     if (b.score !== a.score) return b.score - a.score;
     const endA = latestEndMinutes(a);
     const endB = latestEndMinutes(b);
