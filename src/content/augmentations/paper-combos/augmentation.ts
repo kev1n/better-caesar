@@ -1,11 +1,16 @@
 import { logQuiet } from "../../../shared/log";
 import type { Augmentation } from "../../framework";
-import { isFeatureEnabled } from "../../settings";
+import {
+  FEATURES_STORAGE_KEY,
+  getDefaultFeatureEnabled,
+  isFeatureEnabled
+} from "../../settings";
 import { enumerateCombinations, type EnumerateResult } from "./combinations";
 import { PAPER_COMBOS_CONFIG } from "./config";
 import {
   CARD_PIN_BUTTON_CLASS,
-  DEFAULT_MAX_CLASSES,
+  DEFAULT_MAX_CREDITS,
+  PAPER_COMBOS_ACTIVE_ID,
   PAPER_COMBOS_FEATURE_ID,
   STYLE_ID,
   TOP_BAR_ID
@@ -37,6 +42,13 @@ function loadResultPool(result: LoadComboPoolResult): ComboPool | null {
   return result.state === "ok" ? result.pool : null;
 }
 
+function formatCredits(n: number): string {
+  // Drop trailing .0 for whole-number budgets so the status reads "5
+  // credits" not "5.0 credits".
+  if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n));
+  return n.toFixed(2).replace(/\.?0+$/, "");
+}
+
 function statusFromLoadState(
   result: LoadComboPoolResult | null,
   enumerate: EnumerateResult | null
@@ -53,17 +65,16 @@ function statusFromLoadState(
     return "Pinned sections conflict with each other. Unpin one to continue.";
   }
   if (enumerate && enumerate.combinations.length === 0) {
-    return "No non-overlapping combinations possible. Try unpinning sections.";
+    return "No non-overlapping combinations possible. Try unpinning sections or raising Max.";
   }
-  // Dropped courses to fit: tell the user we couldn't pack everything in.
   if (
     enumerate &&
     enumerate.combinations.length > 0 &&
-    enumerate.effectiveSize < enumerate.requestedSize
+    enumerate.effectiveCredits < enumerate.requestedCredits
   ) {
-    const dropped = enumerate.requestedSize - enumerate.effectiveSize;
-    const noun = dropped === 1 ? "course" : "courses";
-    return `Couldn't fit all ${enumerate.requestedSize} courses without overlap — showing best ${enumerate.effectiveSize}-class combos (${dropped} ${noun} dropped).`;
+    const want = formatCredits(enumerate.requestedCredits);
+    const got = formatCredits(enumerate.effectiveCredits);
+    return `Couldn't fit ${want} credits without overlap — showing best ${got}-credit schedules.`;
   }
   if (enumerate && enumerate.combinations.length === 1) {
     return "Only one valid combination at this size. Add another section of a course (or lower Max) to see alternatives.";
@@ -82,42 +93,42 @@ export class PaperCombosAugmentation implements Augmentation {
   private lastEnumerate: EnumerateResult | null = null;
   private combos: Combination[] = [];
   private cursor = 0;
-  // -1 means "use the course count as the max" — set on first load so the
-  // user sees full-schedule combos by default and can lower it manually.
-  private maxClasses = -1;
+  private maxCredits = DEFAULT_MAX_CREDITS;
   private pinnedByCourseId = new Map<string, string>();
   private loading = false;
-  private mounted = false;
-  // The grid element we attached the on-card pin click handler to. Stored
-  // so we can detach on cleanup (and skip re-attaching on every run).
+  // True when the bar (with the on-page toggle) is mounted on the
+  // schedule page. Distinct from `featureMounted` — the bar is always
+  // present on a paper.nu schedule page so users can flip the feature on
+  // and off in-place; the data-pull / card-hiding side effects only run
+  // when the user has the feature enabled.
+  private barMounted = false;
+  private featureMounted = false;
   private pinClickHandlerGrid: HTMLElement | null = null;
   private pinClickHandler: ((event: MouseEvent) => void) | null = null;
-  // Render-signature dedupe: every renderAll() call computes a string
-  // capturing every input the bar's markup depends on. If unchanged since
-  // the last render, we skip `bar.replaceChildren()` entirely — this is
-  // what stops the runner's MutationObserver from looping on our own
-  // bar updates (childList mutations from the bar would otherwise fire
-  // observer → runAll → run() → renderAll → mutations → observer …).
   private lastRenderSig: string | null = null;
 
   run(doc: Document = document): void {
     if (!isPaperHost()) return;
-    if (!isFeatureEnabled(PAPER_COMBOS_FEATURE_ID)) {
-      if (this.mounted) this.cleanup(doc);
-      return;
-    }
-
     const grid = doc.querySelector<HTMLElement>(
       PAPER_COMBOS_CONFIG.selectors.scheduleGrid
     );
     if (!grid) {
-      if (this.mounted) this.cleanup(doc);
+      // Off the schedule page entirely — tear down everything.
+      if (this.barMounted) this.cleanup(doc);
       return;
     }
 
-    this.mount(doc, grid);
-    this.scheduleLoad(doc);
-    this.renderAll(doc, grid);
+    this.mountBar(doc);
+    const enabled = isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID);
+
+    if (enabled) {
+      this.mountFeature(doc, grid);
+      this.scheduleLoad(doc);
+    } else {
+      this.unmountFeature(doc);
+    }
+
+    this.renderAll(doc, grid, enabled);
   }
 
   cleanup(doc: Document = document): void {
@@ -128,22 +139,54 @@ export class PaperCombosAugmentation implements Augmentation {
     const style = doc.getElementById(STYLE_ID);
     if (style) style.remove();
     this.detachPinClickHandler();
-    this.mounted = false;
+    this.barMounted = false;
+    this.featureMounted = false;
     this.lastRenderSig = null;
   }
 
-  private mount(doc: Document, grid: HTMLElement): void {
+  private mountBar(doc: Document): void {
+    if (this.barMounted) return;
     injectCombosStyles(doc);
-    setRootAttribute(doc, true);
-    this.attachPinClickHandler(doc, grid);
-    this.mounted = true;
+    this.barMounted = true;
   }
 
-  // Delegated click handler on the schedule grid. Catches clicks on any
-  // pin button we mounted inside paper.nu's cards — but stops propagation
-  // first so paper.nu's onClick doesn't open the section detail panel.
-  // Re-attached if the grid element changes between runs (paper.nu can
-  // remount the grid wholesale when navigating between schedule views).
+  private mountFeature(doc: Document, grid: HTMLElement): void {
+    setRootAttribute(doc, true);
+    this.attachPinClickHandler(doc, grid);
+    this.featureMounted = true;
+  }
+
+  // Tear down feature side effects (card-hiding, layout overrides, pin
+  // buttons) without removing the bar — the user just toggled the
+  // feature off in-place and the bar's toggle pill stays so they can
+  // turn it back on.
+  private unmountFeature(doc: Document): void {
+    if (!this.featureMounted) return;
+    setRootAttribute(doc, false);
+    unhideRealCards(doc);
+    this.detachPinClickHandler();
+    this.featureMounted = false;
+    // Reset cursor + pool-derived state so flipping the feature back on
+    // re-derives from a clean slate.
+    this.lastRenderSig = null;
+  }
+
+  // Persist the in-page active flag. The popup-level `paper-combos`
+  // gate stays untouched — that's the user's "show this feature on
+  // paper.nu at all" preference. We only flip the active state here.
+  private async setFeatureEnabled(next: boolean): Promise<void> {
+    try {
+      const current = (await chrome.storage.local.get(FEATURES_STORAGE_KEY)) as
+        Record<string, unknown>;
+      const settings =
+        (current[FEATURES_STORAGE_KEY] as Record<string, boolean>) ?? {};
+      settings[PAPER_COMBOS_ACTIVE_ID] = next;
+      await chrome.storage.local.set({ [FEATURES_STORAGE_KEY]: settings });
+    } catch (err) {
+      logQuiet("paper-combos.setFeatureEnabled", err);
+    }
+  }
+
   private attachPinClickHandler(doc: Document, grid: HTMLElement): void {
     if (this.pinClickHandlerGrid === grid && this.pinClickHandler) return;
     this.detachPinClickHandler();
@@ -200,7 +243,9 @@ export class PaperCombosAugmentation implements Augmentation {
         const grid = doc.querySelector<HTMLElement>(
           PAPER_COMBOS_CONFIG.selectors.scheduleGrid
         );
-        if (grid && this.mounted) this.renderAll(doc, grid);
+        if (grid && this.barMounted) {
+          this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
+        }
       });
   }
 
@@ -212,22 +257,10 @@ export class PaperCombosAugmentation implements Augmentation {
       return;
     }
     this.pruneStalePins();
-    const courseCount = this.pool.groups.length;
-    if (this.maxClasses < 0) {
-      // First load: snap to "all courses" by default so the canvas matches
-      // what the user added. They can dial down via the input afterward.
-      this.maxClasses = Math.min(
-        courseCount,
-        Math.max(courseCount, DEFAULT_MAX_CLASSES)
-      );
-    }
-    if (this.maxClasses < 1) this.maxClasses = 1;
-    if (this.maxClasses > courseCount && courseCount > 0) {
-      this.maxClasses = courseCount;
-    }
+    if (this.maxCredits < 0.1) this.maxCredits = 0.5;
     const pinnedSectionIds = new Set(this.pinnedByCourseId.values());
     const result = enumerateCombinations(this.pool, {
-      maxSize: this.maxClasses,
+      maxCredits: this.maxCredits,
       pinnedSectionIds
     });
     this.lastEnumerate = result;
@@ -248,7 +281,10 @@ export class PaperCombosAugmentation implements Augmentation {
     }
   }
 
-  private computeRenderSig(currentCombo: Combination | null): string {
+  private computeRenderSig(
+    currentCombo: Combination | null,
+    enabled: boolean
+  ): string {
     const poolSig = poolSignature(this.pool);
     const pinSig = Array.from(this.pinnedByCourseId)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -258,9 +294,10 @@ export class PaperCombosAugmentation implements Augmentation {
       ? `${currentCombo.sectionIds.join(",")}/${currentCombo.score.toFixed(3)}/${currentCombo.ratedCount}`
       : "-";
     return [
+      String(enabled),
       poolSig,
       String(this.cursor),
-      String(this.maxClasses),
+      String(this.maxCredits),
       pinSig,
       String(this.combos.length),
       comboSig,
@@ -270,21 +307,25 @@ export class PaperCombosAugmentation implements Augmentation {
     ].join("::");
   }
 
-  private renderAll(doc: Document, grid: HTMLElement): void {
+  private renderAll(
+    doc: Document,
+    grid: HTMLElement,
+    enabled: boolean
+  ): void {
     const bar = ensureTopBar(doc, grid, {
       onPrev: () => this.cyclePrev(doc, grid),
       onNext: () => this.cycleNext(doc, grid),
-      onMaxChange: (value) => this.setMax(doc, grid, value)
+      onMaxChange: (value) => this.setMax(doc, grid, value),
+      onToggleFeature: (next) => {
+        void this.setFeatureEnabled(next);
+      }
     });
-    const currentCombo = this.combos[this.cursor] ?? null;
-    const courseCount = this.pool?.groups.length ?? 0;
+    const currentCombo = enabled ? this.combos[this.cursor] ?? null : null;
 
-    // applyComboVisibility runs unconditionally (outside the dedupe).
+    // Card-visibility side effects only run when the feature is on.
     // setAttribute doesn't fire our childList-only MutationObserver, so
-    // it's loop-safe — and we need to re-stamp hide markers, layout
-    // overrides, and pin buttons whenever paper.nu re-renders schedule
-    // cards from scratch (which clears them).
-    if (currentCombo && this.pool) {
+    // it's loop-safe inside the renderAll cycle even outside the dedupe.
+    if (enabled && currentCombo && this.pool) {
       applyComboVisibility(
         doc,
         grid,
@@ -292,59 +333,51 @@ export class PaperCombosAugmentation implements Augmentation {
         currentCombo,
         new Set(this.pinnedByCourseId.values())
       );
-      // Re-attach the delegated handler if paper.nu swapped the grid.
       this.attachPinClickHandler(doc, grid);
     } else {
       unhideRealCards(doc);
     }
 
-    const sig = this.computeRenderSig(currentCombo);
+    const sig = this.computeRenderSig(currentCombo, enabled);
     if (sig === this.lastRenderSig) return;
     this.lastRenderSig = sig;
 
-    const maxClassesUi = this.maxClasses < 0
-      ? Math.max(1, courseCount)
-      : this.maxClasses;
-
     renderTopBar(doc, bar, {
+      enabled,
       total: this.combos.length,
       cursor: this.cursor,
       score: currentCombo?.score ?? 0,
       ratedCount: currentCombo?.ratedCount ?? 0,
       totalSections: this.pool?.byId.size ?? 0,
-      maxClasses: maxClassesUi,
-      maxAllowed: Math.max(1, courseCount),
-      status: statusFromLoadState(this.lastLoadResult, this.lastEnumerate),
+      maxCredits: this.maxCredits,
+      status: enabled
+        ? statusFromLoadState(this.lastLoadResult, this.lastEnumerate)
+        : undefined,
       truncated: this.lastEnumerate?.truncated ?? false,
-      conflictingPins: this.lastEnumerate?.conflictingPins ?? false
+      conflictingPins: this.lastEnumerate?.conflictingPins ?? false,
+      defaultEnabled: getDefaultFeatureEnabled(PAPER_COMBOS_FEATURE_ID)
     });
   }
 
   private cyclePrev(doc: Document, grid: HTMLElement): void {
     if (this.combos.length === 0) return;
     this.cursor = (this.cursor - 1 + this.combos.length) % this.combos.length;
-    this.renderAll(doc, grid);
+    this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
   }
 
   private cycleNext(doc: Document, grid: HTMLElement): void {
     if (this.combos.length === 0) return;
     this.cursor = (this.cursor + 1) % this.combos.length;
-    this.renderAll(doc, grid);
+    this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
   }
 
   private setMax(doc: Document, grid: HTMLElement, value: number): void {
-    if (!Number.isFinite(value) || value < 1) return;
-    this.maxClasses = Math.floor(value);
+    if (!Number.isFinite(value) || value < 0.5) return;
+    this.maxCredits = value;
     this.recomputeCombos();
-    this.renderAll(doc, grid);
+    this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
   }
 
-  // Pin behavior: clicking a card's pin button toggles the pin for that
-  // specific section. If the same section was already pinned, click
-  // unpins. If a different section of the same course was pinned (only
-  // possible if the user pinned across cycles), click swaps the pin to
-  // this section. Either way, the section the user just clicked is the
-  // authoritative target — they're acting on what's visibly on screen.
   private togglePin(
     doc: Document,
     grid: HTMLElement,
@@ -359,6 +392,6 @@ export class PaperCombosAugmentation implements Augmentation {
     }
 
     this.recomputeCombos();
-    this.renderAll(doc, grid);
+    this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
   }
 }

@@ -30,6 +30,11 @@ export type ComboSection = {
 export type CourseGroup = {
   courseId: string;
   label: string;
+  // Course-level credit/unit value (Northwestern uses "units"; user-facing
+  // copy says "credits"). Defaults to 1 when paper.nu's plan data doesn't
+  // have a usable units field — most courses are 1.0 anyway, so the
+  // fallback is conservative and keeps the budget meaningful.
+  units: number;
   sections: ComboSection[];
 };
 
@@ -38,6 +43,7 @@ export type Combination = {
   sections: ComboSection[];
   score: number;
   ratedCount: number;
+  totalUnits: number;
 };
 
 export type ComboPool = {

@@ -3,6 +3,7 @@ import { PAPER_COMBOS_CONFIG } from "./config";
 import {
   CARD_PIN_BUTTON_CLASS,
   COURSE_ID_DATASET_ATTR,
+  FEATURE_TOGGLE_CLASS,
   ORIGINAL_LEFT_ATTR,
   ORIGINAL_WIDTH_ATTR,
   REAL_CARD_HIDE_ATTR,
@@ -45,13 +46,14 @@ export function readDayColumns(grid: HTMLElement): HTMLElement[] {
 }
 
 export type TopBarState = {
+  enabled: boolean;
+  defaultEnabled: boolean;
   total: number;
   cursor: number;
   score: number;
   ratedCount: number;
   totalSections: number;
-  maxClasses: number;
-  maxAllowed: number;
+  maxCredits: number;
   status?: string;
   truncated: boolean;
   conflictingPins: boolean;
@@ -61,6 +63,7 @@ export type TopBarCallbacks = {
   onPrev(): void;
   onNext(): void;
   onMaxChange(value: number): void;
+  onToggleFeature(next: boolean): void;
 };
 
 // Event delegation pattern: callbacks live on the bar element itself,
@@ -122,6 +125,13 @@ function bindTopBarHandlers(
       case "next":
         callbacks.onNext();
         break;
+      case "toggle": {
+        // The toggle's current state lives on its dataset so we don't
+        // depend on a stale closure capture across re-renders.
+        const next = actionEl.dataset.on !== "true";
+        callbacks.onToggleFeature(next);
+        break;
+      }
     }
   };
 
@@ -129,7 +139,7 @@ function bindTopBarHandlers(
     const target = event.target;
     if (!(target instanceof HTMLInputElement)) return;
     if (target.getAttribute(ACTION_ATTR) !== "max") return;
-    const next = Number.parseInt(target.value, 10);
+    const next = Number.parseFloat(target.value);
     if (Number.isFinite(next)) callbacks.onMaxChange(next);
   };
 
@@ -138,8 +148,7 @@ function bindTopBarHandlers(
   handlerStore.set(bar, { onClick, onInput });
 }
 
-function formatRating(score: number, ratedCount: number): string {
-  if (ratedCount === 0) return "no CTEC";
+function formatRating(score: number): string {
   return score.toFixed(2);
 }
 
@@ -149,6 +158,45 @@ export function renderTopBar(
   state: TopBarState
 ): void {
   bar.replaceChildren();
+  bar.dataset.enabled = String(state.enabled);
+
+  // Toggle pill is always present so users can enable/disable the
+  // feature in-place from the schedule page itself. The pill carries
+  // its own state in `data-on` so the delegated click handler reads
+  // the live value rather than a stale closure capture.
+  const toggle = el(doc, "button", {
+    class: FEATURE_TOGGLE_CLASS,
+    attrs: {
+      type: "button",
+      "aria-pressed": String(state.enabled),
+      "aria-label": state.enabled
+        ? "Turn schedule combinations off"
+        : "Turn schedule combinations on",
+      [ACTION_ATTR]: "toggle"
+    },
+    dataset: { on: String(state.enabled) }
+  }, [
+    el(doc, "span", { class: "bc-paper-combos-toggle-track" }, [
+      el(doc, "span", { class: "bc-paper-combos-toggle-thumb" })
+    ]),
+    el(doc, "span", { class: "bc-paper-combos-toggle-label" }, [
+      "Schedule combinations"
+    ])
+  ]);
+
+  bar.appendChild(toggle);
+
+  if (!state.enabled) {
+    // Off state: just the toggle + a brief hint. No cycle / rating /
+    // max input — clutter-free until the user opts in.
+    bar.appendChild(
+      el(doc, "span", { class: "bc-paper-combos-toggle-hint" }, [
+        "Cycle non-overlapping schedules of your canvas classes."
+      ])
+    );
+    return;
+  }
+
   // Cycle buttons are intentionally always clickable. When `total <= 1`
   // they no-op in the augmentation's cyclePrev/Next handlers — but the
   // browser still fires the click event so the user gets feedback (and
@@ -176,36 +224,47 @@ export function renderTopBar(
     }, ["→"])
   ]);
 
-  const rating = el(doc, "span", {
-    class: "bc-paper-combos-rating",
-    dataset: { rated: String(state.ratedCount) }
-  }, [
-    `★ ${formatRating(state.score, state.ratedCount)}`
-  ]);
+  // Rating chip only appears when at least one section in the active
+  // combo has a cached CTEC mean. With zero coverage there's nothing
+  // honest to show, and a placeholder "no CTEC" pill is just clutter.
+  const rating = state.ratedCount > 0
+    ? el(doc, "span", {
+        class: "bc-paper-combos-rating",
+        dataset: { rated: String(state.ratedCount) }
+      }, [
+        `★ ${formatRating(state.score)}`
+      ])
+    : null;
 
   const maxInput = el(doc, "input", {
     attrs: {
       type: "number",
-      min: "1",
-      max: String(Math.max(1, state.maxAllowed)),
-      step: "1",
-      value: String(state.maxClasses),
+      min: "0.5",
+      step: "0.5",
+      value: String(state.maxCredits),
       [ACTION_ATTR]: "max"
     }
   });
 
   const maxControl = el(doc, "label", { class: "bc-paper-combos-max" }, [
-    "Max",
+    "Max credits",
     maxInput
   ]);
 
-  bar.append(cycle, rating, maxControl);
+  bar.appendChild(cycle);
+  if (rating) bar.appendChild(rating);
+  bar.appendChild(maxControl);
 
   if (state.status) {
     bar.appendChild(
       el(doc, "div", { class: "bc-paper-combos-status" }, [state.status])
     );
   }
+
+  // defaultEnabled isn't user-visible but reading it here keeps it from
+  // being flagged as unused — the augmentation passes it so the bar can
+  // surface a "feature now opt-out" hint in the future.
+  void state.defaultEnabled;
 }
 
 // Map each rendered paper.nu schedule card to the section_id it represents.
@@ -288,19 +347,18 @@ function restoreOriginalLayout(card: HTMLElement): void {
   }
 }
 
-// Pin button mounts inside `.relative` (the inner positioning context
-// paper.nu uses for the trash icon, etc.) so it sticks to the card even
-// when paper.nu re-renders the text container. Idempotent: re-uses the
-// existing button if one's already there.
+// Pin button mounts as a direct child of the outer `.absolute` card,
+// sibling to paper-ctec's analytics-anchor (which overhangs at
+// `bottom: -15px`). That places the pin just above the analytics
+// pill in the bottom-right and lets it escape the dense-card
+// overflow:hidden the same way paper-ctec's actions wrapper does.
+// Idempotent: re-uses the existing button if one's already there.
 function ensurePinButton(
   card: HTMLElement,
   section: ComboSection,
   isPinned: boolean
 ): void {
-  const positioner = card.querySelector<HTMLElement>(":scope > .relative");
-  if (!positioner) return;
-
-  let button = positioner.querySelector<HTMLButtonElement>(
+  let button = card.querySelector<HTMLButtonElement>(
     `:scope > .${CARD_PIN_BUTTON_CLASS}`
   );
   if (!button) {
@@ -310,7 +368,7 @@ function ensurePinButton(
     button.className = CARD_PIN_BUTTON_CLASS;
     button.setAttribute("aria-label", "Pin section to lock it in every combination");
     button.textContent = "📌";
-    positioner.appendChild(button);
+    card.appendChild(button);
   }
 
   button.dataset.pinned = String(isPinned);

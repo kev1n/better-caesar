@@ -1,7 +1,25 @@
 import { logQuiet } from "../../../shared/log";
-import { getTermCourses, type PaperSection } from "../class-search/paper-data";
+import {
+  getPlanCourses,
+  getTermCourses,
+  type PaperSection
+} from "../class-search/paper-data";
+import { DEFAULT_UNITS } from "./constants";
 import { PAPER_COMBOS_CONFIG } from "./config";
 import type { ComboPool, ComboSection, CourseGroup, MeetingBlock } from "./types";
+
+// paper.nu's plan data stores `units` as a string ("1.0", "0.34", "1",
+// or sometimes a range like "0-1"). We parse the leading numeric token
+// and fall back to DEFAULT_UNITS for unparseable values — the budget is
+// only meaningful when courses have a usable weight.
+function parseUnits(raw: string | undefined): number {
+  if (!raw) return DEFAULT_UNITS;
+  const match = raw.trim().match(/^[-]?[\d.]+/);
+  if (!match) return DEFAULT_UNITS;
+  const n = Number.parseFloat(match[0]);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_UNITS;
+  return n;
+}
 
 type RawSerializedSchedule = {
   termId?: unknown;
@@ -132,14 +150,19 @@ function readScheduleSectionIds(raw: RawSerializedSchedule): string[] {
   return out;
 }
 
-function groupByCourse(sections: ComboSection[]): CourseGroup[] {
+function groupByCourse(
+  sections: ComboSection[],
+  unitsByCourse: Map<string, number>
+): CourseGroup[] {
   const byCourse = new Map<string, CourseGroup>();
   for (const section of sections) {
     let group = byCourse.get(section.courseId);
     if (!group) {
+      const planKey = `${section.subject} ${section.catalog}`;
       group = {
         courseId: section.courseId,
         label: `${section.subject} ${section.number}`,
+        units: unitsByCourse.get(planKey) ?? DEFAULT_UNITS,
         sections: []
       };
       byCourse.set(section.courseId, group);
@@ -175,6 +198,20 @@ export async function loadComboPool(): Promise<LoadComboPoolResult> {
     return { state: "term-data-missing" };
   }
 
+  // Plan data is loaded for its `units` field — we look up by the
+  // user-facing course id ("COMP_SCI 111-0"). Failing this fetch is
+  // non-fatal: every course defaults to DEFAULT_UNITS so the credit
+  // budget still works, just less precisely.
+  const unitsByCourse = new Map<string, number>();
+  try {
+    const planCourses = await getPlanCourses();
+    for (const course of planCourses) {
+      unitsByCourse.set(course.id, parseUnits(course.units));
+    }
+  } catch (err) {
+    logQuiet("paper-combos.getPlanCourses", err);
+  }
+
   const lookup = buildSectionLookup(termCourses);
   const sections: ComboSection[] = [];
   const byId = new Map<string, ComboSection>();
@@ -194,7 +231,7 @@ export async function loadComboPool(): Promise<LoadComboPoolResult> {
     state: "ok",
     pool: {
       termId,
-      groups: groupByCourse(sections),
+      groups: groupByCourse(sections, unitsByCourse),
       byId
     }
   };

@@ -1,6 +1,7 @@
 import { ensureStyle } from "../../framework";
 import {
   CARD_PIN_BUTTON_CLASS,
+  FEATURE_TOGGLE_CLASS,
   REAL_CARD_HIDE_ATTR,
   ROOT_ATTR,
   STYLE_ID,
@@ -28,6 +29,73 @@ const CSS = `
   font-family: inherit;
   color: var(--bc-color-text);
   font-size: 0.875rem;
+}
+
+/* Always-visible feature toggle pill. Its iOS-style track + thumb makes
+ * the on/off state obvious from a glance, and it sits to the left of
+ * everything else in the bar so it's the first thing users see. */
+.${FEATURE_TOGGLE_CLASS} {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.2rem 0.55rem 0.2rem 0.3rem;
+  border: 1px solid var(--bc-color-border);
+  border-radius: var(--bc-radius-pill);
+  background: var(--bc-color-bg);
+  color: var(--bc-color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: var(--bc-fw-medium);
+  line-height: 1.2;
+  transition: border-color var(--bc-tx-fast) var(--bc-easing),
+              background var(--bc-tx-fast) var(--bc-easing);
+}
+
+.${FEATURE_TOGGLE_CLASS}:hover {
+  border-color: var(--bc-color-border-strong);
+  background: var(--bc-color-surface-hover);
+}
+
+.${FEATURE_TOGGLE_CLASS} .bc-paper-combos-toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 1.85rem;
+  height: 1rem;
+  border-radius: var(--bc-radius-pill);
+  background: var(--bc-color-border);
+  transition: background var(--bc-tx-fast) var(--bc-easing);
+  flex-shrink: 0;
+}
+
+.${FEATURE_TOGGLE_CLASS} .bc-paper-combos-toggle-thumb {
+  position: absolute;
+  top: 0.1rem;
+  left: 0.1rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: var(--bc-radius-circle);
+  background: var(--bc-color-bg);
+  box-shadow: var(--bc-shadow-button);
+  transition: transform var(--bc-tx-base) var(--bc-easing);
+}
+
+.${FEATURE_TOGGLE_CLASS}[data-on="true"] .bc-paper-combos-toggle-track {
+  background: var(--bc-color-accent);
+}
+
+.${FEATURE_TOGGLE_CLASS}[data-on="true"] .bc-paper-combos-toggle-thumb {
+  transform: translateX(0.85rem);
+}
+
+.${FEATURE_TOGGLE_CLASS}[data-on="true"] {
+  border-color: var(--bc-color-accent);
+  color: var(--bc-color-accent);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-toggle-hint {
+  color: var(--bc-color-text-muted);
+  font-size: 0.78rem;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-cycle {
@@ -88,7 +156,7 @@ const CSS = `
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-max input {
-  width: 3rem;
+  width: 3.5rem;
   padding: 0.25rem 0.4rem;
   border: 1px solid var(--bc-color-border);
   border-radius: var(--bc-radius-sm);
@@ -112,44 +180,51 @@ const CSS = `
   display: none !important;
 }
 
-/* Pin button mounted inside paper.nu's schedule cards. Positioned
- * top-left to mirror paper.nu's trash button (top-right). The card's
- * inner .relative wrapper is the positioning context. */
+/* Pin button: direct child of the card, sibling of paper-ctec's
+ * analytics-anchor. Sits just above the analytics pill in the bottom
+ * right so the user always finds it in the same spot relative to the
+ * other action affordance. Always full opacity so it's discoverable
+ * without hovering — pin state is visually obvious from the bg + border. */
 .${CARD_PIN_BUTTON_CLASS} {
   position: absolute;
-  top: 0.25rem;
-  left: 0.25rem;
-  z-index: 20;
-  width: 1.25rem;
-  height: 1.25rem;
+  bottom: 14px;
+  right: 6px;
+  z-index: 13;
+  width: 22px;
+  height: 22px;
   padding: 0;
-  border: 1px solid transparent;
+  border: 1px solid var(--bc-color-border);
   border-radius: var(--bc-radius-pill);
   background: var(--bc-color-bg);
-  color: var(--bc-color-text-muted);
-  font-size: 0.7rem;
+  color: var(--bc-color-text);
+  font-size: 11px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  opacity: 0.45;
-  transition: opacity var(--bc-tx-fast) var(--bc-easing),
-              background var(--bc-tx-fast) var(--bc-easing),
-              border-color var(--bc-tx-fast) var(--bc-easing);
+  box-shadow: var(--bc-shadow-button);
+  pointer-events: auto;
+  transition: background var(--bc-tx-fast) var(--bc-easing),
+              border-color var(--bc-tx-fast) var(--bc-easing),
+              transform var(--bc-tx-fast) var(--bc-easing);
 }
 
 .${CARD_PIN_BUTTON_CLASS}:hover {
-  opacity: 1;
   background: var(--bc-color-surface-hover);
-  border-color: var(--bc-color-border);
+  border-color: var(--bc-color-border-strong);
+  transform: scale(1.08);
 }
 
 .${CARD_PIN_BUTTON_CLASS}[data-pinned="true"] {
-  opacity: 1;
-  background: var(--bc-color-accent-surface-soft);
+  background: var(--bc-color-accent);
   border-color: var(--bc-color-accent);
-  color: var(--bc-color-accent);
+  color: var(--bc-color-accent-on);
+}
+
+.${CARD_PIN_BUTTON_CLASS}[data-pinned="true"]:hover {
+  background: var(--bc-color-accent-hover);
+  border-color: var(--bc-color-accent-hover);
 }
 `;
 

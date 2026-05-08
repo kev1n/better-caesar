@@ -32,7 +32,7 @@ function makeSection(
   };
 }
 
-function pool(sections: ComboSection[]): ComboPool {
+function pool(sections: ComboSection[], unitsByCourse: Record<string, number> = {}): ComboPool {
   const groups = new Map<string, ComboSection[]>();
   const byId = new Map<string, ComboSection>();
   for (const s of sections) {
@@ -46,6 +46,7 @@ function pool(sections: ComboSection[]): ComboPool {
     groups: Array.from(groups.entries()).map(([courseId, secs]) => ({
       courseId,
       label: courseId,
+      units: unitsByCourse[courseId] ?? 1,
       sections: secs
     })),
     byId
@@ -73,11 +74,11 @@ describe("timesOverlap", () => {
 describe("sectionsConflict", () => {
   it("detects same-day pattern overlap across multi-pattern sections", () => {
     const lecAndLab = makeSection("X;LL", "X:100", [
-      block(0, 9, 0, 10, 0), // Mon lecture
-      block(2, 14, 0, 15, 0) // Wed lab
+      block(0, 9, 0, 10, 0),
+      block(2, 14, 0, 15, 0)
     ]);
     const conflictingDis = makeSection("Y;DD", "Y:100", [
-      block(2, 14, 30, 15, 30) // Wed conflicts with the lab
+      block(2, 14, 30, 15, 30)
     ]);
     expect(sectionsConflict(lecAndLab, conflictingDis)).toBe(true);
   });
@@ -96,20 +97,21 @@ describe("enumerateCombinations", () => {
     const b1 = makeSection("B1", "B", [block(1, 9, 0, 10, 0)]);
     const b2 = makeSection("B2", "B", [block(1, 11, 0, 12, 0)]);
     const result = enumerateCombinations(pool([a1, a2, b1, b2]), {
-      maxSize: 2,
+      maxCredits: 2,
       pinnedSectionIds: new Set()
     });
     expect(result.combinations).toHaveLength(4);
+    expect(result.effectiveCredits).toBe(2);
     expect(result.truncated).toBe(false);
     expect(result.conflictingPins).toBe(false);
   });
 
   it("prunes pairs that conflict", () => {
     const a1 = makeSection("A1", "A", [block(0, 9, 0, 10, 0)]);
-    const b1 = makeSection("B1", "B", [block(0, 9, 30, 10, 30)]); // conflicts with A1
+    const b1 = makeSection("B1", "B", [block(0, 9, 30, 10, 30)]);
     const b2 = makeSection("B2", "B", [block(0, 11, 0, 12, 0)]);
     const result = enumerateCombinations(pool([a1, b1, b2]), {
-      maxSize: 2,
+      maxCredits: 2,
       pinnedSectionIds: new Set()
     });
     expect(result.combinations).toHaveLength(1);
@@ -120,7 +122,7 @@ describe("enumerateCombinations", () => {
     const a1 = makeSection("A1", "A", [block(0, 9, 0, 10, 0)]);
     const b1 = makeSection("B1", "B", [block(0, 9, 30, 10, 30)]);
     const result = enumerateCombinations(pool([a1, b1]), {
-      maxSize: 2,
+      maxCredits: 2,
       pinnedSectionIds: new Set(["A1", "B1"])
     });
     expect(result.combinations).toHaveLength(0);
@@ -132,73 +134,67 @@ describe("enumerateCombinations", () => {
     const a2 = makeSection("A2", "A", [block(0, 13, 0, 14, 0)]);
     const b1 = makeSection("B1", "B", [block(1, 9, 0, 10, 0)]);
     const result = enumerateCombinations(pool([a1, a2, b1]), {
-      maxSize: 2,
+      maxCredits: 2,
       pinnedSectionIds: new Set(["A1"])
     });
     expect(result.combinations).toHaveLength(1);
     expect(result.combinations[0].sectionIds.sort()).toEqual(["A1", "B1"]);
   });
 
-  it("falls back to combinations of size < courses when maxSize is smaller", () => {
+  it("returns combos at the highest reachable credit total when budget caps the schedule", () => {
+    // 3 unit-1 courses, max=2 credits → only 2-credit combos, none of all 3.
     const a = makeSection("A1", "A", [block(0, 9, 0, 10, 0)]);
     const b = makeSection("B1", "B", [block(0, 11, 0, 12, 0)]);
     const c = makeSection("C1", "C", [block(0, 13, 0, 14, 0)]);
     const result = enumerateCombinations(pool([a, b, c]), {
-      maxSize: 2,
+      maxCredits: 2,
       pinnedSectionIds: new Set()
     });
     expect(result.combinations).toHaveLength(3);
-    // All combos at the requested size — no descent needed.
-    expect(result.effectiveSize).toBe(2);
-    expect(result.requestedSize).toBe(2);
+    expect(result.effectiveCredits).toBe(2);
+    expect(result.requestedCredits).toBe(2);
   });
 
-  it("walks down to the largest feasible size when full size has no fit", () => {
-    // Three courses, but A and B's only sections conflict on Mon morning.
-    // No 3-class combo fits without overlap. Should fall back to 2-class
-    // combos, which include {A,C} and {B,C}.
+  it("falls back to a smaller credit total when the requested budget can't be packed", () => {
+    // 3 courses, A and B conflict. No 3-credit combo fits — fallback is
+    // 2-credit, namely {A,C} and {B,C}.
     const a = makeSection("A1", "A", [block(0, 9, 0, 10, 0)]);
     const b = makeSection("B1", "B", [block(0, 9, 30, 10, 30)]);
     const c = makeSection("C1", "C", [block(0, 13, 0, 14, 0)]);
     const result = enumerateCombinations(pool([a, b, c]), {
-      maxSize: 3,
+      maxCredits: 3,
       pinnedSectionIds: new Set()
     });
     expect(result.combinations).toHaveLength(2);
-    expect(result.effectiveSize).toBe(2);
-    expect(result.requestedSize).toBe(3);
+    expect(result.effectiveCredits).toBe(2);
+    expect(result.requestedCredits).toBe(3);
     const ids = result.combinations
       .map((c) => c.sectionIds.slice().sort().join(","))
       .sort();
     expect(ids).toEqual(["A1,C1", "B1,C1"]);
   });
 
-  it("respects the hard cap and signals truncation", () => {
-    const sections: ComboSection[] = [];
-    // 3 courses, 4 sections each = 64 combos. Cap at 10.
-    for (const courseLetter of ["A", "B", "C"]) {
-      for (let i = 0; i < 4; i++) {
-        sections.push(
-          makeSection(
-            `${courseLetter}${i}`,
-            courseLetter,
-            [block(i, 9, 0, 10, 0)]
-          )
-        );
-      }
-    }
-    const result = enumerateCombinations(pool(sections), {
-      maxSize: 3,
-      pinnedSectionIds: new Set(),
-      hardCap: 10
-    });
-    expect(result.combinations.length).toBe(10);
-    expect(result.truncated).toBe(true);
+  it("filters out combos that exceed the credit budget", () => {
+    // A and B are 1-unit each, C is 2-unit. Max=2 credits.
+    // Valid combos: {A}, {B}, {C}, {A,B} all fit. {A,B,C}=4 too much.
+    const a = makeSection("A1", "A", [block(0, 9, 0, 10, 0)]);
+    const b = makeSection("B1", "B", [block(1, 9, 0, 10, 0)]);
+    const c = makeSection("C1", "C", [block(2, 9, 0, 10, 0)]);
+    const result = enumerateCombinations(
+      pool([a, b, c], { A: 1, B: 1, C: 2 }),
+      { maxCredits: 2, pinnedSectionIds: new Set() }
+    );
+    // Highest reachable = 2 credits (either {A,B} or {C}).
+    expect(result.effectiveCredits).toBe(2);
+    const ids = result.combinations
+      .map((cb) => cb.sectionIds.slice().sort().join(","))
+      .sort();
+    expect(ids).toEqual(["A1,B1", "C1"]);
   });
 
   it("returns empty (without crash) when there are no courses", () => {
     const result = enumerateCombinations(pool([]), {
-      maxSize: 4,
+      maxCredits: 4,
       pinnedSectionIds: new Set()
     });
     expect(result.combinations).toEqual([]);

@@ -1,16 +1,12 @@
 import { COMBO_HARD_CAP } from "./constants";
 import { sectionsConflict } from "./overlap";
-import type { ComboPool, ComboSection, Combination } from "./types";
+import type { ComboPool, ComboSection, Combination, CourseGroup } from "./types";
 
 export type EnumerateOptions = {
-  // Maximum number of sections per combination (one per course). The
-  // enumerator looks for combos at exactly this size first; if none fit
-  // (because too many courses time-conflict), it walks down to maxSize-1,
-  // then maxSize-2, etc. and returns the first non-empty size class.
-  // This matches the user's mental model of "max" as a ceiling, not an
-  // exact count — they expect to see *some* schedule even if it can't
-  // pack every course on canvas.
-  maxSize: number;
+  // Maximum total units (Northwestern "credits") allowed in any
+  // combination. The enumerator returns the largest-credit combos that
+  // fit within this budget without overlapping in time.
+  maxCredits: number;
   // Section IDs the user has pinned. Every produced combination must
   // include each pinned section. Conflicting pins yield an empty result.
   pinnedSectionIds: ReadonlySet<string>;
@@ -24,13 +20,13 @@ export type EnumerateResult = {
   combinations: Combination[];
   truncated: boolean;
   conflictingPins: boolean;
-  // The size class that actually produced results. Differs from
-  // requestedSize when the enumerator walked down because the requested
-  // size was infeasible. UI uses this to surface the "had to drop a
-  // course" status to the user.
-  effectiveSize: number;
-  requestedSize: number;
+  // Total credits in the combos we returned (all returned combos share
+  // this total — we keep only the highest-credit class).
+  effectiveCredits: number;
+  requestedCredits: number;
 };
+
+const FLOAT_EPS = 1e-6;
 
 export function enumerateCombinations(
   pool: ComboPool,
@@ -38,18 +34,15 @@ export function enumerateCombinations(
 ): EnumerateResult {
   const cap = options.hardCap ?? COMBO_HARD_CAP;
   const groups = pool.groups;
-  const requestedSize = Math.min(
-    Math.max(0, options.maxSize),
-    groups.length
-  );
+  const requestedCredits = Math.max(0, options.maxCredits);
 
   if (groups.length === 0) {
     return {
       combinations: [],
       truncated: false,
       conflictingPins: false,
-      effectiveSize: 0,
-      requestedSize
+      effectiveCredits: 0,
+      requestedCredits
     };
   }
 
@@ -63,11 +56,13 @@ export function enumerateCombinations(
   // A pin only counts if its course is represented in the current pool.
   const pinnedList: ComboSection[] = [];
   const pinnedCourseIds = new Set<string>();
+  let pinnedCredits = 0;
   for (const group of groups) {
     const pinned = pinnedByCourse.get(group.courseId);
     if (pinned) {
       pinnedList.push(pinned);
       pinnedCourseIds.add(group.courseId);
+      pinnedCredits += group.units;
     }
   }
 
@@ -78,153 +73,164 @@ export function enumerateCombinations(
           combinations: [],
           truncated: false,
           conflictingPins: true,
-          effectiveSize: 0,
-          requestedSize
+          effectiveCredits: 0,
+          requestedCredits
         };
       }
     }
   }
 
-  if (pinnedList.length > requestedSize) {
+  if (pinnedCredits > requestedCredits + FLOAT_EPS) {
     return {
       combinations: [],
       truncated: false,
       conflictingPins: true,
-      effectiveSize: 0,
-      requestedSize
+      effectiveCredits: 0,
+      requestedCredits
     };
   }
 
   const freeGroups = groups.filter((g) => !pinnedCourseIds.has(g.courseId));
-  // Walk from `requestedSize` down to `pinnedList.length` (inclusive). The
-  // pinnedList floor is enforced because every pin must appear; we can't
-  // generate combos smaller than the pin set.
-  const minSize = Math.max(pinnedList.length, 0);
-  for (let target = requestedSize; target >= minSize; target--) {
-    if (target < 1 && groups.length > 0) break;
-    const result = enumerateAtSize({
-      pinnedList,
-      freeGroups,
-      target,
-      cap
-    });
-    if (result.combinations.length > 0) {
-      return {
-        combinations: result.combinations,
-        truncated: result.truncated,
-        conflictingPins: false,
-        effectiveSize: target,
-        requestedSize
-      };
-    }
-    if (result.truncated) {
-      // Hit the hard cap inside this size class — no point descending,
-      // because smaller sizes have a strictly larger search space and
-      // would also truncate (or worse).
-      return {
-        combinations: result.combinations,
-        truncated: true,
-        conflictingPins: false,
-        effectiveSize: target,
-        requestedSize
-      };
+  const pinnedUnitsByCourse = new Map<string, number>();
+  for (const group of groups) {
+    if (pinnedCourseIds.has(group.courseId)) {
+      pinnedUnitsByCourse.set(group.courseId, group.units);
     }
   }
 
+  const all = enumerateAll({
+    pinnedList,
+    pinnedCredits,
+    freeGroups,
+    maxCredits: requestedCredits,
+    cap
+  });
+
+  if (all.combinations.length === 0) {
+    return {
+      combinations: [],
+      truncated: all.truncated,
+      conflictingPins: false,
+      effectiveCredits: 0,
+      requestedCredits
+    };
+  }
+
+  // Keep only the combos that maximize total credits — those are the
+  // user's best schedules under the budget. Smaller combos are valid but
+  // strictly dominated and would just clutter the cycle list.
+  let bestCredits = 0;
+  for (const combo of all.combinations) {
+    if (combo.totalUnits > bestCredits) bestCredits = combo.totalUnits;
+  }
+  const filtered = all.combinations.filter(
+    (c) => Math.abs(c.totalUnits - bestCredits) < FLOAT_EPS
+  );
+
   return {
-    combinations: [],
-    truncated: false,
+    combinations: filtered,
+    truncated: all.truncated,
     conflictingPins: false,
-    effectiveSize: 0,
-    requestedSize
+    effectiveCredits: bestCredits,
+    requestedCredits
   };
 }
 
-type EnumerateAtSizeArgs = {
+type EnumerateAllArgs = {
   pinnedList: ComboSection[];
-  freeGroups: ComboPool["groups"];
-  target: number;
+  pinnedCredits: number;
+  freeGroups: CourseGroup[];
+  maxCredits: number;
   cap: number;
 };
 
-type EnumerateAtSizeResult = {
+type EnumerateAllResult = {
   combinations: Combination[];
   truncated: boolean;
 };
 
-// Backtracking enumerator over free groups: pick exactly
-// `target - pinnedList.length` sections, one per group, no time conflicts
-// with each other or with pins. Pure helper — no orchestrator state, no
-// pin or conflict validation (caller already did that).
-function enumerateAtSize({
+// Backtracking over free groups. At each group we try (a) skipping it
+// or (b) adding any of its sections that doesn't conflict with the
+// current selection AND keeps total units within the budget. Pinned
+// sections are always present in `current` from the start; we never
+// drop them. Emits every valid combo (size ≥ pinnedList.length) that
+// fits the budget; the caller filters down to the maximum-credits set.
+function enumerateAll({
   pinnedList,
+  pinnedCredits,
   freeGroups,
-  target,
+  maxCredits,
   cap
-}: EnumerateAtSizeArgs): EnumerateAtSizeResult {
-  const freePicksNeeded = target - pinnedList.length;
+}: EnumerateAllArgs): EnumerateAllResult {
   const combinations: Combination[] = [];
   let truncated = false;
 
   const current: ComboSection[] = [...pinnedList];
+  // Per-section units snapshot mirrors `current` indices so we can pop
+  // both arrays together as recursion unwinds.
+  const currentUnits: number[] = [];
+  // Pinned sections inherit their group's units. We need group lookup,
+  // not section lookup; pull from the group order to be consistent.
+  // (We don't have direct group access here, but pinnedCredits is the
+  // running total at start.)
+  let runningCredits = pinnedCredits;
 
-  if (freePicksNeeded === 0) {
-    combinations.push({
-      sectionIds: pinnedList.map((s) => s.sectionId),
-      sections: [...pinnedList],
-      score: 0,
-      ratedCount: 0
-    });
-    return { combinations, truncated };
-  }
-
-  const backtrack = (idx: number, picked: number): void => {
-    if (truncated) return;
+  const emit = (): boolean => {
+    if (current.length === 0) return true;
     if (combinations.length >= cap) {
       truncated = true;
-      return;
+      return false;
     }
-    if (picked === freePicksNeeded) {
-      combinations.push({
-        sectionIds: current.map((s) => s.sectionId),
-        sections: [...current],
-        score: 0,
-        ratedCount: 0
-      });
-      return;
-    }
+    combinations.push({
+      sectionIds: current.map((s) => s.sectionId),
+      sections: [...current],
+      score: 0,
+      ratedCount: 0,
+      totalUnits: runningCredits
+    });
+    return true;
+  };
 
-    const groupsLeft = freeGroups.length - idx;
-    const stillNeeded = freePicksNeeded - picked;
-    if (groupsLeft < stillNeeded) return;
-    if (idx >= freeGroups.length) return;
+  const backtrack = (idx: number): boolean => {
+    if (truncated) return false;
+    if (combinations.length >= cap) {
+      truncated = true;
+      return false;
+    }
+    if (idx >= freeGroups.length) {
+      return emit();
+    }
 
     const group = freeGroups[idx];
 
-    // Branch 1: skip this group — only allowed if dropping it still leaves
-    // enough downstream groups to fill the target.
-    if (groupsLeft - 1 >= stillNeeded) {
-      backtrack(idx + 1, picked);
-      if (truncated) return;
-    }
+    // Branch 1: skip this group.
+    if (!backtrack(idx + 1)) return false;
 
     // Branch 2: try every section in this group, skipping conflicts.
-    for (const section of group.sections) {
-      let conflict = false;
-      for (const c of current) {
-        if (sectionsConflict(c, section)) {
-          conflict = true;
-          break;
+    if (runningCredits + group.units <= maxCredits + FLOAT_EPS) {
+      for (const section of group.sections) {
+        let conflict = false;
+        for (const c of current) {
+          if (sectionsConflict(c, section)) {
+            conflict = true;
+            break;
+          }
         }
+        if (conflict) continue;
+        current.push(section);
+        currentUnits.push(group.units);
+        runningCredits += group.units;
+        const ok = backtrack(idx + 1);
+        current.pop();
+        const unit = currentUnits.pop() ?? 0;
+        runningCredits -= unit;
+        if (!ok) return false;
       }
-      if (conflict) continue;
-      current.push(section);
-      backtrack(idx + 1, picked + 1);
-      current.pop();
-      if (truncated) return;
     }
+
+    return true;
   };
 
-  backtrack(0, 0);
+  backtrack(0);
   return { combinations, truncated };
 }

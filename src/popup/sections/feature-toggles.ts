@@ -88,7 +88,7 @@ export const FEATURE_SECTIONS: FeatureSection[] = [
       {
         id: "paper-combos",
         label: "Schedule Combinations",
-        description: "Cycle through every non-overlapping subset of the sections on your canvas, sorted by average CTEC rating."
+        description: "Show the in-page combinations bar on Paper.nu. Use the on/off switch on Paper itself to actually start cycling combos."
       }
     ]
   },

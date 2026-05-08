@@ -19,7 +19,13 @@ const DEFAULT_FEATURE_STATES: Record<string, boolean> = {
   "paper-ctec-single-summary-card": true,
   "paper-ctec-rating-percent": false,
   "paper-card-border-on-hover": true,
-  "paper-combos": false
+  // `paper-combos` is the popup-level visibility gate (controls whether
+  // the bar mounts at all on paper.nu). Default ON so users discover the
+  // toggle on the page itself. The actual feature engagement (cards
+  // hidden, combos cycled) is gated by `paper-combos-active`, flipped
+  // by the bar's on-page toggle and default OFF.
+  "paper-combos": true,
+  "paper-combos-active": false
 };
 
 // In-memory settings loaded from extension storage on startup.
