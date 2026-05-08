@@ -10,6 +10,7 @@ import { PAPER_COMBOS_CONFIG } from "./config";
 import {
   CARD_PIN_BUTTON_CLASS,
   DEFAULT_MAX_CREDITS,
+  DEFAULT_MIN_CREDITS,
   PAPER_COMBOS_ACTIVE_ID,
   PAPER_COMBOS_FEATURE_ID,
   STYLE_ID,
@@ -112,6 +113,7 @@ export class PaperCombosAugmentation implements Augmentation {
   private combos: Combination[] = [];
   private cursor = 0;
   private maxCredits = DEFAULT_MAX_CREDITS;
+  private minCredits = DEFAULT_MIN_CREDITS;
   private pinnedByCourseId = new Map<string, string>();
   // Prohibited time zones drawn on the canvas. Persisted to
   // chrome.storage.local so they survive reloads. Sections whose
@@ -397,6 +399,9 @@ export class PaperCombosAugmentation implements Augmentation {
     }
     this.pruneStalePins();
     if (this.maxCredits < 0.1) this.maxCredits = 0.5;
+    if (this.minCredits < 0) this.minCredits = 0;
+    // Clamp min ≤ max so the floor never invalidates the budget.
+    if (this.minCredits > this.maxCredits) this.minCredits = this.maxCredits;
 
     // Build a zone-filtered pool: any section whose meeting blocks fall
     // in a prohibited zone is dropped from its course group, and a
@@ -407,6 +412,7 @@ export class PaperCombosAugmentation implements Augmentation {
     const pinnedSectionIds = new Set(this.pinnedByCourseId.values());
     const result = enumerateCombinations(filteredPool, {
       maxCredits: this.maxCredits,
+      minCredits: this.minCredits,
       pinnedSectionIds
     });
     this.lastEnumerate = result;
@@ -479,6 +485,7 @@ export class PaperCombosAugmentation implements Augmentation {
       poolSig,
       String(this.cursor),
       String(this.maxCredits),
+      String(this.minCredits),
       this.sortMode,
       pinSig,
       zoneSig,
@@ -499,6 +506,7 @@ export class PaperCombosAugmentation implements Augmentation {
       onPrev: () => this.cyclePrev(doc, grid),
       onNext: () => this.cycleNext(doc, grid),
       onMaxChange: (value) => this.setMax(doc, grid, value),
+      onMinChange: (value) => this.setMin(doc, grid, value),
       onToggleFeature: (next) => {
         void this.setFeatureEnabled(next);
       }
@@ -544,6 +552,7 @@ export class PaperCombosAugmentation implements Augmentation {
       ratedCount: currentCombo?.ratedCount ?? 0,
       totalSections: this.pool?.byId.size ?? 0,
       maxCredits: this.maxCredits,
+      minCredits: this.minCredits,
       sortMode: this.sortMode,
       sortLabels: SORT_MODE_LABELS,
       status: enabled
@@ -590,6 +599,13 @@ export class PaperCombosAugmentation implements Augmentation {
   private setMax(doc: Document, grid: HTMLElement, value: number): void {
     if (!Number.isFinite(value) || value < 0.5) return;
     this.maxCredits = value;
+    this.recomputeCombos();
+    this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
+  }
+
+  private setMin(doc: Document, grid: HTMLElement, value: number): void {
+    if (!Number.isFinite(value) || value < 0) return;
+    this.minCredits = value;
     this.recomputeCombos();
     this.renderAll(doc, grid, isFeatureEnabled(PAPER_COMBOS_ACTIVE_ID));
   }

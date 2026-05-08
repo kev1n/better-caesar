@@ -19,9 +19,9 @@ const CSS = `
 #${TOP_BAR_ID} {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.4rem;
   align-items: center;
-  padding: 0.6rem 0.8rem;
+  padding: 0.5rem 0.7rem;
   margin: 3.25rem 0 0.6rem 0;
   border-radius: var(--bc-radius-lg);
   background: var(--bc-color-bg);
@@ -29,6 +29,21 @@ const CSS = `
   font-family: inherit;
   color: var(--bc-color-text);
   font-size: 0.875rem;
+}
+
+/* Hide native number-input spinner arrows on the bar's number inputs.
+ * Combo of WebKit pseudo-elements + appearance:textfield covers Chrome,
+ * Safari, and Firefox. */
+#${TOP_BAR_ID} input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+#${TOP_BAR_ID} input[type="number"]::-webkit-inner-spin-button,
+#${TOP_BAR_ID} input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
 }
 
 /* Always-visible feature toggle pill. Its iOS-style track + thumb makes
@@ -109,9 +124,9 @@ const CSS = `
   border: 1px solid var(--bc-color-border);
   background: transparent;
   border-radius: var(--bc-radius-md);
-  width: 1.75rem;
-  height: 1.75rem;
-  font-size: 0.95rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.85rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -133,6 +148,7 @@ const CSS = `
   font-weight: var(--bc-fw-semibold);
   min-width: 4.5rem;
   text-align: center;
+  font-size: 0.8rem;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-rating {
@@ -143,6 +159,8 @@ const CSS = `
   background: var(--bc-color-bg-muted);
   border-radius: var(--bc-radius-md);
   font-weight: var(--bc-fw-medium);
+  font-size: 0.78rem;
+  color: var(--bc-color-text-muted);
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-rating[data-rated="0"] {
@@ -163,6 +181,7 @@ const CSS = `
   background: transparent;
   color: inherit;
   font: inherit;
+  font-size: 0.8rem;
   text-align: center;
 }
 
@@ -251,6 +270,21 @@ const CSS = `
 
 .bc-paper-combos-zone:hover {
   background-color: var(--bc-color-accent-surface-tile);
+}
+
+/* Multi-day zones render as one segment per day. The leftmost/rightmost
+ * data attrs let us drop the seam borders + radii so a 3-day zone reads
+ * as a single rounded rectangle spanning Mon-Wed. */
+.bc-paper-combos-zone[data-leftmost="false"] {
+  border-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.bc-paper-combos-zone[data-rightmost="false"] {
+  border-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .bc-paper-combos-zone-label {

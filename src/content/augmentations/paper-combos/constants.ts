@@ -20,6 +20,7 @@ export const COURSE_ID_DATASET_ATTR = "data-bc-paper-combos-course";
 // "credits" because that's what users say. Default budget = 5 units,
 // matching a typical full-time courseload with a buffer.
 export const DEFAULT_MAX_CREDITS = 5;
+export const DEFAULT_MIN_CREDITS = 0;
 export const DEFAULT_UNITS = 1;
 export const COMBO_HARD_CAP = 5000;
 export const NEUTRAL_RATING_MIDPOINT = 3;

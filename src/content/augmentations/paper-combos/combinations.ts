@@ -7,6 +7,10 @@ export type EnumerateOptions = {
   // combination. The enumerator returns the largest-credit combos that
   // fit within this budget without overlapping in time.
   maxCredits: number;
+  // Minimum total units required. Combos with fewer credits are
+  // discarded before the "highest credit class wins" reduction. Defaults
+  // to 0 (no floor).
+  minCredits?: number;
   // Section IDs the user has pinned. Every produced combination must
   // include each pinned section. Conflicting pins yield an empty result.
   pinnedSectionIds: ReadonlySet<string>;
@@ -24,6 +28,10 @@ export type EnumerateResult = {
   // this total — we keep only the highest-credit class).
   effectiveCredits: number;
   requestedCredits: number;
+  // Echoes the floor the caller requested (defaults to 0). Used by the
+  // UI to render an accurate status message when filtering empties out
+  // the result.
+  requestedMinCredits: number;
 };
 
 const FLOAT_EPS = 1e-6;
@@ -35,6 +43,7 @@ export function enumerateCombinations(
   const cap = options.hardCap ?? COMBO_HARD_CAP;
   const groups = pool.groups;
   const requestedCredits = Math.max(0, options.maxCredits);
+  const requestedMinCredits = Math.max(0, options.minCredits ?? 0);
 
   if (groups.length === 0) {
     return {
@@ -42,7 +51,8 @@ export function enumerateCombinations(
       truncated: false,
       conflictingPins: false,
       effectiveCredits: 0,
-      requestedCredits
+      requestedCredits,
+      requestedMinCredits
     };
   }
 
@@ -74,7 +84,8 @@ export function enumerateCombinations(
           truncated: false,
           conflictingPins: true,
           effectiveCredits: 0,
-          requestedCredits
+          requestedCredits,
+          requestedMinCredits
         };
       }
     }
@@ -86,7 +97,8 @@ export function enumerateCombinations(
       truncated: false,
       conflictingPins: true,
       effectiveCredits: 0,
-      requestedCredits
+      requestedCredits,
+      requestedMinCredits
     };
   }
 
@@ -112,7 +124,27 @@ export function enumerateCombinations(
       truncated: all.truncated,
       conflictingPins: false,
       effectiveCredits: 0,
-      requestedCredits
+      requestedCredits,
+      requestedMinCredits
+    };
+  }
+
+  // Apply the min-credits floor BEFORE the "highest credits class wins"
+  // reduction. Otherwise a low-credit combo could win the class and then
+  // get filtered, leaving an empty result even though valid combos at a
+  // higher credit total exist.
+  const aboveFloor = all.combinations.filter(
+    (c) => c.totalUnits + FLOAT_EPS >= requestedMinCredits
+  );
+
+  if (aboveFloor.length === 0) {
+    return {
+      combinations: [],
+      truncated: all.truncated,
+      conflictingPins: false,
+      effectiveCredits: 0,
+      requestedCredits,
+      requestedMinCredits
     };
   }
 
@@ -120,10 +152,10 @@ export function enumerateCombinations(
   // user's best schedules under the budget. Smaller combos are valid but
   // strictly dominated and would just clutter the cycle list.
   let bestCredits = 0;
-  for (const combo of all.combinations) {
+  for (const combo of aboveFloor) {
     if (combo.totalUnits > bestCredits) bestCredits = combo.totalUnits;
   }
-  const filtered = all.combinations.filter(
+  const filtered = aboveFloor.filter(
     (c) => Math.abs(c.totalUnits - bestCredits) < FLOAT_EPS
   );
 
@@ -132,7 +164,8 @@ export function enumerateCombinations(
     truncated: all.truncated,
     conflictingPins: false,
     effectiveCredits: bestCredits,
-    requestedCredits
+    requestedCredits,
+    requestedMinCredits
   };
 }
 

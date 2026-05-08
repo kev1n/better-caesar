@@ -192,6 +192,41 @@ describe("enumerateCombinations", () => {
     expect(ids).toEqual(["A1,B1", "C1"]);
   });
 
+  it("filters out combos below the min-credits floor before picking the best class", () => {
+    // 3 unit-1 courses, all non-conflicting. minCredits=2, maxCredits=3
+    // means 1-credit combos drop out; the {A,B,C} 3-credit combo is the
+    // sole survivor since the post-filter "highest credits" reduction
+    // beats the 2-credit pairs.
+    const a = makeSection("A1", "A", [block(0, 9, 0, 10, 0)]);
+    const b = makeSection("B1", "B", [block(0, 11, 0, 12, 0)]);
+    const c = makeSection("C1", "C", [block(0, 13, 0, 14, 0)]);
+    const result = enumerateCombinations(pool([a, b, c]), {
+      maxCredits: 3,
+      minCredits: 2,
+      pinnedSectionIds: new Set()
+    });
+    expect(result.combinations).toHaveLength(1);
+    expect(result.combinations[0].sectionIds.slice().sort()).toEqual(["A1", "B1", "C1"]);
+    expect(result.effectiveCredits).toBe(3);
+    expect(result.requestedMinCredits).toBe(2);
+  });
+
+  it("returns empty when no combo can satisfy the min-credits floor", () => {
+    // A and B conflict, so no 3-credit combo fits. minCredits=3 then
+    // empties the result entirely (the 2-credit fallback is below floor).
+    const a = makeSection("A1", "A", [block(0, 9, 0, 10, 0)]);
+    const b = makeSection("B1", "B", [block(0, 9, 30, 10, 30)]);
+    const c = makeSection("C1", "C", [block(0, 13, 0, 14, 0)]);
+    const result = enumerateCombinations(pool([a, b, c]), {
+      maxCredits: 3,
+      minCredits: 3,
+      pinnedSectionIds: new Set()
+    });
+    expect(result.combinations).toHaveLength(0);
+    expect(result.effectiveCredits).toBe(0);
+    expect(result.requestedMinCredits).toBe(3);
+  });
+
   it("returns empty (without crash) when there are no courses", () => {
     const result = enumerateCombinations(pool([]), {
       maxCredits: 4,

@@ -56,6 +56,7 @@ export type TopBarState = {
   ratedCount: number;
   totalSections: number;
   maxCredits: number;
+  minCredits: number;
   sortMode: SortMode;
   sortLabels: Record<SortMode, string>;
   status?: string;
@@ -68,6 +69,7 @@ export type TopBarCallbacks = {
   onPrev(): void;
   onNext(): void;
   onMaxChange(value: number): void;
+  onMinChange(value: number): void;
   onToggleFeature(next: boolean): void;
 };
 
@@ -153,9 +155,11 @@ function bindTopBarHandlers(
   const onInput = (event: Event): void => {
     const target = event.target;
     if (target instanceof HTMLInputElement) {
-      if (target.getAttribute(ACTION_ATTR) !== "max") return;
+      const action = target.getAttribute(ACTION_ATTR);
       const next = Number.parseFloat(target.value);
-      if (Number.isFinite(next)) callbacks.onMaxChange(next);
+      if (!Number.isFinite(next)) return;
+      if (action === "max") callbacks.onMaxChange(next);
+      else if (action === "min") callbacks.onMinChange(next);
       return;
     }
     if (target instanceof HTMLSelectElement) {
@@ -262,18 +266,34 @@ export function renderTopBar(
       ])
     : null;
 
+  const minInput = el(doc, "input", {
+    attrs: {
+      type: "number",
+      min: "0",
+      step: "0.5",
+      value: String(state.minCredits),
+      [ACTION_ATTR]: "min",
+      "aria-label": "Minimum credits"
+    }
+  });
+
   const maxInput = el(doc, "input", {
     attrs: {
       type: "number",
       min: "0.5",
       step: "0.5",
       value: String(state.maxCredits),
-      [ACTION_ATTR]: "max"
+      [ACTION_ATTR]: "max",
+      "aria-label": "Maximum credits"
     }
   });
 
-  const maxControl = el(doc, "label", { class: "bc-paper-combos-max" }, [
-    "Max credits",
+  // Single combined "Credits N–M" control. The dash sits between the
+  // two inputs so they read as a single range, not two unrelated knobs.
+  const creditsControl = el(doc, "div", { class: "bc-paper-combos-credits" }, [
+    el(doc, "span", { class: "bc-paper-combos-credits-label" }, ["Credits"]),
+    minInput,
+    el(doc, "span", { class: "bc-paper-combos-credits-sep" }, ["–"]),
     maxInput
   ]);
 
@@ -300,7 +320,7 @@ export function renderTopBar(
   bar.appendChild(cycle);
   if (rating) bar.appendChild(rating);
   bar.appendChild(sortControl);
-  bar.appendChild(maxControl);
+  bar.appendChild(creditsControl);
 
   // Clear-zones button only appears when at least one zone exists.
   if (state.zoneCount > 0) {
@@ -670,19 +690,23 @@ function mountZoneSegment(
   startMinInHour: number,
   duration: number,
   className: string,
-  showLabel: boolean,
-  showRemove: boolean
+  isLeftmost: boolean,
+  isRightmost: boolean
 ): HTMLElement {
   const overlay = buildZoneInCell(doc, hourCell, startMinInHour, duration, className);
   overlay.setAttribute(ZONE_ID_ATTR, zone.id);
-  if (showLabel) {
+  // CSS reads these to drop interior borders/radii so a multi-day zone
+  // looks like one continuous box stitched across day columns.
+  overlay.setAttribute("data-leftmost", String(isLeftmost));
+  overlay.setAttribute("data-rightmost", String(isRightmost));
+  if (isLeftmost) {
     overlay.appendChild(
       el(doc, "span", { class: "bc-paper-combos-zone-label" }, [
         `${formatTime(zone.startMin)} – ${formatTime(zone.endMin)}`
       ])
     );
   }
-  if (showRemove) {
+  if (isRightmost) {
     overlay.appendChild(
       el(doc, "button", {
         class: ZONE_REMOVE_BUTTON_CLASS,
