@@ -86,9 +86,6 @@ function statusFromLoadState(
   if (enumerate?.conflictingPins) {
     return "Pinned sections conflict with each other. Unpin one to continue.";
   }
-  if (enumerate && enumerate.combinations.length === 0) {
-    return "No non-overlapping combinations possible. Try unpinning sections or raising Max.";
-  }
   if (
     enumerate &&
     enumerate.combinations.length > 0 &&
