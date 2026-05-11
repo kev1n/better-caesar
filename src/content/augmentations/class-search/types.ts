@@ -32,12 +32,16 @@ export type SearchFilters = {
 // own FD-xx labels so the UI can shorten chips to "NS" / "EDR" / etc.
 export type FoundationalDisciplineCode = "NS" | "EDR" | "SBS" | "HS" | "EET" | "LA";
 
-// Each FD is sourced from either paper.nu's `distros` digit codes or
-// `disciplines` letter codes. Natural Sciences lives in the distros stream
-// (no letter code); the other five are letter-coded disciplines.
-//   distros: "1" Natural Sciences
-//   disciplines: A Empirical & Deductive, D Historical, E Ethical &
-//                Evaluative, F Literary & Artistic, G Social & Behavioral
+// Each FD reads from two of paper.nu's per-course tag fields, both
+// digit-coded:
+//   • `disciplines` (`f` in raw) — the post-2023 FD system, 1–6 aligned
+//     with the order on Weinberg's foundational-disciplines page.
+//   • `distros` (`s` in raw) — the pre-2023 7-distro system, still tagged
+//     on a lot of older catalog entries. Digits 1/3/4/5/6 map cleanly to
+//     the modern FDs; digit 2 (legacy "Formal Studies") covers the same
+//     math/logic/CS material that the new FD-EDR does. Digit 7
+//     ("Interdisciplinary") has no FD analogue.
+// We OR both fields so a course tagged in either system shows up.
 export const FOUNDATIONAL_DISCIPLINES: ReadonlyArray<{
   code: FoundationalDisciplineCode;
   label: string;
@@ -45,12 +49,12 @@ export const FOUNDATIONAL_DISCIPLINES: ReadonlyArray<{
   distros?: string;
   disciplines?: string;
 }> = [
-  { code: "NS",  label: "Natural Sciences",                short: "Nat Sci",  distros: "1" },
-  { code: "EDR", label: "Empirical & Deductive Reasoning", short: "Emp Ded",  disciplines: "A" },
-  { code: "SBS", label: "Social & Behavioral Sciences",    short: "Soc Beh",  disciplines: "G" },
-  { code: "HS",  label: "Historical Studies",              short: "History",  disciplines: "D" },
-  { code: "EET", label: "Ethical & Evaluative Thinking",   short: "Ethics",   disciplines: "E" },
-  { code: "LA",  label: "Literature & Arts",               short: "Lit Arts", disciplines: "F" }
+  { code: "NS",  label: "Natural Sciences",                short: "Nat Sci",  distros: "1", disciplines: "1" },
+  { code: "EDR", label: "Empirical & Deductive Reasoning", short: "Emp Ded",  distros: "2", disciplines: "2" },
+  { code: "SBS", label: "Social & Behavioral Sciences",    short: "Soc Beh",  distros: "3", disciplines: "3" },
+  { code: "HS",  label: "Historical Studies",              short: "History",  distros: "4", disciplines: "4" },
+  { code: "EET", label: "Ethical & Evaluative Thinking",   short: "Ethics",   distros: "5", disciplines: "5" },
+  { code: "LA",  label: "Literature & Arts",               short: "Lit Arts", distros: "6", disciplines: "6" }
 ];
 
 export type ResultRow = {
