@@ -95,8 +95,10 @@ describe("renderCourseCard", () => {
       ".bc-cs-course-fds .bc-cs-fd-icon-wrap"
     );
     expect(Array.from(wraps).map((w) => w.dataset.fd)).toEqual(["EDR", "SBS", "LA"]);
-    // Each wrap carries the tooltip title so hover shows the full FD name.
-    expect(wraps[0].title).toBe("Empirical & Deductive Reasoning");
+    // Each wrap carries a CSS tooltip with the full FD name.
+    expect(wraps[0].querySelector(".bc-tooltip")?.textContent).toBe(
+      "Empirical & Deductive Reasoning"
+    );
   });
 
   it("renders an empty fd row when the course has no matching tags", () => {

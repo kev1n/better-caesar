@@ -139,7 +139,7 @@ export function resultsStyles(): string {
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      color: var(--bc-color-text-soft);
+      color: var(--bc-color-text);
     }
     .bc-cs-course-fds .bc-cs-fd-icon {
       width: 15px;

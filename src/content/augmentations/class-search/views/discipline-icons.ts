@@ -67,12 +67,12 @@ export function renderDisciplineIcon(
   const fd = FOUNDATIONAL_DISCIPLINES.find((f) => f.code === code);
   const label = fd?.label ?? code;
 
-  // Wrap in <span> so the HTML `title` attribute makes the full bounding
-  // box a tooltip target. SVG <title> children only fire when the cursor
-  // is over a stroked pixel, which is barely-usable for small line icons.
+  // Use the design system's `bc-tooltip-host`/`bc-tooltip` pattern: the
+  // CSS-driven popup fades in within ~120ms instead of the ~500ms baked
+  // into the browser's native `title` tooltip. SVG <title> children stay
+  // for assistive tech.
   const wrap = doc.createElement("span");
-  wrap.className = "bc-cs-fd-icon-wrap";
-  wrap.title = label;
+  wrap.className = "bc-cs-fd-icon-wrap bc-tooltip-host";
   wrap.dataset.fd = code;
 
   const svg = doc.createElementNS(SVG_NS, "svg");
@@ -99,5 +99,11 @@ export function renderDisciplineIcon(
   }
 
   wrap.appendChild(svg);
+
+  const tip = doc.createElement("span");
+  tip.className = "bc-tooltip";
+  tip.textContent = label;
+  wrap.appendChild(tip);
+
   return wrap;
 }

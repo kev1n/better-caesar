@@ -68,7 +68,9 @@ export function statusStyles(): string {
       white-space: nowrap;
       border: 0;
     }
-    .bc-cs-fd-chip:focus-within {
+    /* Keyboard-only focus ring — :has(input:focus-visible) keeps mouse
+       clicks from drawing the extra outline around the chip. */
+    .bc-cs-fd-chip:has(input:focus-visible) {
       outline: 2px solid var(--bc-color-accent);
       outline-offset: 1px;
     }
@@ -83,7 +85,6 @@ export function statusStyles(): string {
     .bc-cs-fd-icon-wrap {
       display: inline-flex;
       align-items: center;
-      cursor: help;
     }
     .bc-cs-fd-chip:hover {
       border-color: var(--bc-color-border-strong);
