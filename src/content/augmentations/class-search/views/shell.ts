@@ -88,7 +88,7 @@ export function setStatus(
 }
 
 export function hasAnyFilter(filters: SearchFilters): boolean {
-  return filters.query.trim().length > 0;
+  return filters.query.trim().length > 0 || filters.disciplines.size > 0;
 }
 
 export function escapeHtml(input: string): string {

@@ -45,10 +45,29 @@ export function applyFilters(
 ): ResultRow[] {
   const terms = prepareQuery(filters.query);
   const hasQuery = terms.length > 0 && terms.some((t) => t.trim().length > 0);
-
-  if (!hasQuery) return [];
-
   const fdCodes = filters.disciplines;
+
+  if (!hasQuery && fdCodes.size === 0) return [];
+
+  // Discipline-only path: no query, but the user toggled at least one FD
+  // chip. Surface every course that matches the chip set, sorted by
+  // subject then catalog ascending — there's no relevance signal to
+  // bucket against.
+  if (!hasQuery) {
+    const filtered: ResultRow[] = [];
+    for (const course of termCourses) {
+      if (course.sections.length === 0) continue;
+      if (!matchesAnyDiscipline(course, catalogIndex, fdCodes)) continue;
+      filtered.push({ course, sections: course.sections });
+    }
+    filtered.sort((a, b) => {
+      const subjectDelta = a.course.subject.localeCompare(b.course.subject);
+      if (subjectDelta !== 0) return subjectDelta;
+      return compareCatalog(a.course.catalog, b.course.catalog);
+    });
+    return filtered;
+  }
+
   const scored: Scored[] = [];
   const placed = new Set<PaperTermCourse>();
 

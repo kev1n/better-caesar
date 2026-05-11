@@ -40,10 +40,12 @@ export function statusStyles(): string {
       margin-left: auto;
     }
     .bc-cs-fd-chip {
-      font: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       font-size: var(--bc-font-11);
       font-weight: var(--bc-fw-semibold);
-      padding: 3px 9px;
+      padding: 3px 9px 3px 7px;
       border-radius: var(--bc-radius-pill);
       border: 1px solid var(--bc-color-border-divider);
       background: var(--bc-color-surface-soft);
@@ -52,11 +54,18 @@ export function statusStyles(): string {
       user-select: none;
       transition: background-color var(--bc-tx-fast), border-color var(--bc-tx-fast), color var(--bc-tx-fast);
     }
+    .bc-cs-fd-chip input {
+      accent-color: var(--bc-color-accent);
+      margin: 0;
+      width: 11px;
+      height: 11px;
+      cursor: pointer;
+    }
     .bc-cs-fd-chip:hover {
       border-color: var(--bc-color-border-strong);
       color: var(--bc-color-text);
     }
-    .bc-cs-fd-chip[data-active="true"] {
+    .bc-cs-fd-chip:has(input:checked) {
       background: var(--bc-color-accent-surface-tile);
       border-color: var(--bc-color-accent-border-18);
       color: var(--bc-color-accent-pressed);
