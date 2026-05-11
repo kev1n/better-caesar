@@ -27,8 +27,18 @@ void startAccessGate();
 mountAccessGateModal();
 mountServerBanner();
 void initCartCache();
+// Hydrate course history on every host — the cache is read by the
+// paper.nu prereq-filter augmentation to mark eligibility, not just
+// CAESAR. Read-only on non-CAESAR hosts (no fetch); the opportunistic
+// reconcile that actually pulls fresh data still gates on CAESAR.
+const courseHistoryReady = initCourseHistoryCache();
 initModalCache();
-new AugmentationRunner(augmentationRegistry).start();
+const augmentationRunner = new AugmentationRunner(augmentationRegistry);
+augmentationRunner.start();
+// First augmentation tick fires before storage hydration finishes; once
+// the course-history cache lands, kick the runner so the prereq-filter
+// re-evaluates with real data instead of an empty map.
+void courseHistoryReady.then(() => augmentationRunner.requestRun());
 
 // Opportunistic cart-cache reconcile. Only fires on CAESAR pages — we need
 // the user's PeopleSoft session cookies to fetch the cart URL, and they
@@ -38,7 +48,7 @@ if (/caesar\.ent\.northwestern\.edu/i.test(window.location.host)) {
   void initCartCache().then(() => runOpportunisticReconcile());
   // Same opportunistic pattern as cart-cache: needs the live PeopleSoft
   // session cookies, gated on a 1hr stale check internally.
-  void initCourseHistoryCache().then(() => runOpportunisticCourseHistoryReconcile());
+  void courseHistoryReady.then(() => runOpportunisticCourseHistoryReconcile());
   // Queue indicator is also CAESAR-only — paper.nu has its own
   // status-bar surface and doesn't drive the PeopleSoft mutex.
   mountTrafficIndicator(document);

@@ -35,6 +35,15 @@ export class AugmentationRunner {
     this.observeAccessGate();
   }
 
+  // Manual re-tick. Use when a data source the augmentations depend on
+  // (e.g. course-history cache hydrating from chrome.storage.local) lands
+  // after the initial start() — there's no DOM mutation to piggy-back on,
+  // so without this the augmentations would only refresh on the next
+  // unrelated DOM change.
+  requestRun(): void {
+    this.runAll();
+  }
+
   private runAll(): void {
     if (!isAccessAllowed()) return;
     for (const augmentation of this.augmentations) {
