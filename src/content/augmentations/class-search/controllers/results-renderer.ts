@@ -253,7 +253,12 @@ export function createResultsRenderer(deps: ResultsRendererDeps): ResultsRendere
     const { doc, resultsEl, statusEl } = deps;
     resultsEl.innerHTML = "";
 
-    if (deps.filters.query.trim().length === 0) {
+    // No active filters of any kind → show the "Your classes" overview.
+    // Discipline chips alone (no query) still produce results below.
+    if (
+      deps.filters.query.trim().length === 0 &&
+      deps.filters.disciplines.size === 0
+    ) {
       renderMyClasses();
       return;
     }

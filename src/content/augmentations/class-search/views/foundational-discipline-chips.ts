@@ -1,9 +1,10 @@
 // Inline Foundational Discipline filter chips for the class-search status
 // row. Pure DOM — the mount-state controller wires up state.filters.disciplines
-// and re-renders results on toggle.
+// and re-renders results on toggle. Each chip is a <label> + <input
+// type=checkbox> so the affordance reads "toggleable filter" not "button".
 
 import { FOUNDATIONAL_DISCIPLINES } from "../types";
-import type { FoundationalDisciplineCode, SearchFilters } from "../types";
+import type { SearchFilters } from "../types";
 
 export type FoundationalDisciplineChipsProps = {
   filters: SearchFilters;
@@ -19,26 +20,24 @@ export function renderFoundationalDisciplineChips(
   host.className = "bc-cs-fd-filters";
 
   for (const fd of FOUNDATIONAL_DISCIPLINES) {
-    const btn = doc.createElement("button");
-    btn.type = "button";
-    btn.className = "bc-cs-fd-chip";
-    btn.dataset.fd = fd.code;
-    btn.dataset.active = props.filters.disciplines.has(fd.code) ? "true" : "false";
-    btn.textContent = fd.short;
-    btn.title = `Filter to ${fd.label}`;
-    btn.addEventListener("click", () => {
-      toggleDiscipline(props.filters, fd.code);
-      btn.dataset.active = props.filters.disciplines.has(fd.code) ? "true" : "false";
+    const label = doc.createElement("label");
+    label.className = "bc-cs-fd-chip";
+    label.dataset.fd = fd.code;
+    label.title = `Filter to ${fd.label}`;
+
+    const input = doc.createElement("input");
+    input.type = "checkbox";
+    input.checked = props.filters.disciplines.has(fd.code);
+    input.addEventListener("change", () => {
+      if (input.checked) props.filters.disciplines.add(fd.code);
+      else props.filters.disciplines.delete(fd.code);
       props.onChange();
     });
-    host.appendChild(btn);
-  }
-}
 
-function toggleDiscipline(
-  filters: SearchFilters,
-  code: FoundationalDisciplineCode
-): void {
-  if (filters.disciplines.has(code)) filters.disciplines.delete(code);
-  else filters.disciplines.add(code);
+    const text = doc.createElement("span");
+    text.textContent = fd.short;
+
+    label.append(input, text);
+    host.appendChild(label);
+  }
 }
