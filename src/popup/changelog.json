@@ -11,10 +11,18 @@
   },
   "entries": [
     {
-      "version": "0.7.0",
-      "date": "2026-05-11",
+      "version": "0.7.1",
+      "date": "2026-05-12",
       "headline": "See what you're eligible to take, on Paper.nu",
       "items": [
+        {
+          "kind": "feat",
+          "text": "Filter Sharper Search by Weinberg's Foundational Disciplines — toggle Nat Sci, Emp Ded, Soc Beh, History, Ethics, or Lit Arts to narrow results, and see at a glance which a course fulfills from the icons on every card."
+        },
+        {
+          "kind": "fix",
+          "text": "Searching something like \"comp_sci 3\" in Sharper Search now lists courses in catalog-number order (300, 305, … 349, …) instead of by title length."
+        },
         {
           "kind": "feat",
           "text": "Paper.nu search now shows little eligibility badges on every course based on what you've already taken in CAESAR — click the chip above the results to hide the ones you can't take yet."
