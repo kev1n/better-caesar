@@ -83,7 +83,7 @@ export async function resolvePerSectionSeats(
         normalizeSectionNum(s.section) === parsedLabel.section &&
         (row.component ? s.component === row.component : true)
     );
-    if (!section?.capacity) {
+    if (section?.capacity === undefined || section.capacity === null || section.capacity === "") {
       logDebug(SCOPE, "skip: paper.nu course found but no section.capacity", {
         wantedSection: parsedLabel.section,
         wantedComponent: row.component,
@@ -157,8 +157,9 @@ function normalizeSectionNum(s: string): string {
   return s.replace(/^0+/, "") || "0";
 }
 
-function parseCount(value: string | null): number | null {
-  if (value === null) return null;
+function parseCount(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : null;
   const n = Number.parseInt(value.replace(/[^\d-]/g, ""), 10);
   return Number.isFinite(n) ? n : null;
 }

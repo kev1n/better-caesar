@@ -5,17 +5,15 @@
 
 const DEBUG_KEY = "bc-debug";
 
-let debugEnabled: boolean | null = null;
-
+// Re-read localStorage on every call so users can toggle bc-debug mid-session
+// without reloading the page. Cost is negligible — logQuiet/logDebug are
+// called at human-action rates, not in hot loops.
 function isDebug(): boolean {
-  if (debugEnabled !== null) return debugEnabled;
   try {
-    debugEnabled =
-      typeof localStorage !== "undefined" && localStorage.getItem(DEBUG_KEY) === "1";
+    return typeof localStorage !== "undefined" && localStorage.getItem(DEBUG_KEY) === "1";
   } catch {
-    debugEnabled = false;
+    return false;
   }
-  return debugEnabled;
 }
 
 export function logQuiet(scope: string, err: unknown): void {
@@ -28,7 +26,6 @@ export function logDebug(scope: string, ...args: unknown[]): void {
   console.debug(`[bc:${scope}]`, ...args);
 }
 
-// Test-only: reset the cached debug flag so each test starts fresh.
-export function _resetDebugCache(): void {
-  debugEnabled = null;
-}
+// Test-only: kept for spec backward-compat. The cache was removed in favor of
+// re-reading localStorage on every call, so this is a no-op now.
+export function _resetDebugCache(): void {}
