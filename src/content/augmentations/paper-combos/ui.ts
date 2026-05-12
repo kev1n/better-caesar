@@ -435,11 +435,14 @@ export function renderTopBar(
     }
   }, ["⋯"]);
 
-  // Left cluster: status info (what's currently showing).
+  // Two flex spacers — one before cycle, one after rating — push the
+  // [cycle + rating] cluster into the horizontal center of the bar.
+  // Toggle stays anchored left, sort/credits/menu stays anchored right,
+  // and the user's primary "which combo am I on" readout sits dead-
+  // centre where the eye naturally lands.
+  bar.appendChild(el(doc, "span", { class: "bc-paper-combos-spacer" }));
   bar.appendChild(cycle);
   if (rating) bar.appendChild(rating);
-  // Auto-margin spacer pushes the right cluster — sort/credits/kebab
-  // — to the bar's far end so the toolbar reads as two visual groups.
   bar.appendChild(el(doc, "span", { class: "bc-paper-combos-spacer" }));
   // Right cluster: inline copies of sort + credits, the kebab, and
   // the popover container holding the popover copies. CSS shows

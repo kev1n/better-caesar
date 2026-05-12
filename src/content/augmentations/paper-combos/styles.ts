@@ -214,29 +214,33 @@ const CSS = `
 
 /* Always-visible feature toggle pill. Its iOS-style track + thumb makes
  * the on/off state obvious from a glance, and it sits to the left of
- * everything else in the bar so it's the first thing users see. */
+ * everything else in the bar so it's the first thing users see. The
+ * resting state wears an accent-colored outline so it reads as a call-
+ * to-action — most users arrive with the feature off, and the outline
+ * draws the eye without implying any state has changed. */
 .${FEATURE_TOGGLE_CLASS} {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  height: 1.75rem;
-  padding: 0 0.65rem 0 0.35rem;
-  border: 1px solid var(--bc-color-border);
+  height: 1.85rem;
+  padding: 0 0.7rem 0 0.4rem;
+  border: 1.5px solid var(--bc-color-accent);
   border-radius: var(--bc-radius-pill);
-  background: var(--bc-color-bg-muted);
-  color: var(--bc-color-text);
+  background: var(--bc-color-accent-surface-soft);
+  color: var(--bc-color-accent);
   cursor: pointer;
   font: inherit;
-  font-size: 0.8rem;
-  font-weight: var(--bc-fw-medium);
+  font-size: 0.82rem;
+  font-weight: var(--bc-fw-semibold);
   line-height: 1;
   transition: border-color var(--bc-tx-fast) var(--bc-easing),
-              background var(--bc-tx-fast) var(--bc-easing);
+              background var(--bc-tx-fast) var(--bc-easing),
+              box-shadow var(--bc-tx-fast) var(--bc-easing);
 }
 
 .${FEATURE_TOGGLE_CLASS}:hover {
-  border-color: var(--bc-color-border-strong);
-  background: var(--bc-color-surface-hover);
+  border-color: var(--bc-color-accent-hover);
+  box-shadow: 0 0 0 3px var(--bc-color-accent-surface-soft);
 }
 
 .${FEATURE_TOGGLE_CLASS} .bc-paper-combos-toggle-track {
@@ -280,27 +284,38 @@ const CSS = `
   font-size: 0.78rem;
 }
 
+/* Cycle cluster: wrap prev/counter/next in a single bordered pill so
+ * the centered "X / Y" reads as the bar's primary readout. Sits in
+ * the visual middle of the bar (flex spacers on both sides push it
+ * there) so the user's eye lands on the current-combo count before
+ * anything else. */
 #${TOP_BAR_ID} .bc-paper-combos-cycle {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.25rem;
+  padding: 0.2rem 0.3rem;
+  border: 1px solid var(--bc-color-border-strong);
+  background: var(--bc-color-bg);
+  border-radius: var(--bc-radius-pill);
+  box-shadow: var(--bc-shadow-button);
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-cycle button {
   cursor: pointer;
-  border: 1px solid var(--bc-color-border);
-  background: var(--bc-color-bg-muted);
-  border-radius: var(--bc-radius-sm);
-  width: 1.75rem;
-  height: 1.75rem;
-  font-size: 0.85rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--bc-radius-circle);
+  width: 1.6rem;
+  height: 1.6rem;
+  font-size: 0.95rem;
+  font-weight: var(--bc-fw-semibold);
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--bc-color-text);
-  transition: border-color var(--bc-tx-fast) var(--bc-easing),
-              background var(--bc-tx-fast) var(--bc-easing);
+  color: var(--bc-color-accent);
+  transition: background var(--bc-tx-fast) var(--bc-easing),
+              color var(--bc-tx-fast) var(--bc-easing);
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-cycle button[disabled] {
@@ -309,17 +324,18 @@ const CSS = `
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-cycle button:not([disabled]):hover {
-  border-color: var(--bc-color-border-strong);
-  background: var(--bc-color-surface-hover);
+  background: var(--bc-color-accent-surface-soft);
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-counter {
   font-variant-numeric: tabular-nums;
-  font-weight: var(--bc-fw-semibold);
-  min-width: 4rem;
+  font-weight: var(--bc-fw-bold);
+  min-width: 4.5rem;
   text-align: center;
-  font-size: 0.82rem;
-  color: var(--bc-color-text);
+  font-size: 1rem;
+  color: var(--bc-color-accent);
+  padding: 0 0.35rem;
+  letter-spacing: 0.01em;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-rating {
