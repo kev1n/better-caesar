@@ -11,6 +11,21 @@
   },
   "entries": [
     {
+      "version": "0.7.1",
+      "date": "2026-05-12",
+      "headline": "Filter Sharper Search by Foundational Discipline",
+      "items": [
+        {
+          "kind": "feat",
+          "text": "Filter Sharper Search by Weinberg's Foundational Disciplines — toggle Nat Sci, Emp Ded, Soc Beh, History, Ethics, or Lit Arts to narrow results, and see at a glance which a course fulfills from the icons on every card."
+        },
+        {
+          "kind": "fix",
+          "text": "Searching something like \"comp_sci 3\" in Sharper Search now lists courses in catalog-number order (300, 305, … 349, …) instead of by title length."
+        }
+      ]
+    },
+    {
       "version": "0.6.0",
       "date": "2026-05-08",
       "headline": "Missing grad year? You're in; schedule combinations",
