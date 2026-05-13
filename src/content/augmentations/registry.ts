@@ -5,6 +5,7 @@ import { ctecLinksAugmentation } from "./ctec-links";
 import { enrollmentNavigationAugmentation } from "./enrollment-navigation";
 import { paperCombosAugmentation } from "./paper-combos";
 import { paperCtecAugmentation } from "./paper-ctec";
+import { paperHideTakenAugmentation } from "./paper-hide-taken";
 import { prereqFilterAugmentation } from "./prereq-filter";
 import { seatsNotesAugmentation } from "./seats-notes";
 
@@ -19,6 +20,7 @@ export const augmentationRegistry: Augmentation[] = [
   ctecLinksAugmentation,
   paperCtecAugmentation,
   paperCombosAugmentation,
+  paperHideTakenAugmentation,
   prereqFilterAugmentation,
   seatsNotesAugmentation,
   cartPageHydrator

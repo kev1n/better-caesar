@@ -41,6 +41,15 @@ function isPaperHost(): boolean {
   return host === "paper.nu" || host === "www.paper.nu";
 }
 
+// paper.nu only renders its Browse/Filter button strip when its internal
+// `queryEmpty` state is true. Treat that strip's absence as the canonical
+// "user has typed something" signal — DOM-driven so the AugmentationRunner
+// picks the transition up through its MutationObserver without us having
+// to wire input events.
+function isUserSearching(doc: Document): boolean {
+  return !doc.querySelector("div.m-4.flex.justify-center.gap-2");
+}
+
 function isEligibleWhenSwitchOn(
   state: EligibilityResult["state"],
   unknownIsEligible: boolean
@@ -370,8 +379,23 @@ export class PrereqFilterAugmentation implements Augmentation {
       this.mountRow(doc, list);
     }
     this.updateFeatureSwitchState(featureOn);
+
+    const searching = isUserSearching(doc);
+
+    // "Prereqs (Beta)" feature toggle lives in the empty state — when the
+    // user starts typing, it makes way for the filter/hide-taken switches
+    // which operate on the live result set.
+    if (this.switchEl) {
+      this.switchEl.style.display = searching ? "none" : "";
+    }
+
     if (featureOn) {
       this.ensureFilterSwitch(doc);
+      // "Show Only Prereq Fulfilled" only matters when there ARE results
+      // to filter. Hide when the user hasn't searched yet.
+      if (this.filterBtnEl) {
+        this.filterBtnEl.style.display = searching ? "" : "none";
+      }
     } else if (this.filterBtnEl) {
       this.filterBtnEl.remove();
       this.filterBtnEl = null;

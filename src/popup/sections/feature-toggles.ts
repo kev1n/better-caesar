@@ -91,6 +91,11 @@ export const FEATURE_SECTIONS: FeatureSection[] = [
         description: "Show the in-page combinations bar on Paper.nu. Use the on/off switch on Paper itself to actually start cycling combos."
       },
       {
+        id: "paper-hide-taken",
+        label: "Hide Taken Courses",
+        description: "Hides Paper.nu search results for courses you've already completed or transferred. In-progress courses stay visible, and repeatable courses (396/397, seminars, independent study) are never filtered."
+      },
+      {
         id: "prereq-filter",
         label: "Prereq Filter (Experimental)",
         description: "Paints eligibility badges on Paper.nu search results + schedule cards based on your CAESAR course history. Data quality caveat: Paper.nu's data is sometimes out of sync with the actual course requirements."
