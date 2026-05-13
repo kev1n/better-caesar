@@ -1,5 +1,6 @@
 import { html, render, type TemplateResult } from "lit-html";
 
+import type { CtecAnalyticsStrategy } from "../../ctec-links/types";
 import type { ModalCommentTone, ModalDisplayData } from "../modal-data";
 import { preventAndStop, stopPropagation } from "../ui-shared";
 import type { Section } from "./section";
@@ -17,6 +18,7 @@ import {
 export type CommentsSectionProps = {
   doc: Document;
   data: ModalDisplayData;
+  strategy: CtecAnalyticsStrategy;
   state: AnalyticsModalState;
   callbacks: AnalyticsModalCallbacks;
 };
@@ -25,10 +27,10 @@ export type CommentsSectionProps = {
 // alongside a main panel with search/sort toolbar, active filter chips,
 // count, and the filtered comment-card list.
 export const CommentsSection: Section<CommentsSectionProps> = {
-  render({ doc, data, state, callbacks }) {
+  render({ doc, data, strategy, state, callbacks }) {
     return html`<div class="bc-paper-ctec-modal-comments">
       ${renderCommentsRail(data, state, callbacks)}
-      ${renderCommentsMain(doc, data, state, callbacks)}
+      ${renderCommentsMain(doc, data, strategy, state, callbacks)}
     </div>`;
   }
 };
@@ -215,7 +217,8 @@ const commentsHostCache = new WeakMap<
 function commentsListSignature(
   data: ModalDisplayData,
   state: AnalyticsModalState,
-  query: string
+  query: string,
+  strategy: CtecAnalyticsStrategy
 ): string {
   return [
     data.comments.length,
@@ -225,13 +228,15 @@ function commentsListSignature(
     state.commentsTermFilter,
     state.commentsSortBy,
     state.commentsVisibleCount,
-    query
+    query,
+    strategy
   ].join("\x1f");
 }
 
 function renderCommentsMain(
   doc: Document,
   data: ModalDisplayData,
+  strategy: CtecAnalyticsStrategy,
   state: AnalyticsModalState,
   callbacks: AnalyticsModalCallbacks
 ): TemplateResult {
@@ -251,10 +256,10 @@ function renderCommentsMain(
   const { list: commentsList, count: countLabel } = cache;
 
   const draw = (query: string) => {
-    const sig = commentsListSignature(data, state, query);
+    const sig = commentsListSignature(data, state, query, strategy);
     if (cache!.signature === sig) return;
     cache!.signature = sig;
-    renderCommentList(commentsList, countLabel, data, state, query);
+    renderCommentList(commentsList, countLabel, data, strategy, state, query);
   };
   draw(state.commentsQuery);
 
@@ -344,6 +349,7 @@ function renderCommentList(
   container: HTMLElement,
   countLabel: HTMLElement,
   data: ModalDisplayData,
+  strategy: CtecAnalyticsStrategy,
   state: AnalyticsModalState,
   query: string
 ): void {
@@ -404,7 +410,7 @@ function renderCommentList(
 
   for (let i = 0; i < visibleCount; i++) {
     container.append(
-      renderCommentCard(doc, filtered[i]!, highlights, state.commentsActiveTopic)
+      renderCommentCard(doc, filtered[i]!, strategy, highlights, state.commentsActiveTopic)
     );
   }
 
@@ -430,7 +436,7 @@ function renderCommentList(
       const fragment = doc.createDocumentFragment();
       for (let i = currentRendered; i < nextRendered; i++) {
         fragment.append(
-          renderCommentCard(doc, filtered[i]!, highlights, state.commentsActiveTopic)
+          renderCommentCard(doc, filtered[i]!, strategy, highlights, state.commentsActiveTopic)
         );
       }
       container.insertBefore(fragment, more);
@@ -445,7 +451,7 @@ function renderCommentList(
       // scratch (which would discard the just-appended cards).
       const cached = commentsHostCache.get(doc);
       if (cached) {
-        cached.signature = commentsListSignature(data, state, query);
+        cached.signature = commentsListSignature(data, state, query, strategy);
       }
     });
     container.append(more);
@@ -455,6 +461,7 @@ function renderCommentList(
 function renderCommentCard(
   doc: Document,
   comment: ModalDisplayData["comments"][number],
+  strategy: CtecAnalyticsStrategy,
   highlights: string[],
   activeTopic: string | null
 ): HTMLElement {
@@ -506,6 +513,14 @@ function renderCommentCard(
   term.textContent = comment.term;
   footer.append(term);
 
+  const axisLabel = commentAxisLabel(comment, strategy);
+  if (axisLabel) {
+    const axis = doc.createElement("span");
+    axis.className = "bc-paper-ctec-modal-comment-axis";
+    axis.textContent = axisLabel;
+    footer.append(axis);
+  }
+
   for (const topic of comment.topics) {
     const chip = doc.createElement("span");
     chip.className = `bc-paper-ctec-modal-comment-theme${
@@ -518,6 +533,18 @@ function renderCommentCard(
   card.append(footer);
 
   return card;
+}
+
+function commentAxisLabel(
+  comment: ModalDisplayData["comments"][number],
+  strategy: CtecAnalyticsStrategy
+): string {
+  if (strategy === "course") return comment.instructor.trim();
+  if (strategy === "instructor") {
+    const match = comment.description.trim().match(/^([A-Z][A-Z_]*)\s+(\d+)/);
+    return match ? `${match[1]} ${match[2]}` : "";
+  }
+  return "";
 }
 
 // Highlights any of the provided phrases inside `text`. Used for both the
@@ -610,8 +637,9 @@ function isHiddenPrompt(prompt: string): boolean {
 export function renderComments(
   doc: Document,
   data: ModalDisplayData,
+  strategy: CtecAnalyticsStrategy,
   state: AnalyticsModalState,
   callbacks: AnalyticsModalCallbacks
 ): TemplateResult {
-  return CommentsSection.render({ doc, data, state, callbacks });
+  return CommentsSection.render({ doc, data, strategy, state, callbacks });
 }

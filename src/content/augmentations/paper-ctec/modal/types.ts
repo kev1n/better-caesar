@@ -1,4 +1,68 @@
+import type { CtecAnalyticsStrategy } from "../../ctec-links/types";
 import type { ModalCommentTone, ModalDisplayData, ModalMetricKind } from "../modal-data";
+
+// One CTEC report candidate the dry-run dialog can present. `source`
+// labels which strategy this row "came from" so the available-list can
+// group them by alternative pathway. PROTOTYPE: shape is what we'd
+// persist; the data populating it is currently mocked, see
+// `buildInitialDryRunState` in `modal/dry-run.ts`.
+export type DryRunCandidate = {
+  id: string;
+  source: CtecAnalyticsStrategy;
+  term: string;
+  instructor: string;
+  // Short course label, e.g. "ECON 281". Distinct from `description`
+  // because the description is the raw CAESAR string ("ECON 281-0-30
+  // ECONOMETRICS"); the catalog label is what we want in the row chip.
+  catalogLabel: string;
+  description: string;
+};
+
+// Two-step wizard: first the user picks WHICH alternative pathway to
+// explore (choose stage — just a count summary, no row detail), then
+// the picker UI for that pathway opens (pick stage). Pick stage shows
+// a list of preset queries — no individual-row picking — so the user
+// has a clear, opinionated default and a few easy substitutes.
+export type DryRunStage =
+  | { kind: "choose" }
+  | { kind: "pick"; source: CtecAnalyticsStrategy; preset: DryRunPreset };
+
+// A preset filter the user chooses on the pick stage. Each one
+// resolves to a concrete set of candidate rows when applied.
+//   recent              — most recent N sections from the pool, unfiltered
+//   diverse-instructors — one section per professor, up to N distinct (course mode only)
+//   by-catalog          — every section of one specific class (instructor mode only)
+//   by-instructor       — every section by one specific professor (course mode only)
+export type DryRunPreset =
+  | { kind: "recent" }
+  | { kind: "diverse-instructors" }
+  | { kind: "by-catalog"; catalog: string; title: string; count: number }
+  | { kind: "by-instructor"; instructor: string; count: number };
+
+// Per-pathway discovery status. Lets the choose stage tell the user
+// what's happening — loading, error, no access, or "N sections found"
+// — without conflating the two pools' independent lifecycles.
+export type DryRunPoolStatus =
+  | { kind: "loading" }
+  | { kind: "ready"; rows: DryRunCandidate[] }
+  | { kind: "empty" }
+  | { kind: "no-access" }
+  | { kind: "auth-required"; loginUrl: string }
+  | { kind: "error"; message: string };
+
+export type DryRunState = {
+  // Current wizard stage.
+  stage: DryRunStage;
+  // Hard cap on how many rows the eventual fetch should pull. Still
+  // honored when applying a preset — `recent` slices to capacity,
+  // `by-*` filters can return more (the fetcher caps from there).
+  capacity: number;
+  // Per-pathway discovery state. Lets the choose stage show loading
+  // skeletons / error chips per card. Updated by the controller after
+  // discoverCourseRows / discoverInstructorRows resolve.
+  coursePool: DryRunPoolStatus;
+  instructorPool: DryRunPoolStatus;
+};
 
 // Initial number of comment cards rendered when the comments tab opens, and
 // the increment per "Show more" click. Sized to keep tab-switch latency
@@ -46,6 +110,18 @@ export type AnalyticsModalState = {
   // of ms. User clicks "Show more" to grow this; persists across re-renders
   // so filtering/sorting after expanding doesn't reset the visible window.
   commentsVisibleCount: number;
+  // Non-null when the dry-run preview dialog is open. Lets the user
+  // inspect + reorder + toggle which CTECs would be pulled before the
+  // network call goes out. PROTOTYPE only — confirmation currently
+  // hands off to the existing switchStrategy path without consuming
+  // the user's selection.
+  dryRun: DryRunState | null;
+  // Set when the user explicitly cancels out of the dry-run dialog.
+  // Suppresses the auto-open-on-not-found behavior so users don't get
+  // re-trapped in the same dialog they just dismissed. Cleared when
+  // the user explicitly re-opens via the "Reopen preview" button on
+  // the not-found body, when they switch strategy, or on modal close.
+  dryRunDismissed: boolean;
 };
 
 export type AnalyticsModalCallbacks = {
@@ -61,6 +137,29 @@ export type AnalyticsModalCallbacks = {
   onLoadMore: () => void;
   onDismissRefreshFlash: () => void;
   onToggleHeatmapExpanded: () => void;
+  // Switches the active analytics lens. Persists globally — the chip
+  // rating on schedule cards and any future modal opens both pick up the
+  // user's last choice. Triggers a re-fetch when the new lens has no
+  // cached data yet.
+  onStrategyChange: (strategy: CtecAnalyticsStrategy) => void;
+  // Opens the dry-run preview dialog. Starts on the `choose` wizard
+  // stage; the user picks which alternative pathway to drill into,
+  // then the `pick` stage opens. Used by the "Reopen preview"
+  // recovery button on the not-found body.
+  onOpenDryRun: () => void;
+  // Wizard navigation. Pick: advance from `choose` into the preset
+  // picker for `source`. Back: return from `pick` to `choose`.
+  onDryRunChooseSource: (source: CtecAnalyticsStrategy) => void;
+  onDryRunBack: () => void;
+  // Switch which preset is active in the pick stage. Same source,
+  // different filter (recent / by-catalog / by-instructor / diverse).
+  onDryRunSelectPreset: (preset: DryRunPreset) => void;
+  // Confirms the active preset, closes the dialog, and hands off to
+  // the strategy-switch + fetch path. PROTOTYPE: the preset itself is
+  // not yet threaded into the fetch — the existing batched fetcher
+  // picks its own top N for the chosen strategy.
+  onDryRunConfirm: () => void;
+  onDryRunCancel: () => void;
 };
 
 export type AnalyticsModalInput = {
@@ -89,6 +188,24 @@ export type AnalyticsModalInput = {
   // the header. Cleared by the augmentation after success auto-dismiss or on
   // user dismissal.
   refreshFlash: ModalRefreshFlash | null;
+  // Active analytics lens — drives the segmented selector in the header,
+  // the adaptive disclaimer copy, and which slice of CTEC data populates
+  // the body. Read from chrome.storage.local at render time so the modal
+  // reflects the user's global preference (and changes here persist back).
+  strategy: CtecAnalyticsStrategy;
+  // True when the active lens has never produced a discovery pass AND a
+  // fetch is currently in flight. Suppresses showing the combo-lens
+  // subset as "loaded" data for course/instructor lenses on first visit.
+  freshLensLoading: boolean;
+  // True when broadening to the Course lens would surface the same rows
+  // as Combo (only one prof has ever taught this course in cache). Hides
+  // the option from the header selector and dry-run choose stage.
+  courseLensRedundant: boolean;
+  // True when broadening to the Instructor lens would surface the same
+  // rows as Combo (this prof has only ever taught this one course in
+  // the subject). Hides the option from the header selector and dry-run
+  // choose stage.
+  instructorLensRedundant: boolean;
 };
 
 // Per-tone visual metadata used by the comment cards (left border + tag pill)

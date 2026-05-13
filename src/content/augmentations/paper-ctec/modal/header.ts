@@ -1,5 +1,6 @@
 import { html, type TemplateResult } from "lit-html";
 
+import type { CtecAnalyticsStrategy } from "../../ctec-links/types";
 import type { ModalDisplayData } from "../modal-data";
 import { preventAndStop, stopPropagation } from "../ui-shared";
 import type { Section } from "./section";
@@ -19,8 +20,9 @@ export type HeaderSectionProps = {
 };
 
 // Modal header: close button, identity row (title + meta strip + actions),
-// optional refresh-flash banner, optional tab strip. The tab strip only
-// appears when data is loaded — otherwise the body shows a status card.
+// strategy selector (always visible — lets the user pivot even when the
+// current lens has no data), optional refresh-flash banner, optional tab
+// strip (only when data is loaded; otherwise the body shows a status card).
 export const HeaderSection: Section<HeaderSectionProps> = {
   render({ doc: _doc, input, state, callbacks }) {
     return html`<header class="bc-paper-ctec-modal-header">
@@ -55,13 +57,91 @@ export const HeaderSection: Section<HeaderSectionProps> = {
         </div>
         ${renderActions(input, callbacks)}
       </div>
+      ${renderStrategySelector(input, callbacks)}
       ${input.refreshFlash ? renderRefreshFlash(input.refreshFlash, callbacks) : ""}
-      ${input.data
-        ? html`${renderDisclaimer(input)}${renderTabs(state, callbacks, input.data)}`
-        : ""}
+      ${input.data ? renderTabs(state, callbacks, input.data) : ""}
     </header>`;
   }
 };
+
+type StrategyOption = {
+  id: CtecAnalyticsStrategy;
+  label: string;
+  shortDescription: string;
+};
+
+const STRATEGY_OPTIONS: readonly StrategyOption[] = [
+  {
+    id: "combo",
+    label: "Course + Prof",
+    shortDescription: "This professor's sections of this course"
+  },
+  {
+    id: "course",
+    label: "Course",
+    shortDescription: "Every professor who has taught this course"
+  },
+  {
+    id: "instructor",
+    label: "Prof",
+    shortDescription: "Every course this professor has taught"
+  }
+];
+
+// Segmented control above the disclaimer. Each click persists globally
+// (chip ratings + future modal opens), but the user can still flip back
+// without consequence — strategies share the same per-subject cache.
+function renderStrategySelector(
+  input: AnalyticsModalInput,
+  callbacks: AnalyticsModalCallbacks
+): TemplateResult {
+  // All three tabs always render, even when the broader lens would
+  // surface the same rows as combo. Hiding "redundant" tabs proved
+  // confusing in practice: users who'd just used a lens saw its tab
+  // vanish on the next combo switch, and users who'd never explored
+  // the broader lens had no way to find it. Predictable affordances
+  // win over auto-hiding. The wizard choose-stage still respects
+  // redundancy because that's a one-time pick with its own "0
+  // sections" framing for empty pathways.
+  const options = STRATEGY_OPTIONS;
+  return html`<div class="bc-paper-ctec-modal-strategy-row">
+    <div
+      class="bc-paper-ctec-modal-strategy"
+      role="tablist"
+      aria-label="CTEC view"
+    >
+      ${options.map((option) => {
+        const isActive = input.strategy === option.id;
+        return html`<button
+          type="button"
+          class=${`bc-paper-ctec-modal-strategy-option${
+            isActive ? " is-active" : ""
+          }`}
+          role="tab"
+          aria-selected=${isActive ? "true" : "false"}
+          title=${option.shortDescription}
+          @click=${(event: Event) => {
+            preventAndStop(event);
+            if (isActive) return;
+            callbacks.onStrategyChange(option.id);
+          }}
+        >${option.label}</button>`;
+      })}
+    </div>
+    ${input.strategy === "combo"
+      ? ""
+      : html`<button
+          type="button"
+          class="bc-paper-ctec-modal-strategy-reopen"
+          title="Adjust which sections are loaded for the active lens"
+          @click=${(event: Event) => {
+            preventAndStop(event);
+            callbacks.onOpenDryRun();
+          }}
+        >Adjust selection…</button>`}
+    ${input.data ? renderDisclaimer(input) : ""}
+  </div>`;
+}
 
 const REFRESH_TOOLTIP =
   "Use this when a new round of CTECs comes out each quarter. Asks Northwestern for any newly-published evaluations for this course and adds them to your view. Runs in the background — your existing data stays visible the whole time.";
@@ -76,7 +156,14 @@ function renderActions(
   input: AnalyticsModalInput,
   callbacks: AnalyticsModalCallbacks
 ): TemplateResult | string {
-  const showLoadMore = input.canLoadMore || input.loading;
+  // Incremental "Load N more terms" only makes sense in combo view —
+  // course and instructor lenses are explored through the wizard's
+  // preset picker (which sets the scope explicitly), and the
+  // "(M left)" counter in those lenses points at every untouched
+  // section CAESAR knows about, which can balloon past 20+ and isn't
+  // the right affordance for the lens's "broader summary" framing.
+  const showLoadMore =
+    input.strategy === "combo" && (input.canLoadMore || input.loading);
   const showRefresh = input.canRefresh;
   const reportUrl = input.data?.course.reportUrl;
 
@@ -123,7 +210,7 @@ function renderActions(
             ? "Checking Northwestern…"
             : "↻ Check for new CTECs"}</span
           > <span class="bc-paper-ctec-modal-info-icon" aria-hidden="true">i</span
-          ><span class="bc-tooltip bc-tooltip--rich bc-tooltip--right">${REFRESH_TOOLTIP}</span></button>`
+          ><span class="bc-tooltip bc-tooltip--rich">${REFRESH_TOOLTIP}</span></button>`
       : ""}
     ${reportUrl
       ? html`<a
@@ -137,41 +224,63 @@ function renderActions(
   </div>`;
 }
 
-// Persistent scope banner sitting between the identity row and tabs. The
-// analytics view aggregates *only* the sections of this exact course taught
-// by this exact professor — no cross-professor or cross-course mixing — and
-// users were misreading trend deltas as comparing different instructors.
-// This banner makes the scope unmissable on every tab.
+// Single-line scope pill sitting between the strategy selector and tabs.
+// Tells the user which lens is active and the size of the aggregate
+// window. The orange "name" pill tracks the variable axis: combo +
+// instructor highlight the professor; course highlights the course code.
 function renderDisclaimer(input: AnalyticsModalInput): TemplateResult {
   const instructor = input.identity.instructor.trim();
   const code = `${input.identity.subject} ${input.identity.catalog}`;
-  const termCount = input.data?.terms.length ?? 0;
+  const terms = input.data?.terms ?? [];
+  const termCount = terms.length;
   const termLabel = termCount === 1 ? "term" : "terms";
-  const subject = instructor || "this professor";
+  const termFragment = html`<span class="bc-paper-ctec-modal-disclaimer-count"
+    >${termCount} ${termLabel}</span
+  >`;
+  const namePill = (label: string) =>
+    html`<span class="bc-paper-ctec-modal-disclaimer-name">${label}</span>`;
+
+  let body: TemplateResult;
+  if (input.strategy === "course") {
+    const profCount = new Set(
+      terms
+        .map((t) => t.instructor.trim().toLowerCase())
+        .filter((v) => v.length > 0)
+    ).size;
+    const acrossClause =
+      profCount > 0
+        ? html` across ${profCount} ${profCount === 1 ? "professor" : "professors"}`
+        : "";
+    body = html`All ${namePill(code)} sections — ${termFragment}${acrossClause}`;
+  } else if (input.strategy === "instructor") {
+    const courseCount = new Set(
+      terms
+        .map((t) => extractCourseLabel(t.description))
+        .filter((v) => v.length > 0)
+    ).size;
+    const acrossClause =
+      courseCount > 0
+        ? html` across ${courseCount} ${courseCount === 1 ? "course" : "courses"}`
+        : "";
+    const profPill = instructor ? namePill(instructor) : "this professor";
+    body = html`${profPill}'s ${input.identity.subject} teaching —
+      ${termFragment}${acrossClause}`;
+  } else {
+    const profPill = instructor ? namePill(instructor) : "this professor";
+    body = html`${profPill}'s ${code} — ${termFragment}`;
+  }
 
   return html`<div
     class="bc-paper-ctec-modal-disclaimer"
     role="note"
     aria-label="Data scope"
-  >
-    <span class="bc-paper-ctec-modal-disclaimer-text">
-      <span class="bc-paper-ctec-modal-disclaimer-headline">
-        Showing only ${instructor
-          ? html`<span class="bc-paper-ctec-modal-disclaimer-name">${instructor}</span>`
-          : "this professor"}'s ${code} data
-        ${termCount > 0
-          ? html` · <span class="bc-paper-ctec-modal-disclaimer-count"
-              >${termCount} ${termLabel}</span
-            >`
-          : ""}
-      </span>
-      <span class="bc-paper-ctec-modal-disclaimer-detail"
-        >No other professors are mixed in. Every chart, average, trend, and
-        “vs recent term” number on this page is computed from
-        ${subject}'s own past sections of ${code} — nothing else.</span
-      >
-    </span>
-  </div>`;
+  >${body}</div>`;
+}
+
+function extractCourseLabel(description: string): string {
+  const match = description.trim().match(/^([A-Z][A-Z_]*)\s+(\d+)/);
+  if (!match) return "";
+  return `${match[1]} ${match[2]}`;
 }
 
 function renderRefreshFlash(

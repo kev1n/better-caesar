@@ -243,7 +243,7 @@ export const psCreditPool = defineCreditPool({
   }
 });
 
-export const CTEC_CREDIT_CAP = 20;
+export const CTEC_CREDIT_CAP = 30;
 export const CTEC_CREDIT_WINDOW_MS = 60 * 60 * 1000;
 
 // Each batch of up to CTEC_BATCH_SIZE PeopleSoft class-page fetches consumes

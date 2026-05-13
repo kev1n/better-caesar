@@ -108,6 +108,7 @@ export type ModalCommentTone = "pos" | "neu" | "mix" | "neg";
 export type ModalComment = {
   term: string;
   instructor: string;
+  description: string;
   prompt: string;
   text: string;
   topics: string[];

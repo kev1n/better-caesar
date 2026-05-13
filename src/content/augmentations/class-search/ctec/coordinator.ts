@@ -29,7 +29,7 @@ import {
   type CtecReportAggregate
 } from "../../ctec-links/reports";
 import { CTEC_ERROR_TOAST_MESSAGE } from "../../ctec-links/rate-limit";
-import { getRecentAggregationTerms } from "../../../settings";
+import { getRecentAggregationTerms, subscribeCtecStrategy } from "../../../settings";
 import { buildModalDisplayData } from "../../paper-ctec/modal-data";
 import type {
   AnalyticsModalSource,
@@ -71,6 +71,31 @@ export function createCtecCoordinator(
 ): CtecCoordinator {
   const resolved = new Map<string, PaperCtecWidgetData>();
   const inFlight = new Map<string, Promise<void>>();
+
+  // Strategy switches invalidate every resolved aggregate (the map is
+  // keyed on course identity only; strategy is implicit in the lookup).
+  // Clear and repaint every live host so the section row picks up the
+  // new lens's data on the next render tick — same pattern used by
+  // paper-ctec's chip coordinator. Unsubscribe fires from stop().
+  const unsubscribeStrategy = subscribeCtecStrategy(() => {
+    resolved.clear();
+    for (const key of hosts.keys()) {
+      const identity = sources.get(key);
+      if (!identity) continue;
+      // Re-derive from the per-strategy cache slice. getCachedReportAggregate
+      // defaults to the now-current strategy, so this picks up the right
+      // data automatically.
+      const cachedAggregate = getCachedReportAggregate(
+        identity.params,
+        identity.titleHint,
+        getRecentAggregationTerms()
+      );
+      if (cachedAggregate) {
+        resolved.set(key, cacheToWidget(cachedAggregate));
+      }
+      repaint(key);
+    }
+  });
   // Most recent live host per key — repaint targets. Section rows can be
   // rebuilt by results-renderer on every search; the latest register()
   // call wins.
@@ -241,6 +266,7 @@ export function createCtecCoordinator(
       inFlight.clear();
       hosts.clear();
       sources.clear();
+      unsubscribeStrategy();
     }
   };
 }

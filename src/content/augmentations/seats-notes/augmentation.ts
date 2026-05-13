@@ -20,8 +20,8 @@ import {
   STYLE_ID
 } from "./constants";
 import {
-  extractCareerHint,
   extractClassNumber,
+  extractCourseIdentifier,
   isDisabledClassRow,
   readActiveStrm
 } from "./helpers";
@@ -50,6 +50,9 @@ import {
 type SeatsNotesFetched = {
   result: SeatsNotesResult;
   fetchedAt: number;
+  // Populated only when the result is a combined-section success AND we
+  // could resolve both halves (paper.nu capacity + CAESAR per-section
+  // enrolled). null when the disclaimer fallback is used.
   perSection: PerSectionSeats | null;
 };
 
@@ -93,6 +96,9 @@ export class SeatsNotesAugmentation implements Augmentation {
         const cells = toCells(ctx.cells);
         const cached = readCachedEntry(ctx.key);
         if (cached) {
+          // Cache short-circuit — render the loaded card synchronously so
+          // the user never sees a blank/idle flash. perSection upgrade is
+          // handled by the success handler's background resolver.
           controls.renderSuccess({
             result: cached.result,
             fetchedAt: cached.fetchedAt,
@@ -111,10 +117,16 @@ export class SeatsNotesAugmentation implements Augmentation {
           this.pendingRefresh.add(ctx.key);
           controls.fetch();
         };
+        // Always paint synchronously with whatever data we have. CAESAR's
+        // live per-section enrolled is already in data.result — the only
+        // thing the perSection upgrade adds is paper.nu's per-section cap.
         paintLoaded(cells, data.result, data.fetchedAt, ctx.key, onRefresh, data.perSection);
 
-        // Combined-section seat numbers need paper.nu's per-section cap;
-        // resolve it in the background and re-paint when it lands.
+        // Background upgrade for combined sections that haven't been
+        // resolved yet (cache short-circuit, or fresh fetch before
+        // paper.nu's term JSON warms). When paper.nu data lands, re-paint
+        // the same cells with real per-section numbers. No-op if the row
+        // scrolled out of the DOM in the meantime.
         if (data.result.ok && data.result.isCombinedSection && !data.perSection) {
           void this.maybeResolvePerSection(data.result).then((perSection) => {
             if (!perSection || !cells.seatsCell.isConnected) return;
@@ -155,12 +167,17 @@ export class SeatsNotesAugmentation implements Augmentation {
       }
 
       const link = row.querySelector<HTMLAnchorElement>(CLASS_LINK_SELECTOR);
-      const careerHint = extractCareerHint(link?.textContent ?? "");
+      const { subject, catalog } = extractCourseIdentifier(link?.textContent ?? "");
 
       let result: SeatsNotesResult;
       try {
         const lookupResponse = await lookupClass(
-          { type: "lookup-class", classNumber: key, careerHint },
+          {
+            type: "lookup-class",
+            classNumber: key,
+            subjectHint: subject,
+            catalogHint: catalog
+          },
           {
             priority: "background",
             owner: "seats-notes",
@@ -185,6 +202,9 @@ export class SeatsNotesAugmentation implements Augmentation {
         showToast(`${verb}. ${warning}.`, { tone: "warn", durationMs: 5000 });
       }
 
+      // Don't await paper.nu here — return synchronously so the cell paints
+      // CAESAR's data immediately. The success handler kicks off the
+      // perSection upgrade in the background.
       return { result, fetchedAt, perSection: null };
     },
 
@@ -201,6 +221,8 @@ export class SeatsNotesAugmentation implements Augmentation {
     });
   }
 
+  // Wraps the resolver. Bails fast for non-combined / failure results so we
+  // don't pay the paper.nu cache touch.
   private async maybeResolvePerSection(
     result: SeatsNotesResult
   ): Promise<PerSectionSeats | null> {

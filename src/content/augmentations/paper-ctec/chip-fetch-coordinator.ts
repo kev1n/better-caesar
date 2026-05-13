@@ -259,6 +259,17 @@ export function createChipFetchCoordinator(
       renderForKey(target.key, data);
       if (data.state === "error") {
         deps.showToast(deps.ctecErrorToastMessage, { tone: "warn", durationMs: 9000 });
+      } else if (
+        data.state === "not-found" &&
+        userActivated.has(target.key)
+      ) {
+        // User explicitly asked for CTEC and we got nothing. Surface
+        // the analytics modal immediately so its dry-run dialog can
+        // auto-open — the chip itself has no UI for picking
+        // alternatives. Gated on userActivated so cache-warm autoloads
+        // don't pop a modal in the background.
+        const source = targetSources.get(target.key);
+        if (source) deps.openAnalyticsModal(source);
       } else {
         const warning = deps.ctecCreditPool.format();
         if (warning) {

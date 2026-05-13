@@ -1,3 +1,5 @@
+import type { CtecAnalyticsStrategy } from "./augmentations/ctec-links/types";
+
 // Storage keys keep the `better-caesar:` prefix from the project's original
 // name to preserve every existing install's toggles, caches, and gate state
 // across the rename to Pencil. Renaming the prefix would orphan all stored
@@ -5,6 +7,14 @@
 export const FEATURES_STORAGE_KEY = "better-caesar:features:v1";
 export const RECENT_AGGREGATION_TERMS_STORAGE_KEY =
   "better-caesar:recent-agg-terms:v1";
+export const CTEC_STRATEGY_STORAGE_KEY = "better-caesar:ctec-strategy:v1";
+
+export const DEFAULT_CTEC_STRATEGY: CtecAnalyticsStrategy = "combo";
+const VALID_CTEC_STRATEGIES: ReadonlySet<CtecAnalyticsStrategy> = new Set([
+  "combo",
+  "course",
+  "instructor"
+]);
 
 // Default and bounds for the "recent terms" aggregation knob exposed in
 // the popup. Controls how many of a course's most recent loaded terms get
@@ -46,9 +56,14 @@ const DEFAULT_FEATURE_STATES: Record<string, boolean> = {
 // Defaults to enabled (true) for any unset feature.
 let settings: Record<string, boolean> = {};
 let recentAggregationTerms: number = DEFAULT_RECENT_AGGREGATION_TERMS;
+let ctecStrategy: CtecAnalyticsStrategy = DEFAULT_CTEC_STRATEGY;
 
 void chrome.storage.local
-  .get([FEATURES_STORAGE_KEY, RECENT_AGGREGATION_TERMS_STORAGE_KEY])
+  .get([
+    FEATURES_STORAGE_KEY,
+    RECENT_AGGREGATION_TERMS_STORAGE_KEY,
+    CTEC_STRATEGY_STORAGE_KEY
+  ])
   .then((result: Record<string, unknown>) => {
     const rawFeatures = result[FEATURES_STORAGE_KEY];
     if (rawFeatures && typeof rawFeatures === "object") {
@@ -57,6 +72,7 @@ void chrome.storage.local
     recentAggregationTerms = sanitizeRecentAggregationTerms(
       result[RECENT_AGGREGATION_TERMS_STORAGE_KEY]
     );
+    ctecStrategy = sanitizeCtecStrategy(result[CTEC_STRATEGY_STORAGE_KEY]);
   });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -74,7 +90,39 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (recentChange) {
     recentAggregationTerms = sanitizeRecentAggregationTerms(recentChange.newValue);
   }
+
+  const strategyChange = changes[CTEC_STRATEGY_STORAGE_KEY];
+  if (strategyChange) {
+    const next = sanitizeCtecStrategy(strategyChange.newValue);
+    const changed = next !== ctecStrategy;
+    ctecStrategy = next;
+    if (changed) {
+      for (const listener of ctecStrategyListeners) {
+        try {
+          listener(next);
+        } catch {
+          // Listener crashes shouldn't poison the dispatch loop.
+        }
+      }
+    }
+  }
 });
+
+// Subscribers fire on every strategy mutation — including same-tab writes,
+// because chrome.storage.onChanged fires for own-tab writes too. Used by
+// chip / class-search coordinators to invalidate their resolved aggregates
+// (which are keyed on (subject, catalog, instructor) only, not strategy)
+// and re-derive from the per-strategy cache slice. Returns an unsubscribe
+// fn so callers can detach on cleanup().
+const ctecStrategyListeners = new Set<(strategy: CtecAnalyticsStrategy) => void>();
+export function subscribeCtecStrategy(
+  listener: (strategy: CtecAnalyticsStrategy) => void
+): () => void {
+  ctecStrategyListeners.add(listener);
+  return () => {
+    ctecStrategyListeners.delete(listener);
+  };
+}
 
 function sanitizeRecentAggregationTerms(value: unknown): number {
   const numeric =
@@ -114,4 +162,40 @@ export async function setFeatureEnabled(id: string, value: boolean): Promise<voi
     : {};
   map[id] = value;
   await chrome.storage.local.set({ [FEATURES_STORAGE_KEY]: map });
+}
+
+function sanitizeCtecStrategy(value: unknown): CtecAnalyticsStrategy {
+  if (typeof value === "string" && VALID_CTEC_STRATEGIES.has(value as CtecAnalyticsStrategy)) {
+    return value as CtecAnalyticsStrategy;
+  }
+  return DEFAULT_CTEC_STRATEGY;
+}
+
+export function getCtecStrategy(): CtecAnalyticsStrategy {
+  return ctecStrategy;
+}
+
+// Persists the user's chosen analytics lens. Updates the in-memory cache
+// synchronously so callers reading `getCtecStrategy()` on the next render
+// see the new value immediately; the async write to chrome.storage.local
+// fires-and-forgets (the onChanged listener will reconcile if another tab
+// raced us). Default lens is "combo" — same-(course, instructor) — which
+// preserves pre-feature behavior for anyone who never opens the selector.
+export function setCtecStrategy(strategy: CtecAnalyticsStrategy): void {
+  const changed = strategy !== ctecStrategy;
+  ctecStrategy = strategy;
+  void chrome.storage.local.set({ [CTEC_STRATEGY_STORAGE_KEY]: strategy });
+  // Fire listeners directly for same-tab writes. The onChanged handler also
+  // fires (async), but by then in-memory `ctecStrategy` already equals
+  // `next` and its own `changed` guard suppresses the dispatch — leaving
+  // chip / class-search coordinators with stale resolved-Map entries from
+  // the prior lens. Cross-tab writes still come through onChanged.
+  if (!changed) return;
+  for (const listener of ctecStrategyListeners) {
+    try {
+      listener(strategy);
+    } catch {
+      // Listener crashes shouldn't poison the dispatch loop.
+    }
+  }
 }

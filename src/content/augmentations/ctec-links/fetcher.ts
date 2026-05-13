@@ -179,10 +179,25 @@ async function fetchCtecLinksCore(
   const realCached = cachedCourseEntries.filter(
     (e) => e.actionId !== NOT_FOUND_ACTION_ID
   );
+  // Sentinel-only short-circuit. A sentinel records "we discovered for
+  // (catalog, INSTRUCTOR_X) and found nothing" — it does NOT mean
+  // "no data exists for this catalog in general." Course-mode queries
+  // run with instructor="" (wildcard), and `entryMatchesCourse`'s
+  // empty-request semantics would happily match a combo sentinel for
+  // (213, prof X) — falsely returning not-found for the broader query.
+  // Require the sentinel's recorded instructor to match the requested
+  // instructor LITERALLY (post-normalize), not via the wildcard rule,
+  // so each lens only short-circuits on its own confirmed misses.
+  const normalizedRequested = normalizeSearch(instructor);
+  const sentinelExactMatch = cachedCourseEntries.some(
+    (e) =>
+      e.actionId === NOT_FOUND_ACTION_ID &&
+      normalizeSearch(e.instructor) === normalizedRequested
+  );
   if (
     accessConfirmed &&
     !forceRefresh &&
-    cachedCourseEntries.length > 0 &&
+    sentinelExactMatch &&
     realCached.length === 0
   ) {
     return { state: "not-found" };
@@ -273,10 +288,14 @@ async function fetchCtecLinksCore(
     }
   };
   writeSubjectIndex(subject, {
+    ...(cachedIndex ?? {
+      subjectCode: subject,
+      subjectLabel: subject,
+      builtAt: Date.now(),
+      sourceUrl: window.location.href,
+      entries: []
+    }),
     subjectCode: subject,
-    subjectLabel: cachedIndex?.subjectLabel ?? subject,
-    builtAt: cachedIndex?.builtAt ?? Date.now(),
-    sourceUrl: cachedIndex?.sourceUrl ?? window.location.href,
     entries: merged,
     courseState: nextCourseState
   });
@@ -325,8 +344,240 @@ export function readCoursePendingRowCount(
   return Math.max(0, state?.pendingRowCount ?? 0);
 }
 
-function buildCourseStateKey(catalogNumber: string, instructor: string): string {
+// Exported so reports.ts can probe whether a (catalog, instructor) tuple
+// has had its discovery run yet — used by the strategy-switch path to
+// decide between "we have data, just show it" and "first-time fetch."
+// Same format used internally for combo (instructor=name) and course
+// (instructor="") modes.
+export function buildCourseStateKey(catalogNumber: string, instructor: string): string {
   return `${catalogNumber}|${normalizeSearch(instructor)}`;
+}
+
+export type CourseDiscoveryResult =
+  | { state: "found"; rows: CtecRowSeed[] }
+  | { state: "no-access" }
+  | { state: "not-found" }
+  | { state: "auth-required"; loginUrl: string }
+  | { state: "error"; message: string };
+
+// In-memory cache so flipping in/out of the dry-run dialog within a
+// single tab session doesn't re-hit CAESAR. Discovery is idempotent
+// for a given (subject, catalog) pair — published evaluation lists
+// only change quarter-by-quarter — so an SPA-lifetime cache is plenty.
+const courseDiscoveryCache = new Map<string, CourseDiscoveryResult>();
+
+function courseDiscoveryCacheKey(subject: string, catalogNumber: string): string {
+  return `${subject}|${catalogNumber}`;
+}
+
+// Persists course-discovery row sets onto the subject index so the
+// wizard skips re-scraping CAESAR after a page reload. Stores the
+// pre-Bluera row list keyed by catalog number — the same shape the
+// in-memory cache holds. Empty arrays represent a confirmed
+// "discovery ran, found nothing" result, kept distinct from missing
+// keys (= never discovered) so the read path can short-circuit
+// without re-fetching.
+function readPersistedCourseDiscovery(
+  subject: string,
+  catalogNumber: string
+): CtecRowSeed[] | null {
+  const index = readSubjectIndex(subject);
+  if (!index?.courseDiscovery) return null;
+  const rows = index.courseDiscovery[catalogNumber];
+  return Array.isArray(rows) ? rows : null;
+}
+
+function writePersistedCourseDiscovery(
+  subject: string,
+  catalogNumber: string,
+  rows: CtecRowSeed[]
+): void {
+  const existing = readSubjectIndex(subject);
+  const base: CtecSubjectIndex = existing ?? {
+    subjectCode: subject,
+    subjectLabel: subject,
+    builtAt: Date.now(),
+    sourceUrl: window.location.href,
+    entries: []
+  };
+  const next: Record<string, CtecRowSeed[]> = {
+    ...(base.courseDiscovery ?? {}),
+    [catalogNumber]: rows
+  };
+  writeSubjectIndex(subject, { ...base, courseDiscovery: next });
+}
+
+// Lightweight version of fetchCtecLinksBackground: discovers every
+// section row for a (subject, catalog) pair across the careers that
+// catalogue it, but stops short of resolving Bluera URLs. Used by the
+// dry-run dialog's choose stage to show "X sections found" counts and
+// to seed the pick stage's row list before the user commits to Bluera
+// fetches.
+export async function discoverCourseRows(
+  params: CtecLinkParams
+): Promise<CourseDiscoveryResult> {
+  const key = courseDiscoveryCacheKey(params.subject, params.catalogNumber);
+  const cached = courseDiscoveryCache.get(key);
+  if (cached) return cached;
+
+  const persisted = readPersistedCourseDiscovery(
+    params.subject,
+    params.catalogNumber
+  );
+  if (persisted !== null) {
+    const result: CourseDiscoveryResult =
+      persisted.length === 0
+        ? { state: "not-found" }
+        : { state: "found", rows: persisted };
+    courseDiscoveryCache.set(key, result);
+    return result;
+  }
+
+  const result = await runPeopleSoftTask(
+    "background",
+    () => discoverCourseRowsInternal(params),
+    {
+      owner: REQUEST_OWNER,
+      label: `Discover sections for ${params.subject} ${params.catalogNumber}`
+    }
+  );
+  if (result.state === "found") {
+    courseDiscoveryCache.set(key, result);
+    writePersistedCourseDiscovery(
+      params.subject,
+      params.catalogNumber,
+      result.rows
+    );
+  } else if (result.state === "not-found") {
+    courseDiscoveryCache.set(key, result);
+    writePersistedCourseDiscovery(params.subject, params.catalogNumber, []);
+  }
+  return result;
+}
+
+async function discoverCourseRowsInternal(
+  params: CtecLinkParams
+): Promise<CourseDiscoveryResult> {
+  if (isCtecAccessDenied()) return { state: "no-access" };
+  if (getCtecAccessStatus() === "unknown") {
+    await probeCtecAccess();
+    if (isCtecAccessDenied()) return { state: "no-access" };
+  }
+
+  try {
+    return await withSilentAuthRecovery(
+      () => discoverCourseRowsCore(params),
+      isCaesarAuthRequiredError
+    );
+  } catch (error) {
+    if (isCtecAccessDeniedError(error)) return { state: "no-access" };
+    if (isCaesarAuthRequiredError(error)) {
+      return { state: "auth-required", loginUrl: error.loginUrl };
+    }
+    return {
+      state: "error",
+      message: error instanceof Error ? error.message : "Discovery failed."
+    };
+  }
+}
+
+async function discoverCourseRowsCore(
+  params: CtecLinkParams
+): Promise<CourseDiscoveryResult> {
+  const { subject, catalogNumber } = params;
+  const candidates = resolveCareerCandidates(subject, catalogNumber);
+
+  let lastError: string | null = null;
+  for (const candidate of candidates) {
+    const careerResult = await discoverFromCareer(
+      subject,
+      catalogNumber,
+      candidate
+    );
+    if (careerResult.state === "found") return careerResult;
+    if (careerResult.state === "error") {
+      lastError = careerResult.message;
+      // Try the next career — some careers will 404 the course while
+      // another holds it.
+    }
+  }
+  if (lastError) return { state: "error", message: lastError };
+  return { state: "not-found" };
+}
+
+async function discoverFromCareer(
+  subject: string,
+  catalogNumber: string,
+  career: string
+): Promise<CourseDiscoveryResult> {
+  const resultsUrl = buildSubjectResultsUrl(subject, career);
+  let html: string;
+  try {
+    const response = await fetchPeopleSoftGetResult(resultsUrl, {
+      timeoutMs: CTEC_FETCH_TIMEOUT_MS
+    });
+    if (isUnauthorizedStatus(response.status)) {
+      throw new CaesarAuthRequiredError(resultsUrl);
+    }
+    html = response.text;
+  } catch (e) {
+    if (isCaesarAuthRequiredError(e)) throw e;
+    return {
+      state: "error",
+      message: e instanceof Error ? e.message : "Failed to load CTEC page."
+    };
+  }
+
+  if (detectAndMarkUnauthorized(html, "discover-course subject-results GET")) {
+    throw new CtecAccessDeniedError();
+  }
+  if (isAuthResponse(html)) throw new CaesarAuthRequiredError(resultsUrl);
+
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const form = doc.forms.namedItem("win0");
+  if (!(form instanceof HTMLFormElement)) {
+    return { state: "error", message: "Could not parse CTEC form." };
+  }
+
+  const actionUrl = resolveActionUrl(form.action);
+  const baseParams = serializeForm(form);
+
+  const courseRows = collectCourseRows(doc);
+  const targetCourse = courseRows.find((c) =>
+    descriptionMatchesCatalog(c.description, catalogNumber)
+  );
+  if (!targetCourse) return { state: "not-found" };
+
+  let courseResponse: string;
+  try {
+    const response = await fetchPeopleSoftResult(
+      actionUrl,
+      buildActionParams(baseParams, targetCourse.actionId),
+      { timeoutMs: CTEC_FETCH_TIMEOUT_MS }
+    );
+    if (isUnauthorizedStatus(response.status)) {
+      throw new CaesarAuthRequiredError(actionUrl);
+    }
+    courseResponse = response.text;
+  } catch (e) {
+    if (isCaesarAuthRequiredError(e)) throw e;
+    return {
+      state: "error",
+      message: e instanceof Error ? e.message : "Failed to load course."
+    };
+  }
+
+  if (detectAndMarkUnauthorized(courseResponse, "discover-course course POST")) {
+    throw new CtecAccessDeniedError();
+  }
+  if (isAuthResponse(courseResponse)) throw new CaesarAuthRequiredError(actionUrl);
+
+  const allClassRows = collectClassRowsFromText(courseResponse);
+  const sorted = allClassRows
+    .filter((r) => descriptionMatchesCatalog(r.description, catalogNumber))
+    .sort((a, b) => termToSortKey(b.term) - termToSortKey(a.term));
+
+  return { state: "found", rows: sorted };
 }
 
 function buildFoundResult(entries: CtecIndexedEntry[], hasMore: boolean): CtecLinkData {
@@ -360,6 +611,37 @@ function buildRowKey(term: string, description: string, instructor: string): str
   ].join("|");
 }
 
+// Collapses CAESAR rows that would resolve to the same logical CTEC
+// report — keyed on (term, normalized instructor, SUBJECT NNN catalog
+// prefix). PeopleSoft's class grid surfaces every section row
+// individually (lab/discussion/lecture, multiple physical sections of
+// the same course in the same term), but cross-listed sections share a
+// single Bluera report and the existing post-fetch dedupe collapses
+// them by URL after the fact — burning one Bluera fetch per duplicate.
+// Dropping the duplicates pre-fetch keeps actual Bluera traffic in
+// line with the dry-run preset's "Will load N" promise.
+export function dedupeRowsByLogicalKey<T extends CtecRowSeed>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const row of rows) {
+    const catalogPrefix = row.description
+      .trim()
+      .match(/^([A-Z][A-Z_]*)\s+(\d+)/);
+    const catalogLabel = catalogPrefix
+      ? `${catalogPrefix[1]} ${catalogPrefix[2]}`
+      : row.description;
+    const key = [
+      normalizeSearch(row.term),
+      normalizeSearch(row.instructor),
+      catalogLabel
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
+}
+
 function writeSentinel(
   subject: string,
   catalogNumber: string,
@@ -378,10 +660,14 @@ function writeSentinel(
   const existing = existingIndex?.entries ?? [];
   const merged = dedupeEntries([...existing, sentinel]);
   writeSubjectIndex(subject, {
+    ...(existingIndex ?? {
+      subjectCode: subject,
+      subjectLabel: subject,
+      builtAt: Date.now(),
+      sourceUrl: window.location.href,
+      entries: []
+    }),
     subjectCode: subject,
-    subjectLabel: existingIndex?.subjectLabel ?? subject,
-    builtAt: existingIndex?.builtAt ?? Date.now(),
-    sourceUrl: existingIndex?.sourceUrl ?? window.location.href,
     entries: merged
   });
 }
@@ -468,17 +754,39 @@ async function fetchCourseEntries(
   const allClassRows = collectClassRowsFromText(courseResponse);
   if (allClassRows.length === 0) return { type: "not-found" };
 
+  // Side-effect: cache the catalog-filtered rows (no instructor filter)
+  // so the dry-run dialog's Course pathway can read them without a
+  // duplicate round-trip. Combo / course mode already does this scrape
+  // for its own ends; we just hold onto the broader slice it discards.
+  // Mirror into the persisted subject index too so refreshing the tab
+  // doesn't evict the discovery — without the persisted side, every
+  // reload re-walks the C-endpoint just to show the same row count.
+  const catalogOnlyRows = dedupeRowsByLogicalKey(
+    allClassRows
+      .filter((r) => descriptionMatchesCatalog(r.description, catalogNumber))
+      .sort((a, b) => termToSortKey(b.term) - termToSortKey(a.term))
+  );
+  if (catalogOnlyRows.length > 0) {
+    courseDiscoveryCache.set(
+      courseDiscoveryCacheKey(subject, catalogNumber),
+      { state: "found", rows: catalogOnlyRows }
+    );
+    writePersistedCourseDiscovery(subject, catalogNumber, catalogOnlyRows);
+  }
+
   // Same matchers entryMatchesCourse uses on read — keeps cross-listed
   // sections and rows from a mis-targeted course out of the index.
   // PeopleSoft serves rows oldest-first; sort newest-first so the first
   // batchSize-sized slice picks up recent CTECs.
-  const sortedRows = allClassRows
-    .filter(
-      (r) =>
-        descriptionMatchesCatalog(r.description, catalogNumber) &&
-        instructorMatches(r.instructor, instructor)
-    )
-    .sort((a, b) => termToSortKey(b.term) - termToSortKey(a.term));
+  const sortedRows = dedupeRowsByLogicalKey(
+    allClassRows
+      .filter(
+        (r) =>
+          descriptionMatchesCatalog(r.description, catalogNumber) &&
+          instructorMatches(r.instructor, instructor)
+      )
+      .sort((a, b) => termToSortKey(b.term) - termToSortKey(a.term))
+  );
 
   // Skip already-fetched rows; each call processes at most batchSize new ones.
   const todoAll: CtecRowSeed[] = sortedRows.filter(

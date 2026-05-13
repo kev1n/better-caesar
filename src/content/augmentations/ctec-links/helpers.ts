@@ -1,5 +1,6 @@
 import type { CtecIndexedEntry } from "../../ctec-index/types";
 import { INSTRUCTOR_SELECTOR, NOT_FOUND_ACTION_ID } from "./constants";
+import type { CtecAnalyticsStrategy, CtecLinkParams } from "./types";
 
 export function termToSortKey(term: string): number {
   // Handles both "Fall 2023" and "2023 Fall" (CTEC uses year-first format).
@@ -96,6 +97,11 @@ export function instructorMatches(
   return requested.some((ln) => rowLast.includes(ln));
 }
 
+// Predicate for the "combo" lens — entry must match this exact
+// (course, instructor) pair. Used by the fetcher's discovery short-circuits
+// (it's locked to combo regardless of the user's analytics lens because
+// those checks key cache keys on this specific identity) and by the
+// strategy dispatcher below for combo-strategy reads.
 export function entryMatchesCourse(
   entry: CtecIndexedEntry,
   subject: string,
@@ -113,6 +119,58 @@ export function entryMatchesCourse(
   }
 
   return instructorMatches(entry.instructor, instructor);
+}
+
+// "course" lens — drops the instructor filter. Any professor who taught
+// this subject + catalog qualifies. Used to show course-wide ratings even
+// when the user's specific professor never taught this course (or has no
+// CTECs yet) — falls back on the broader cohort.
+export function entryMatchesByCourse(
+  entry: CtecIndexedEntry,
+  catalogNumber: string
+): boolean {
+  if (entry.actionId === NOT_FOUND_ACTION_ID) {
+    return catalogTokenRegex(catalogNumber).test(entry.searchText);
+  }
+  return descriptionMatchesCatalog(entry.description, catalogNumber);
+}
+
+// "instructor" lens — drops the catalog filter. Any course this instructor
+// taught within the current subject qualifies. Lets users gauge a
+// professor's track record when there's no overlap between their teaching
+// history and the specific course being viewed.
+export function entryMatchesByInstructor(
+  entry: CtecIndexedEntry,
+  instructor: string
+): boolean {
+  // Sentinels (NOT_FOUND_ACTION_ID) only carry course+instructor identity,
+  // not class-level data. They're a "we asked CAESAR and it had nothing"
+  // marker for combo strategy; they don't contribute to instructor-wide
+  // aggregation and would just dilute the signal if we let them through.
+  if (entry.actionId === NOT_FOUND_ACTION_ID) return false;
+  return instructorMatches(entry.instructor, instructor);
+}
+
+// Strategy dispatcher — picks the right predicate for the active analytics
+// lens. Subject scoping is enforced upstream by `readSubjectIndex(subject)`,
+// so all three lenses operate within the same subject's cached entries.
+export function entryMatchesStrategy(
+  entry: CtecIndexedEntry,
+  params: CtecLinkParams,
+  strategy: CtecAnalyticsStrategy
+): boolean {
+  if (strategy === "course") {
+    return entryMatchesByCourse(entry, params.catalogNumber);
+  }
+  if (strategy === "instructor") {
+    return entryMatchesByInstructor(entry, params.instructor);
+  }
+  return entryMatchesCourse(
+    entry,
+    params.subject,
+    params.catalogNumber,
+    params.instructor
+  );
 }
 
 export function extractSubjectAndCatalog(

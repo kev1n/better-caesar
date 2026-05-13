@@ -261,6 +261,11 @@ export function modalCommentStyles(): string {
       color: var(--bc-color-text-subtle);
       font-weight: var(--bc-fw-regular);
     }
+    .bc-paper-ctec-modal-comment-axis {
+      font-size: var(--bc-font-11);
+      color: var(--bc-color-text-muted);
+      font-weight: var(--bc-fw-medium);
+    }
     .bc-paper-ctec-modal-comment-prompt {
       font-size: var(--bc-font-11);
       color: var(--bc-color-text-muted);

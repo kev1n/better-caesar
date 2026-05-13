@@ -5,15 +5,19 @@ import {
   subscribe as subscribeCartCache
 } from "../../cart-cache";
 import type { Augmentation } from "../../framework";
-import { getRecentAggregationTerms, isFeatureEnabled } from "../../settings";
+import {
+  getRecentAggregationTerms,
+  isFeatureEnabled,
+  subscribeCtecStrategy
+} from "../../settings";
 import { resolveChipSection, addChipSectionToCart } from "./cart-flow";
 import { ctecCreditPool, psCreditPool } from "../../../shared/credit-pool";
 import { showToast } from "../../../shared/toast";
 import { isCtecAccessDenied } from "../../ctec-index/access";
 import { CTEC_ERROR_TOAST_MESSAGE } from "../ctec-links/rate-limit";
 import {
-  getCachedReportAggregate,
-  getCtecCourseAnalyticsSnapshot,
+  getCachedChipAggregate,
+  getChipCourseAnalyticsSnapshot,
   hasCachedReportAggregate,
   type CtecReportAggregateResult
 } from "../ctec-links/reports";
@@ -99,6 +103,7 @@ export class PaperCtecAugmentation implements Augmentation {
     windowLocation: { assign: (url: string | URL) => window.location.assign(url) }
   });
   private readonly modal: ModalController;
+  private unsubscribeStrategy: (() => void) | null = null;
 
   constructor() {
     void initCartCache();
@@ -124,8 +129,8 @@ export class PaperCtecAugmentation implements Augmentation {
       showToast,
       fetchAggregate: (params, titleHint, onProgress, options) =>
         this.fetchAggregateForChip(params, titleHint, onProgress, options),
-      getCachedAggregate: getCachedReportAggregate,
-      getCourseAnalyticsSnapshot: getCtecCourseAnalyticsSnapshot,
+      getCachedAggregate: getCachedChipAggregate,
+      getCourseAnalyticsSnapshot: getChipCourseAnalyticsSnapshot,
       getAggregateLimit: getRecentAggregationTerms,
       getFetchLimit: () => PAPER_CTEC_CONFIG.aggregate.recentTerms,
       buildModalDisplayData,
@@ -207,6 +212,19 @@ export class PaperCtecAugmentation implements Augmentation {
     );
 
     this.chipCart.start();
+
+    // Strategy switches invalidate every chip's resolved aggregate (the
+    // map is keyed on (subject, catalog, instructor) only — strategy is
+    // implicit in the lookup, so a stored aggregate from one lens would
+    // bleed into another lens's render). Clearing forces syncTargets to
+    // re-derive from the per-strategy cache slice on its next pass. We
+    // also clear analyticsResolved so the modal's not-found / error
+    // verdict from a prior lens doesn't shadow the new lens.
+    this.unsubscribeStrategy = subscribeCtecStrategy(() => {
+      this.chipFetch.state.resolved.clear();
+      this.analyticsResolved.clear();
+      this.run(document);
+    });
   }
 
   private async fetchAggregateForChip(
@@ -249,6 +267,8 @@ export class PaperCtecAugmentation implements Augmentation {
     this.analyticsInFlight.clear();
     this.modal.invalidate();
     this.authRecovery.dispose();
+    this.unsubscribeStrategy?.();
+    this.unsubscribeStrategy = null;
 
     teardownPageForCleanup(doc);
   }

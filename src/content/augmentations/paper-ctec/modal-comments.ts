@@ -24,6 +24,7 @@ export function collectComments(
         raw.push({
           term: entry.term,
           instructor: entry.instructor,
+          description: entry.description,
           prompt: group.prompt,
           text,
           tone: classifySentiment(text),

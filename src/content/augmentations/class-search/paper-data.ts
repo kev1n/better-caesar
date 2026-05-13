@@ -17,7 +17,10 @@ const SUBJECTS_KEY = `${STORAGE_PREFIX}subjects:v1`;
 const PLAN_KEY = `${STORAGE_PREFIX}plan:v3`;
 // v2: catalog now comes from per-term `n` (user-facing "111-3") instead of
 // `i` (CAESAR's internal padded id "002333").
-// v3: storage shape is byCourseKey Record so subject+catalog lookups are O(1).
+// v3: storage shape is now a `byCourseKey` Record<"SUBJ|catalog", PaperTermCourse>
+// so consumers get O(1) subject+catalog lookups without rebuilding an index
+// at every call site. `getTermCourses()` still returns an array (Object.values)
+// for backward compat with iterating callers.
 const CURRENT_TERM_CACHE_VERSION = 3;
 const TERM_KEY = (termId: string) =>
   `${STORAGE_PREFIX}term:v${CURRENT_TERM_CACHE_VERSION}:${termId}`;
@@ -170,6 +173,8 @@ type CachedTerm = {
   termId: string;
   updated: string;
   cachedAt: number;
+  // v3 storage shape: keyed by "SUBJECT|catalog" so subject+catalog lookups
+  // are O(1) for every consumer, with no per-call-site index rebuild.
   byCourseKey: Record<string, PaperTermCourse>;
 };
 

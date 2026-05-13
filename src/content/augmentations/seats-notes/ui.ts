@@ -324,6 +324,9 @@ function buildSeatsCard(
   );
   card.appendChild(details);
 
+  // Combined section, but we couldn't resolve per-section numbers (paper.nu
+  // unreachable, section not found, capacity field missing). Fall back to
+  // the generic disclaimer.
   if (response.isCombinedSection) {
     card.appendChild(buildCombinedSectionWarning(response.classCapacity));
   }

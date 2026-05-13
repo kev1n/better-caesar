@@ -11,13 +11,33 @@ import type {
 } from "../../ctec-index/types";
 import { fetchTextResultViaBackground } from "../../remote-fetch";
 import { getCurrentPeopleSoftTaskSignal } from "../../peoplesoft/traffic";
+import { getCtecStrategy } from "../../settings";
 import { extractChartFromImage } from "../paper-ctec/chart-extract";
-import { fetchCtecLinksBackground, readCoursePendingRowCount } from "./fetcher";
+import {
+  buildCourseStateKey,
+  fetchCtecLinksBackground
+} from "./fetcher";
+import {
+  buildInstructorStateKey,
+  fetchCtecLinksByInstructor
+} from "./fetcher-instructor";
 import { CaesarAuthRequiredError } from "../class-search/caesar-search/types";
 import { NOT_FOUND_ACTION_ID } from "./constants";
-import { entryMatchesCourse, isAuthResponse, termToSortKey } from "./helpers";
+import { entryMatchesStrategy, isAuthResponse, termToSortKey } from "./helpers";
 import { CTEC_FETCH_TIMEOUT_MS } from "./rate-limit";
-import type { CtecLinkParams } from "./types";
+import { getSectionLens } from "./section-lens";
+import type { CtecAnalyticsStrategy, CtecLinkParams } from "./types";
+
+// Per-section preference > global setting > combo (the historical
+// default). Centralizes the lookup so every read/fetch path picks the
+// same lens for the same params without each caller redoing the
+// resolution dance.
+function resolveLens(
+  params: CtecLinkParams,
+  override?: CtecAnalyticsStrategy
+): CtecAnalyticsStrategy {
+  return override ?? getSectionLens(params) ?? getCtecStrategy();
+}
 
 export type CtecAggregateMetric = {
   mean: number;
@@ -83,6 +103,7 @@ export type CtecCourseAnalyticsResult =
 type FetchCtecReportAggregateOptions = {
   fetchLimit?: number;
   aggregateLimit?: number;
+  strategy?: CtecAnalyticsStrategy;
 };
 
 // Auth-required is signaled via thrown CaesarAuthRequiredError and handled
@@ -102,8 +123,10 @@ export async function fetchCtecReportAggregate(
   options: FetchCtecReportAggregateOptions = {}
 ): Promise<CtecReportAggregateResult> {
   if (isCtecAccessDenied()) return { state: "no-access" };
+  const strategy = resolveLens(params, options.strategy);
   const result = await ensureReportEntries(params, titleHint, onProgress, {
-    fetchLimit: options.fetchLimit
+    fetchLimit: options.fetchLimit,
+    strategy
   });
   if (result.state !== "found") return result;
 
@@ -121,12 +144,15 @@ export async function fetchCtecCourseAnalytics(
   recentAggregateLimit?: number,
   onProgress?: (message: string) => void,
   fetchLimit?: number,
-  forceRefreshLinks?: boolean
+  forceRefreshLinks?: boolean,
+  strategy?: CtecAnalyticsStrategy
 ): Promise<CtecCourseAnalyticsResult> {
   if (isCtecAccessDenied()) return { state: "no-access" };
+  const lens = resolveLens(params, strategy);
   const result = await ensureReportEntries(params, titleHint, onProgress, {
     fetchLimit,
-    forceRefreshLinks
+    forceRefreshLinks,
+    strategy: lens
   });
   if (result.state !== "found") return result;
 
@@ -135,32 +161,73 @@ export async function fetchCtecCourseAnalytics(
     analytics: buildCourseAnalytics(
       result.entries,
       recentAggregateLimit,
-      readPendingRowCountFor(params)
+      readPendingRowCountFor(params, lens)
     )
   };
+}
+
+// Whether a given strategy has ever been explored for these params. The
+// underlying courseState map tracks discovery per (catalog, instructor)
+// for combo, per (catalog, "") for course, and a synthetic
+// `_instructor:${name}` key for instructor mode. A marker's mere
+// presence means we've at least run a discovery pass; pendingRowCount
+// may still be > 0 (more sections / terms left to fetch), but the user
+// has *some* data and shouldn't pay another round-trip just for opening
+// the lens. The modal's "Load more" button is the explicit path for
+// pulling more.
+export function hasStrategyBeenExplored(
+  params: CtecLinkParams,
+  strategy: CtecAnalyticsStrategy
+): boolean {
+  const index = readSubjectIndex(params.subject);
+  if (!index?.courseState) return false;
+  let key: string;
+  if (strategy === "combo") {
+    key = buildCourseStateKey(params.catalogNumber, params.instructor);
+  } else if (strategy === "course") {
+    key = buildCourseStateKey(params.catalogNumber, "");
+  } else {
+    key = buildInstructorStateKey(params.instructor);
+  }
+  return !!index.courseState[key];
 }
 
 export function getCtecCourseAnalyticsSnapshot(
   params: CtecLinkParams,
   titleHint?: string,
-  recentAggregateLimit?: number
+  recentAggregateLimit?: number,
+  strategy?: CtecAnalyticsStrategy
 ): CtecCourseAnalytics | null {
   if (getCtecAccessStatus() !== "confirmed") return null;
-  const entries = getIndexedEntriesForCourse(params, titleHint);
+  const lens = resolveLens(params, strategy);
+  const entries = getIndexedEntriesForCourse(params, titleHint, lens);
   if (entries.length === 0) return null;
   return buildCourseAnalytics(
     entries,
     recentAggregateLimit,
-    readPendingRowCountFor(params)
+    readPendingRowCountFor(params, lens)
   );
 }
 
-function readPendingRowCountFor(params: CtecLinkParams): number {
-  return readCoursePendingRowCount(
-    readSubjectIndex(params.subject),
-    params.catalogNumber,
-    params.instructor
-  );
+function readPendingRowCountFor(
+  params: CtecLinkParams,
+  strategy: CtecAnalyticsStrategy
+): number {
+  // Each lens persists its own pendingRowCount under a different
+  // courseState key. Read the right one so the modal's "Load N more
+  // (M left)" affordance reflects this lens's discovery progress, not
+  // a stale combo count when the user is browsing in Course / Prof.
+  const index = readSubjectIndex(params.subject);
+  if (!index?.courseState) return 0;
+  let key: string;
+  if (strategy === "combo") {
+    key = buildCourseStateKey(params.catalogNumber, params.instructor);
+  } else if (strategy === "course") {
+    key = buildCourseStateKey(params.catalogNumber, "");
+  } else {
+    key = buildInstructorStateKey(params.instructor);
+  }
+  return Math.max(0, index.courseState[key]?.pendingRowCount ?? 0);
 }
 
 // Cache-only aggregate: returns a CtecReportAggregate from the subject index
@@ -170,7 +237,8 @@ function readPendingRowCountFor(params: CtecLinkParams): number {
 export function getCachedReportAggregate(
   params: CtecLinkParams,
   titleHint: string | undefined,
-  recentTerms: number
+  recentTerms: number,
+  strategy?: CtecAnalyticsStrategy
 ): CtecReportAggregate | null {
   // Cached data only renders once access is verified. While the status is
   // "unknown" we fall through to null, which makes the chip show its
@@ -178,7 +246,8 @@ export function getCachedReportAggregate(
   // an earlier extension version (or before we shipped the access gate).
   // The user's click drives a real probe and either confirms or denies.
   if (getCtecAccessStatus() !== "confirmed") return null;
-  const entries = sortEntries(getIndexedEntriesForCourse(params, titleHint));
+  const lens = resolveLens(params, strategy);
+  const entries = sortEntries(getIndexedEntriesForCourse(params, titleHint, lens));
   if (entries.length === 0) return null;
 
   const window = entries.slice(0, recentTerms);
@@ -188,16 +257,63 @@ export function getCachedReportAggregate(
   return buildReportAggregate(entries, { aggregateLimit: recentTerms });
 }
 
+// Chip-flavored read: combo > section preference > global. The schedule
+// chip's rating and hours summary should always reflect the most precise
+// data we have for the section — when combo (this prof × this course)
+// has cached evaluations, that's what the chip shows, regardless of
+// which broader lens the user has been browsing in the modal. The modal
+// strategy tabs let users explore Course / Prof slices without
+// "polluting" the at-a-glance rating on the card. Falls back to the
+// section's preferred lens (or global) when combo has no data, so
+// fallback-lens picks still drive the chip when there's no combo
+// data to show.
+export function getCachedChipAggregate(
+  params: CtecLinkParams,
+  titleHint: string | undefined,
+  recentTerms: number
+): CtecReportAggregate | null {
+  const comboAggregate = getCachedReportAggregate(
+    params,
+    titleHint,
+    recentTerms,
+    "combo"
+  );
+  if (comboAggregate) return comboAggregate;
+  return getCachedReportAggregate(params, titleHint, recentTerms);
+}
+
+// Same combo-preference rule for the chip hover preview's snapshot read.
+export function getChipCourseAnalyticsSnapshot(
+  params: CtecLinkParams,
+  titleHint?: string,
+  recentAggregateLimit?: number
+): CtecCourseAnalytics | null {
+  const comboSnapshot = getCtecCourseAnalyticsSnapshot(
+    params,
+    titleHint,
+    recentAggregateLimit,
+    "combo"
+  );
+  if (comboSnapshot && comboSnapshot.entries.length > 0) return comboSnapshot;
+  return getCtecCourseAnalyticsSnapshot(
+    params,
+    titleHint,
+    recentAggregateLimit
+  );
+}
+
 // Existence-only variant of getCachedReportAggregate. Skips the
 // buildReportAggregate cost for callers (e.g. side-card sync) that only
 // need to know whether *any* parsed report is cached for this course.
 export function hasCachedReportAggregate(
   params: CtecLinkParams,
   titleHint: string | undefined,
-  recentTerms: number
+  recentTerms: number,
+  strategy?: CtecAnalyticsStrategy
 ): boolean {
   if (getCtecAccessStatus() !== "confirmed") return false;
-  const entries = sortEntries(getIndexedEntriesForCourse(params, titleHint));
+  const lens = resolveLens(params, strategy);
+  const entries = sortEntries(getIndexedEntriesForCourse(params, titleHint, lens));
   if (entries.length === 0) return false;
   const window = entries.slice(0, recentTerms);
   return window.some((entry) => entry.reportSummary !== undefined);
@@ -260,7 +376,8 @@ export function parseCtecReportHtml(
 
 function getIndexedEntriesForCourse(
   params: CtecLinkParams,
-  titleHint?: string
+  titleHint: string | undefined,
+  strategy: CtecAnalyticsStrategy
 ): CtecIndexedEntry[] {
   const index = readSubjectIndex(params.subject);
   if (!index) return [];
@@ -268,9 +385,14 @@ function getIndexedEntriesForCourse(
   const baseEntries = index.entries.filter((entry) =>
     entry.actionId !== NOT_FOUND_ACTION_ID &&
     entry.blueraUrl &&
-    entryMatchesCourse(entry, params.subject, params.catalogNumber, params.instructor)
+    entryMatchesStrategy(entry, params, strategy)
   );
 
+  // Title-hint disambiguation only applies to course-scoped lenses where
+  // cross-listed sections could pollute results. The instructor lens
+  // intentionally spans courses, so title narrowing would defeat its
+  // purpose (and silently drop most of the data).
+  if (strategy === "instructor") return baseEntries;
   return selectEntriesForTitle(baseEntries, titleHint);
 }
 
@@ -281,21 +403,43 @@ function getIndexedEntriesForCourse(
 // Bluera loop on each attempt — not the entire CAESAR discovery.
 async function ensureReportEntries(
   params: CtecLinkParams,
-  titleHint?: string,
-  onProgress?: (message: string) => void,
-  options: { fetchLimit?: number; forceRefreshLinks?: boolean } = {}
+  titleHint: string | undefined,
+  onProgress: ((message: string) => void) | undefined,
+  options: {
+    fetchLimit?: number;
+    forceRefreshLinks?: boolean;
+    strategy: CtecAnalyticsStrategy;
+  }
 ): Promise<EnsureReportEntriesResult> {
-  const links = await fetchCtecLinksBackground(
-    params,
-    options.forceRefreshLinks ?? false,
-    onProgress
-  );
+  const { strategy } = options;
+  // Combo and course lenses both use the catalog-keyed fetcher. The trick
+  // for course mode: pass instructor="" so `instructorMatches` treats it
+  // as a wildcard and every section under the catalog gets discovered +
+  // its Bluera URL fetched. courseState and sentinel writes get keyed on
+  // the empty-instructor variant, kept independent from combo's per-prof
+  // state so the two lenses don't shadow each other's cache decisions.
+  // Instructor mode walks a different CAESAR surface (NW_CTEC_SRCH_CHOIC=T)
+  // that enumerates instructors in the subject, so it gets its own fetcher.
+  const fetchParams =
+    strategy === "course" ? { ...params, instructor: "" } : params;
+  const links =
+    strategy === "instructor"
+      ? await fetchCtecLinksByInstructor(
+          params,
+          options.forceRefreshLinks ?? false,
+          onProgress
+        )
+      : await fetchCtecLinksBackground(
+          fetchParams,
+          options.forceRefreshLinks ?? false,
+          onProgress
+        );
   if (links.state === "auth-required") {
     throw new CaesarAuthRequiredError(links.loginUrl);
   }
   if (links.state !== "found") return links;
 
-  let entries = sortEntries(getIndexedEntriesForCourse(params, titleHint));
+  let entries = sortEntries(getIndexedEntriesForCourse(params, titleHint, strategy));
   if (entries.length === 0) {
     return { state: "not-found" };
   }
@@ -340,7 +484,7 @@ async function ensureReportEntries(
     cacheReportSummary(params.subject, url, summary);
   }
 
-  entries = sortEntries(getIndexedEntriesForCourse(params, titleHint));
+  entries = sortEntries(getIndexedEntriesForCourse(params, titleHint, strategy));
   return {
     state: "found",
     entries

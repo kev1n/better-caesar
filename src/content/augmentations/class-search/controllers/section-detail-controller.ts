@@ -358,12 +358,15 @@ function renderRow(
   fetchedAt: number,
   onRefresh: () => void
 ): void {
-  // `caesar` is threaded through for the cache write upstream.
+  // `caesar` is still threaded through for the cache write upstream — the
+  // detail view itself no longer paints a header (the section row already
+  // shows section label / time / room one line up).
   void caesar;
   paint(null);
 
   // Combined-section per-section numbers need paper.nu's per-section cap;
-  // resolve in the background and re-paint when it lands.
+  // resolve in the background and re-paint when it lands. No-op for
+  // non-combined sections or unresolvable lookups.
   if (result.ok && result.isCombinedSection) {
     void resolvePerSectionSeats(result, deps.getTermId()).then((perSection) => {
       if (perSection && detailRow.isConnected) paint(perSection);

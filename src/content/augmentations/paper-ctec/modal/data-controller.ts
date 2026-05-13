@@ -1,9 +1,11 @@
 import { ctecCreditPool } from "../../../../shared/credit-pool";
 import { showToast } from "../../../../shared/toast";
+import { getCtecStrategy } from "../../../settings";
+import { getSectionLens } from "../../ctec-links/section-lens";
 import { CTEC_ERROR_TOAST_MESSAGE } from "../../ctec-links/rate-limit";
 import {
   fetchCtecCourseAnalytics,
-  getCachedReportAggregate,
+  getCachedChipAggregate,
   getCtecCourseAnalyticsSnapshot
 } from "../../ctec-links/reports";
 import { PAPER_CTEC_CONFIG } from "../config";
@@ -53,6 +55,10 @@ export interface ModalDataController {
   isBackgroundRefreshing(key: string): boolean;
   getRefreshFlash(key: string): ModalRefreshFlash | null;
   getTargetCount(key: string): number | undefined;
+  // Drops the per-key analytics batch target so the next kickBatch starts
+  // from parsedCount + batchSize instead of carrying over a prior lens's
+  // count. Called on lens-switch paths.
+  clearTargetCount(key: string): void;
   setRefreshFlash(key: string, flash: ModalRefreshFlash): void;
   clearRefreshFlash(key: string): void;
   kickBatch(context: AnalyticsModalSource, increment?: boolean): void;
@@ -131,13 +137,24 @@ export function createModalDataController(
     const snapshot = getCtecCourseAnalyticsSnapshot(
       context.params,
       context.titleHint,
-      batchSize
+      batchSize,
+      getSectionLens(context.params) ?? getCtecStrategy()
     );
     const parsedCount = countParsedEntries(snapshot);
-    const previousTarget = analyticsTargetCount.get(context.key) ?? parsedCount;
-    const nextTarget = increment
-      ? Math.max(previousTarget, parsedCount) + batchSize
-      : Math.max(previousTarget, parsedCount + batchSize);
+    // Fresh fetch after a lens switch: ignore parsedCount entirely.
+    // Course/instructor lenses pull combo's overlapping entries into
+    // parsedCount via the broader filter, which used to inflate
+    // nextTarget to 2× batchSize and have the fetcher chase reports
+    // for entries the user never asked about. The undefined-target
+    // sentinel is the signal that clearTargetCount just ran (lens
+    // switch / dry-run confirm) — start from exactly batchSize.
+    const previousTarget = analyticsTargetCount.get(context.key);
+    const nextTarget =
+      previousTarget === undefined
+        ? batchSize
+        : increment
+          ? Math.max(previousTarget, parsedCount) + batchSize
+          : Math.max(previousTarget, parsedCount + batchSize);
     analyticsTargetCount.set(context.key, nextTarget);
 
     const start = async (): Promise<PaperCtecAnalyticsState | null> => {
@@ -182,6 +199,31 @@ export function createModalDataController(
           const warning = ctecCreditPool.format();
           if (warning) {
             showToast(`Loaded CTEC. ${warning}.`, { tone: "warn", durationMs: 5000 });
+          }
+          // Repaint the schedule chip from the freshly-loaded lens. After a
+          // section-lens switch via the wizard or strategy tabs we cleared
+          // `state.resolved[context.key]`; without this nudge the chip would
+          // sit on the Load-CTEC placeholder until paper.nu next mutates the
+          // DOM (potentially never, on a quiet page). Use the chip-flavored
+          // reader so combo (most precise) wins the rating display when it
+          // has data, even if the user is currently browsing in the modal
+          // via Course or Prof lens.
+          const aggregate = getCachedChipAggregate(
+            context.params,
+            context.titleHint,
+            PAPER_CTEC_CONFIG.aggregate.recentTerms
+          );
+          if (aggregate) {
+            const widgetData: PaperCtecWidgetData = {
+              state: "found",
+              aggregate
+            };
+            state.resolved.set(context.key, widgetData);
+            callbacks.renderForKey(context.key, widgetData);
+          } else if (resultState.state === "not-found") {
+            const widgetData: PaperCtecWidgetData = { state: "not-found" };
+            state.resolved.set(context.key, widgetData);
+            callbacks.renderForKey(context.key, widgetData);
           }
         }
         return resultState;
@@ -234,10 +276,12 @@ export function createModalDataController(
     // from the previous run while a new check is in flight.
     clearRefreshFlash(context.key);
 
+    const strategy = getSectionLens(context.params) ?? getCtecStrategy();
     const previousSnapshot = getCtecCourseAnalyticsSnapshot(
       context.params,
       context.titleHint,
-      PAPER_CTEC_CONFIG.aggregate.recentTerms
+      PAPER_CTEC_CONFIG.aggregate.recentTerms,
+      strategy
     );
     const previousParsed = countParsedEntries(previousSnapshot);
     const previousTotal = previousSnapshot?.entries.length ?? 0;
@@ -271,7 +315,8 @@ export function createModalDataController(
           const updatedSnapshot = getCtecCourseAnalyticsSnapshot(
             context.params,
             context.titleHint,
-            PAPER_CTEC_CONFIG.aggregate.recentTerms
+            PAPER_CTEC_CONFIG.aggregate.recentTerms,
+            strategy
           );
           const newTotal = updatedSnapshot?.entries.length ?? 0;
           const addedCount = Math.max(0, newTotal - previousTotal);
@@ -283,8 +328,9 @@ export function createModalDataController(
           // Refresh the schedule chip's mini-summary too — newly-published
           // terms can shift the aggregated rating/responses count. Pull the
           // updated aggregate straight from cache without going through the
-          // chip's loading state.
-          const refreshedAggregate = getCachedReportAggregate(
+          // chip's loading state. Combo-first so the chip stays anchored to
+          // the most precise (prof, course) data when it exists.
+          const refreshedAggregate = getCachedChipAggregate(
             context.params,
             context.titleHint,
             PAPER_CTEC_CONFIG.aggregate.recentTerms
@@ -335,6 +381,9 @@ export function createModalDataController(
     },
     getTargetCount(key) {
       return analyticsTargetCount.get(key);
+    },
+    clearTargetCount(key) {
+      analyticsTargetCount.delete(key);
     },
     setRefreshFlash,
     clearRefreshFlash,

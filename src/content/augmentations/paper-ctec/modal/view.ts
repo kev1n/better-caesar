@@ -4,6 +4,7 @@ import { ANALYTICS_MODAL_ID } from "../constants";
 import { preventAndStop, stopPropagation } from "../ui-shared";
 import { disposeTrendChartObserver } from "./charts";
 import { CommentsSection } from "./comments";
+import { renderDryRunOverlay } from "./dry-run";
 import { HeaderSection } from "./header";
 import { OverviewSection } from "./overview";
 import { TermsSection } from "./terms";
@@ -125,9 +126,34 @@ function buildTemplate(
 ): TemplateResult {
   return html`<div class="bc-paper-ctec-modal-card" @click=${stopPropagation}>
     ${HeaderSection.render({ doc, input, state, callbacks })}
-    ${input.data
-      ? renderBody(doc, input.data, state, callbacks)
-      : renderStatusBody(input, callbacks)}
+    ${input.freshLensLoading
+      ? renderFreshLensLoading(input)
+      : input.data
+        ? renderBody(doc, input.data, input.strategy, state, callbacks)
+        : renderStatusBody(input, callbacks)}
+    ${renderDryRunOverlay(input, state, callbacks)}
+  </div>`;
+}
+
+// First-time lens switch: a fetch is in flight and we have NO confirmed
+// discovery for the active lens. Suppress the data body so cached combo
+// entries (which the course/instructor matchers treat as a valid subset)
+// don't render as if they were the new lens's data.
+function renderFreshLensLoading(input: AnalyticsModalInput): TemplateResult {
+  const label =
+    input.strategy === "course"
+      ? "Loading Course view…"
+      : input.strategy === "instructor"
+        ? "Loading Prof view…"
+        : "Loading CTEC reports…";
+  return html`<div class="bc-paper-ctec-modal-status-body">
+    <div class="bc-paper-ctec-modal-status-card">
+      <div class="bc-paper-ctec-modal-status-spinner"></div>
+      <h3 class="bc-paper-ctec-modal-status-title">${label}</h3>
+      <p class="bc-paper-ctec-modal-status-text">
+        Pulling fresh data for this view from Northwestern.
+      </p>
+    </div>
   </div>`;
 }
 
@@ -137,6 +163,7 @@ function buildTemplate(
 function renderBody(
   doc: Document,
   data: NonNullable<AnalyticsModalInput["data"]>,
+  strategy: AnalyticsModalInput["strategy"],
   state: AnalyticsModalState,
   callbacks: AnalyticsModalCallbacks
 ): TemplateResult {
@@ -144,7 +171,7 @@ function renderBody(
     ${state.tab === "overview"
       ? OverviewSection.render({ doc, data, state, callbacks })
       : state.tab === "comments"
-        ? CommentsSection.render({ doc, data, state, callbacks })
+        ? CommentsSection.render({ doc, data, strategy, state, callbacks })
         : TermsSection.render({ doc, data, state, callbacks })}
   </div>`;
 }
@@ -180,11 +207,12 @@ function renderStatusBody(
 
     if (input.notFound) {
       return html`<h3 class="bc-paper-ctec-modal-status-title">
-          No CTEC reports found
+          ${notFoundTitle(input)}
         </h3>
         <p class="bc-paper-ctec-modal-status-text">
-          We couldn't find any published CTEC evaluations for this section.
-        </p>`;
+          ${notFoundBody(input)}
+        </p>
+        ${renderStrategyPivots(input, callbacks)}`;
     }
 
     if (input.loading) {
@@ -195,7 +223,20 @@ function renderStatusBody(
         </p>`;
     }
 
-    return "";
+    // Fallback: nothing loaded for the active lens and no fetch in
+    // flight. Without an explicit affordance the modal renders an
+    // empty card body (the "grey box" users reported when navigating
+    // to a section with no data for their preferred lens). Give them
+    // a clear status message and the wizard re-entry button so
+    // they're never stuck staring at blank space.
+    return html`<h3 class="bc-paper-ctec-modal-status-title">
+        Nothing loaded for this view yet
+      </h3>
+      <p class="bc-paper-ctec-modal-status-text">
+        Pick another lens from the tabs above, or open the preview to
+        explore alternatives.
+      </p>
+      ${renderStrategyPivots(input, callbacks)}`;
   })();
 
   const cardCls = input.errorMessage
@@ -204,5 +245,58 @@ function renderStatusBody(
 
   return html`<div class="bc-paper-ctec-modal-status-body">
     <div class=${cardCls}>${inner}</div>
+  </div>`;
+}
+
+// Empty-state copy varies by lens so the message tracks what we *did*
+// search rather than reading the same way every time. Combo (the
+// default) is the only case that has obvious pivots — "try the course
+// without instructor", "try the instructor without course" — so it gets
+// the most encouraging message; the course/instructor lenses' empty
+// states are rarer and more terminal.
+function notFoundTitle(input: AnalyticsModalInput): string {
+  if (input.strategy === "course") {
+    return `No CTECs for ${input.identity.subject} ${input.identity.catalog}`;
+  }
+  if (input.strategy === "instructor") {
+    const name = input.identity.instructor.trim() || "this professor";
+    return `No CTECs for ${name} in ${input.identity.subject}`;
+  }
+  return "No CTECs for this professor + course";
+}
+
+function notFoundBody(input: AnalyticsModalInput): string {
+  if (input.strategy === "combo") {
+    const name = input.identity.instructor.trim() || "this professor";
+    return `${name} doesn't have any published CTEC evaluations for ${input.identity.subject} ${input.identity.catalog}. You can still get a read using one of the broader views below.`;
+  }
+  if (input.strategy === "course") {
+    return `Northwestern hasn't published any CTECs for ${input.identity.subject} ${input.identity.catalog} yet — that's pretty unusual.`;
+  }
+  return `Northwestern hasn't published CTECs for this professor in ${input.identity.subject} yet.`;
+}
+
+// Recovery affordance for the not-found body: gives the user a single
+// click back into the dry-run dialog after they've explicitly dismissed
+// it. Without this, cancelling the dry-run would strand them on the
+// empty body with no way forward — the original bug we fixed.
+function renderStrategyPivots(
+  _input: AnalyticsModalInput,
+  callbacks: AnalyticsModalCallbacks
+): TemplateResult {
+  return html`<div class="bc-paper-ctec-modal-status-pivots">
+    <p class="bc-paper-ctec-modal-status-pivots-prompt">
+      Want to look at alternatives instead?
+    </p>
+    <div class="bc-paper-ctec-modal-status-pivots-row">
+      <button
+        type="button"
+        class="bc-btn bc-btn--primary bc-btn--pill bc-paper-ctec-modal-status-pivot-btn"
+        @click=${(event: Event) => {
+          preventAndStop(event);
+          callbacks.onOpenDryRun();
+        }}
+      >Reopen preview →</button>
+    </div>
   </div>`;
 }
