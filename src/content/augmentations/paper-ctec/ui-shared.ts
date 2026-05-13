@@ -9,6 +9,7 @@ export type IconName =
   | "cart"
   | "chart"
   | "check"
+  | "checkbox"
   | "clock"
   | "lock"
   | "plus"
@@ -104,6 +105,7 @@ const ICON_SHAPES: Record<IconName, IconShape> = {
     ]
   },
   check: { paths: ["M5 12.5 10 17l9-10"] },
+  checkbox: { paths: ["M5 5h14v14H5z", "M8.5 12.5 11 15l4.5-6"] },
   plus: { paths: ["M12 5v14", "M5 12h14"] },
   cart: {
     paths: ["M3 3h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 7H6.5"],

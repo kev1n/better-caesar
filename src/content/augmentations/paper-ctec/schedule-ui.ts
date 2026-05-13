@@ -288,7 +288,7 @@ function makeCartButton(
     disabled = true;
     stateAttr = "in-cart";
   } else if (state.kind === "enrolled") {
-    icon = "cart";
+    icon = "checkbox";
     label = "Enrolled";
     title = "You're enrolled in this class.";
     disabled = true;

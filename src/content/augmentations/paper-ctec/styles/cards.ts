@@ -290,11 +290,16 @@ export function cardStyles(): string {
       box-shadow: var(--bc-shadow-button-hover);
     }
     button.${WIDGET_CLASS}-cart-btn[data-cart-state="success"],
-    button.${WIDGET_CLASS}-cart-btn[data-cart-state="in-cart"],
-    button.${WIDGET_CLASS}-cart-btn[data-cart-state="enrolled"] {
+    button.${WIDGET_CLASS}-cart-btn[data-cart-state="in-cart"] {
       background: var(--bc-color-cart-success-bg);
       border-color: var(--bc-color-cart-success-border);
       color: var(--bc-color-cart-success-text);
+    }
+    button.${WIDGET_CLASS}-cart-btn[data-cart-state="enrolled"] {
+      background: var(--bc-color-paper);
+      background: color-mix(in srgb, var(--bc-color-paper) 78%, white);
+      border-color: var(--bc-color-paper);
+      color: var(--bc-color-cart-text);
     }
     button.${WIDGET_CLASS}-cart-btn[data-cart-state="error"] {
       background: var(--bc-color-cart-error-bg);
