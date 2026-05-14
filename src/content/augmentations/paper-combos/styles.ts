@@ -284,6 +284,87 @@ const CSS = `
   font-size: 0.78rem;
 }
 
+/* Toggle stack: holds the always-visible out-of-class hours chip above
+ * the toggle pill. Column flex with the chip on top and toggle on the
+ * bottom; align-items:flex-start keeps the chip left-aligned with the
+ * toggle's leading edge instead of centering and looking lopsided.
+ * row-gap is intentionally tight (2px) so the two items read as a
+ * single unit. The bar's own align-items:center vertically centers
+ * this taller stack against the rest of the row. */
+#${TOP_BAR_ID} .bc-paper-combos-toggle-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  row-gap: 2px;
+  min-width: 0;
+}
+
+/* Hours chip: small pill above the toggle. Reads as "informational
+ * readout" — neutral muted background, no accent color (the toggle below
+ * already owns the accent slot). Tabular numerals so the value doesn't
+ * jitter as the user cycles combos. data-coverage carries the data
+ * completeness state:
+ *   full     — every section in the combo has cached CTEC hours
+ *   partial  — some sections imputed; chip dimmed to half-hint at the gap
+ *   none     — no cached data anywhere; value reads "— hrs/wk" and
+ *              the chip dims further so it doesn't draw the eye
+ * The chip stays visible in every state — the user said "at all times"
+ * — so they always know where the readout lives, even before CTEC has
+ * been fetched for the term. */
+#${TOP_BAR_ID} .bc-paper-combos-hours {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: 0.1rem 0.45rem;
+  background: var(--bc-color-bg-muted);
+  border: 1px solid var(--bc-color-border-divider);
+  border-radius: var(--bc-radius-pill);
+  font-size: 0.7rem;
+  line-height: 1.15;
+  color: var(--bc-color-text-muted);
+  white-space: nowrap;
+  cursor: help;
+  transition: opacity var(--bc-tx-fast) var(--bc-easing),
+              border-color var(--bc-tx-fast) var(--bc-easing);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-hours:hover {
+  border-color: var(--bc-color-border-strong);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-hours-label {
+  font-size: 0.62rem;
+  font-weight: var(--bc-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--bc-ls-wide);
+  color: var(--bc-color-text-subtle);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-hours-value {
+  font-weight: var(--bc-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--bc-color-text);
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-hours[data-coverage="partial"] {
+  opacity: 0.78;
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-hours[data-coverage="none"] {
+  opacity: 0.55;
+}
+
+/* Very narrow viewports drop the "Out of class" label to keep the chip
+ * compact alongside the label-less toggle (see the existing 700px rule
+ * below). Mirrors the toggle-label collapse so both stacks shrink to
+ * just the essential signal at the same breakpoint. */
+@media (max-width: 700px) {
+  #${TOP_BAR_ID} .bc-paper-combos-hours-label {
+    display: none;
+  }
+}
+
 /* Cycle cluster: wrap prev/counter/next in a single bordered pill so
  * the centered "X / Y" reads as the bar's primary readout. Sits in
  * the visual middle of the bar (flex spacers on both sides push it

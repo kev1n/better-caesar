@@ -44,6 +44,52 @@ function getSectionRating(section: ComboSection): number | null {
   return aggregate?.metrics.instruction?.mean ?? null;
 }
 
+// CTEC's "Average number of hours per week" prompt — out-of-classroom
+// study time, parsed at ctec-links/reports.ts:802. Same lookup contract
+// as getSectionRating; returns null when no cached aggregate exists or
+// when CTEC respondents skipped the hours question entirely.
+function getSectionHours(section: ComboSection): number | null {
+  const instructor = buildInstructorLastNameLabel(section.instructorNames);
+  if (!instructor) return null;
+  const aggregate = getCachedReportAggregate(
+    {
+      subject: section.subject,
+      catalogNumber: section.catalog,
+      instructor
+    },
+    section.title,
+    getRecentAggregationTerms()
+  );
+  return aggregate?.metrics.hours?.mean ?? null;
+}
+
+export type OutOfClassEstimate = {
+  // Total estimated out-of-class hours per week for the combo. null when
+  // zero sections in the combo have cached CTEC hours data — UI shows a
+  // dash instead of a fake number. Imputed sections contribute the mean
+  // of known sections so partial-data combos still rank fairly.
+  hours: number | null;
+  rated: number;
+  total: number;
+};
+
+export function estimateOutOfClassHours(combo: Combination): OutOfClassEstimate {
+  const total = combo.sections.length;
+  if (total === 0) return { hours: 0, rated: 0, total: 0 };
+  let sum = 0;
+  let rated = 0;
+  for (const section of combo.sections) {
+    const h = getSectionHours(section);
+    if (h !== null) {
+      sum += h;
+      rated += 1;
+    }
+  }
+  if (rated === 0) return { hours: null, rated: 0, total };
+  const mean = sum / rated;
+  return { hours: sum + mean * (total - rated), rated, total };
+}
+
 // Combination score = mean of available CTEC ratings, with the neutral
 // midpoint (3 on the 0–6 scale) imputed for sections that have no cached
 // aggregate. Keeps unrated electives from sinking an otherwise-strong combo

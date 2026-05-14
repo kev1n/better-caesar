@@ -20,6 +20,7 @@ import { loadComboPool, type LoadComboPoolResult } from "./data";
 import {
   DEFAULT_SORT_MODE,
   SORT_MODE_LABELS,
+  estimateOutOfClassHours,
   sortCombinations,
   type SortMode
 } from "./scoring";
@@ -489,6 +490,14 @@ export class PaperCombosAugmentation implements Augmentation {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
       .join("|");
+    // Include the out-of-class hours estimate in the signature — when the
+    // user's CTEC cache warms in the background, the chip should refresh
+    // even if the section set didn't change. Section IDs alone don't
+    // capture that.
+    const hoursEst = currentCombo ? estimateOutOfClassHours(currentCombo) : null;
+    const hoursSig = hoursEst
+      ? `${hoursEst.hours === null ? "null" : hoursEst.hours.toFixed(2)}/${hoursEst.rated}/${hoursEst.total}`
+      : "-";
     const comboSig = currentCombo
       ? `${currentCombo.sectionIds.join(",")}/${currentCombo.score.toFixed(3)}/${currentCombo.ratedCount}`
       : "-";
@@ -507,6 +516,7 @@ export class PaperCombosAugmentation implements Augmentation {
       zoneSig,
       String(this.combos.length),
       comboSig,
+      hoursSig,
       this.lastLoadResult?.state ?? "",
       String(this.lastEnumerate?.truncated ?? false),
       String(this.lastEnumerate?.conflictingPins ?? false)
@@ -562,6 +572,10 @@ export class PaperCombosAugmentation implements Augmentation {
     if (sig === this.lastRenderSig) return;
     this.lastRenderSig = sig;
 
+    const hours = currentCombo
+      ? estimateOutOfClassHours(currentCombo)
+      : { hours: null as number | null, rated: 0, total: 0 };
+
     renderTopBar(doc, bar, {
       enabled,
       total: this.combos.length,
@@ -573,6 +587,9 @@ export class PaperCombosAugmentation implements Augmentation {
       minCredits: this.minCredits,
       sortMode: this.sortMode,
       sortLabels: SORT_MODE_LABELS,
+      hours: hours.hours,
+      hoursRated: hours.rated,
+      hoursTotal: hours.total,
       status: enabled
         ? statusFromLoadState(this.lastLoadResult, this.lastEnumerate)
         : undefined,

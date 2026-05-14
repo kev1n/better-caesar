@@ -60,6 +60,15 @@ export type TopBarState = {
   minCredits: number;
   sortMode: SortMode;
   sortLabels: Record<SortMode, string>;
+  // Estimated total out-of-class hours/week for the active combo, summed
+  // from CTEC's "Average hours per week" metric per section. Sections
+  // without cached CTEC data inherit the mean of the rated ones, so a
+  // partial-coverage combo still gets a comparable number. `hours` is
+  // null when zero sections in the combo had any cached hours data —
+  // the chip then shows "—" instead of inventing a value.
+  hours: number | null;
+  hoursRated: number;
+  hoursTotal: number;
   status?: string;
   truncated: boolean;
   conflictingPins: boolean;
@@ -262,6 +271,59 @@ function formatRating(score: number): string {
   return score.toFixed(2);
 }
 
+function formatHours(hours: number): string {
+  // Round to whole hours — the CTEC source is a self-reported survey
+  // estimate, so decimals imply a precision the data doesn't have.
+  return String(Math.round(hours));
+}
+
+// Out-of-class hours summary chip. Always rendered above the toggle
+// when the feature is enabled — regardless of sort mode — so the user
+// always has an at-a-glance read on how much homework the active combo
+// implies. Three display states:
+//
+//   • Fully rated (rated === total): "18 hrs/wk", full opacity.
+//   • Partially rated (rated > 0, < total): "≈ 18 hrs/wk", dimmed via
+//     data-coverage="partial", plus a tooltip noting the imputation.
+//   • Zero data (rated === 0 OR no sections): "— hrs/wk", dimmed via
+//     data-coverage="none". Honest "we don't know" instead of a fake 0.
+//
+// The chip's wider tooltip explains the methodology (out-of-class study
+// time per CTEC, etc.) so the user understands what the number means.
+function buildHoursChip(doc: Document, state: TopBarState): HTMLElement {
+  const hasAnyData = state.hours !== null;
+  const fullyRated = hasAnyData && state.hoursRated === state.hoursTotal;
+  const coverage = !hasAnyData
+    ? "none"
+    : fullyRated
+      ? "full"
+      : "partial";
+  const valueText =
+    !hasAnyData
+      ? "— hrs/wk"
+      : fullyRated
+        ? `${formatHours(state.hours!)} hrs/wk`
+        : `≈ ${formatHours(state.hours!)} hrs/wk`;
+
+  const tooltipBase =
+    "Estimated time spent on this schedule outside of class meetings, " +
+    "based on CTEC's \"Average hours per week\" responses.";
+  const tooltip = !hasAnyData
+    ? `${tooltipBase} No CTEC data cached for any section in this combination yet — open the analytics panel on a course card to populate it.`
+    : fullyRated
+      ? `${tooltipBase} All ${state.hoursTotal} sections have cached CTEC data.`
+      : `${tooltipBase} ${state.hoursRated} of ${state.hoursTotal} sections have cached data; the rest inherit the mean of the rated ones.`;
+
+  return el(doc, "div", {
+    class: "bc-paper-combos-hours",
+    dataset: { coverage },
+    attrs: { title: tooltip, "aria-label": tooltip }
+  }, [
+    el(doc, "span", { class: "bc-paper-combos-hours-label" }, ["Out of class"]),
+    el(doc, "span", { class: "bc-paper-combos-hours-value" }, [valueText])
+  ]);
+}
+
 // Factories so we can render two copies (inline + popover) without
 // duplicating the markup inline in renderTopBar. Both copies carry the
 // same data-bc-combos-action attrs, so the delegated click/input
@@ -353,7 +415,16 @@ export function renderTopBar(
     ])
   ]);
 
-  bar.appendChild(toggle);
+  // Wrap the toggle in a vertical stack so the always-visible out-of-class
+  // hours chip can sit right above it. The bar's `align-items: center`
+  // vertically centers this stack against the cycle pill / rating / right
+  // cluster, keeping the optical baseline of the rest of the bar steady.
+  const toggleStack = el(doc, "div", { class: "bc-paper-combos-toggle-stack" });
+  if (state.enabled) {
+    toggleStack.appendChild(buildHoursChip(doc, state));
+  }
+  toggleStack.appendChild(toggle);
+  bar.appendChild(toggleStack);
 
   if (!state.enabled) {
     // Off state: just the toggle + a brief hint. No cycle / rating /
