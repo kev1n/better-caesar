@@ -29,7 +29,7 @@ const CSS = `
   flex-wrap: nowrap;
   align-items: center;
   column-gap: 0.5rem;
-  padding: 0.18rem 0.5rem;
+  padding: 0.1rem 0.5rem;
   border-radius: var(--bc-radius-md);
   background: var(--bc-color-bg);
   border: 1px solid var(--bc-color-border);
@@ -55,8 +55,8 @@ const CSS = `
   display: none;
   align-items: center;
   justify-content: center;
-  height: 1.55rem;
-  width: 1.55rem;
+  height: 1.4rem;
+  width: 1.4rem;
   padding: 0;
   border: 1px solid var(--bc-color-border);
   background: var(--bc-color-bg-muted);
@@ -181,7 +181,7 @@ const CSS = `
  * bar surface in either mode), so the controls feel inset. */
 #${TOP_BAR_ID} .bc-paper-combos-input,
 #${TOP_BAR_ID} .bc-paper-combos-sort-select {
-  height: 1.55rem;
+  height: 1.4rem;
   padding: 0 0.45rem;
   border: 1px solid var(--bc-color-border);
   border-radius: var(--bc-radius-sm);
@@ -222,8 +222,8 @@ const CSS = `
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  height: 1.65rem;
-  padding: 0 0.6rem 0 0.35rem;
+  height: 1.5rem;
+  padding: 0 0.55rem 0 0.3rem;
   border: 1.5px solid var(--bc-color-accent);
   border-radius: var(--bc-radius-pill);
   background: var(--bc-color-accent-surface-soft);
@@ -246,8 +246,8 @@ const CSS = `
 .${FEATURE_TOGGLE_CLASS} .bc-paper-combos-toggle-track {
   position: relative;
   display: inline-block;
-  width: 1.85rem;
-  height: 1rem;
+  width: 1.7rem;
+  height: 0.9rem;
   border-radius: var(--bc-radius-pill);
   background: var(--bc-color-border);
   transition: background var(--bc-tx-fast) var(--bc-easing);
@@ -258,8 +258,8 @@ const CSS = `
   position: absolute;
   top: 0.1rem;
   left: 0.1rem;
-  width: 0.8rem;
-  height: 0.8rem;
+  width: 0.7rem;
+  height: 0.7rem;
   border-radius: var(--bc-radius-circle);
   background: var(--bc-color-bg);
   box-shadow: var(--bc-shadow-button);
@@ -271,7 +271,7 @@ const CSS = `
 }
 
 .${FEATURE_TOGGLE_CLASS}[data-on="true"] .bc-paper-combos-toggle-thumb {
-  transform: translateX(0.85rem);
+  transform: translateX(0.8rem);
 }
 
 .${FEATURE_TOGGLE_CLASS}[data-on="true"] {
@@ -580,9 +580,9 @@ const CSS = `
    * intrinsic 1.4rem + 0.2rem vertical padding measured 1.8rem and
    * grew the bar taller in the combinations-on state than in
    * combinations-off (where the 1.65rem toggle is the tallest item). */
-  height: 1.55rem;
+  height: 1.4rem;
   box-sizing: border-box;
-  padding: 0 0.3rem;
+  padding: 0 0.25rem;
   border: 1px solid var(--bc-color-border-strong);
   background: var(--bc-color-bg);
   border-radius: var(--bc-radius-pill);
@@ -594,9 +594,9 @@ const CSS = `
   border: none;
   background: transparent;
   border-radius: var(--bc-radius-circle);
-  width: 1.25rem;
-  height: 1.25rem;
-  font-size: 0.95rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 0.85rem;
   font-weight: var(--bc-fw-semibold);
   line-height: 1;
   display: inline-flex;
@@ -619,19 +619,19 @@ const CSS = `
 #${TOP_BAR_ID} .bc-paper-combos-counter {
   font-variant-numeric: tabular-nums;
   font-weight: var(--bc-fw-bold);
-  min-width: 4.5rem;
+  min-width: 4rem;
   text-align: center;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   line-height: 1;
   color: var(--bc-color-accent);
-  padding: 0 0.35rem;
+  padding: 0 0.3rem;
   letter-spacing: 0.01em;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-rating {
   display: inline-flex;
   align-items: center;
-  height: 1.55rem;
+  height: 1.4rem;
   padding: 0 0.5rem;
   background: var(--bc-color-bg-muted);
   border: 1px solid var(--bc-color-border);
@@ -652,7 +652,7 @@ const CSS = `
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  height: 1.55rem;
+  height: 1.4rem;
   padding: 0 0.5rem 0 0.55rem;
   background: var(--bc-color-bg-muted);
   border: 1px solid var(--bc-color-border);
@@ -697,13 +697,13 @@ const CSS = `
 
 #${TOP_BAR_ID} .bc-paper-combos-credits input[type="number"] {
   width: 2.25rem;
-  height: 1.25rem;
+  height: 1.1rem;
   padding: 0;
   border: none;
   background: transparent;
   color: var(--bc-color-text);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: var(--bc-fw-semibold);
   font-variant-numeric: tabular-nums;
   text-align: center;
