@@ -6,6 +6,7 @@ import type { ComboSection, Combination } from "./types";
 
 export type SortMode =
   | "rating"
+  | "lazy"
   | "early-end"
   | "late-start"
   | "early-start"
@@ -17,6 +18,7 @@ export const DEFAULT_SORT_MODE: SortMode = "rating";
 
 export const SORT_MODE_LABELS: Record<SortMode, string> = {
   rating: "Top CTEC rating",
+  lazy: "Lazy mode (least hours/week)",
   "early-end": "Earliest end of day",
   "late-start": "Latest start (sleep in)",
   "early-start": "Earliest start",
@@ -169,6 +171,22 @@ function compareForMode(
       case "rating":
         primary = b.score - a.score;
         break;
+      case "lazy": {
+        // Out-of-class hours asc. Combos with zero hours data (hours ===
+        // null) sink to the bottom — sorting them by an imputed number
+        // would be a lie. Ties on the hours total prefer combos with
+        // more rated sections (less imputation = more honest).
+        const aEst = estimateOutOfClassHours(a);
+        const bEst = estimateOutOfClassHours(b);
+        const aH = aEst.hours;
+        const bH = bEst.hours;
+        if (aH === null && bH === null) primary = 0;
+        else if (aH === null) primary = 1;
+        else if (bH === null) primary = -1;
+        else primary = aH - bH;
+        if (primary === 0) primary = bEst.rated - aEst.rated;
+        break;
+      }
       case "early-end":
         primary = latestEndMinutes(a) - latestEndMinutes(b);
         break;
@@ -221,6 +239,7 @@ export function sortCombinations(
 export function isSortMode(value: string): value is SortMode {
   return (
     value === "rating" ||
+    value === "lazy" ||
     value === "early-end" ||
     value === "late-start" ||
     value === "early-start" ||
