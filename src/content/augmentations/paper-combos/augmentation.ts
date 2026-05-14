@@ -493,10 +493,13 @@ export class PaperCombosAugmentation implements Augmentation {
     // Include the out-of-class hours estimate in the signature — when the
     // user's CTEC cache warms in the background, the chip should refresh
     // even if the section set didn't change. Section IDs alone don't
-    // capture that.
+    // capture that. The estimator is also called downstream in renderAll
+    // to feed the chip, but signature-time computation is the only way
+    // to detect a CTEC-cache-only delta without re-rendering on every
+    // mutation.
     const hoursEst = currentCombo ? estimateOutOfClassHours(currentCombo) : null;
     const hoursSig = hoursEst
-      ? `${hoursEst.hours === null ? "null" : hoursEst.hours.toFixed(2)}/${hoursEst.rated}/${hoursEst.total}`
+      ? `${hoursEst.hours === null ? "null" : hoursEst.hours.toFixed(2)}/${hoursEst.rated}/${hoursEst.total}/${hoursEst.knownSum.toFixed(2)}`
       : "-";
     const comboSig = currentCombo
       ? `${currentCombo.sectionIds.join(",")}/${currentCombo.score.toFixed(3)}/${currentCombo.ratedCount}`

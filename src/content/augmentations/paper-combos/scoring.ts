@@ -65,31 +65,81 @@ function getSectionHours(section: ComboSection): number | null {
   return aggregate?.metrics.hours?.mean ?? null;
 }
 
+export type KnownHoursEntry = {
+  // Section label suitable for a tooltip — "COMP_SCI 211-0" etc.
+  label: string;
+  hours: number;
+};
+
 export type OutOfClassEstimate = {
-  // Total estimated out-of-class hours per week for the combo. null when
-  // zero sections in the combo have cached CTEC hours data — UI shows a
-  // dash instead of a fake number. Imputed sections contribute the mean
-  // of known sections so partial-data combos still rank fairly.
+  // Imputed total estimated out-of-class hours per week for the combo.
+  // null when zero sections in the combo have cached CTEC hours data —
+  // UI shows a dash instead of a fake number. Imputed sections contribute
+  // the mean of known sections so partial-data combos still rank fairly.
+  // The lazy-mode sort comparator uses this so combos that contain
+  // unrated sections don't artificially float to the top.
   hours: number | null;
   rated: number;
   total: number;
+  // Sum of CTEC hours across sections that have cached data. Used as the
+  // chip's headline number — purely the "what we know" sum, no imputation.
+  // 0 when rated === 0.
+  knownSum: number;
+  // Per-section detail for the chip's tooltip / formula display. Ordered
+  // the same as combo.sections, but only includes sections with cached
+  // hours data.
+  knownValues: KnownHoursEntry[];
+  // Arithmetic mean of knownValues' hours. null when rated === 0. Pulled
+  // out so the chip's tooltip can spell out the formula without redoing
+  // the math.
+  knownMean: number | null;
 };
 
 export function estimateOutOfClassHours(combo: Combination): OutOfClassEstimate {
   const total = combo.sections.length;
-  if (total === 0) return { hours: 0, rated: 0, total: 0 };
+  if (total === 0) {
+    return {
+      hours: 0,
+      rated: 0,
+      total: 0,
+      knownSum: 0,
+      knownValues: [],
+      knownMean: null
+    };
+  }
   let sum = 0;
   let rated = 0;
+  const knownValues: KnownHoursEntry[] = [];
   for (const section of combo.sections) {
     const h = getSectionHours(section);
     if (h !== null) {
       sum += h;
       rated += 1;
+      knownValues.push({
+        label: `${section.subject} ${section.number}`,
+        hours: h
+      });
     }
   }
-  if (rated === 0) return { hours: null, rated: 0, total };
+  if (rated === 0) {
+    return {
+      hours: null,
+      rated: 0,
+      total,
+      knownSum: 0,
+      knownValues: [],
+      knownMean: null
+    };
+  }
   const mean = sum / rated;
-  return { hours: sum + mean * (total - rated), rated, total };
+  return {
+    hours: sum + mean * (total - rated),
+    rated,
+    total,
+    knownSum: sum,
+    knownValues,
+    knownMean: mean
+  };
 }
 
 // Combination score = mean of available CTEC ratings, with the neutral
