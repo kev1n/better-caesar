@@ -72,12 +72,29 @@ export class PaperExportHelperAugmentation implements Augmentation {
   private openModal(): void {
     if (this.modal) return;
     this.modal = openExportHelperModal(document, DEFAULT_CALENDAR_APP, {
-      onDownload: () => {
-        // Native passthrough lands in the next commit.
-        this.closeModal();
-      },
+      onDownload: () => this.triggerNativeDownload(),
       onClose: () => this.closeModal()
     });
+  }
+
+  // Re-dispatch a click on paper.nu's native Download button with the
+  // bypass flag flipped so our capture-phase interceptor lets the event
+  // through to React. We deliberately keep the modal open until the
+  // click lands — the dispatch is synchronous, so by the time we close,
+  // the native handler has already initiated the .ics download.
+  private triggerNativeDownload(): void {
+    const button = this.boundButton;
+    if (!button) {
+      this.closeModal();
+      return;
+    }
+    this.allowNativeClickThrough = true;
+    try {
+      button.click();
+    } finally {
+      this.allowNativeClickThrough = false;
+    }
+    this.closeModal();
   }
 
   private closeModal(): void {
