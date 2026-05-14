@@ -4,6 +4,24 @@ import { buildInstructorLastNameLabel } from "../paper-ctec/identity";
 import { NEUTRAL_RATING_MIDPOINT } from "./constants";
 import type { ComboSection, Combination } from "./types";
 
+// Deduplicate sections by sectionId so the always-visible chip doesn't
+// double-count when the user has multiple sections of the same course on
+// paper.nu's canvas (e.g. stacked alternatives feeding the combinations
+// enumerator). Combinations themselves are already deduped by
+// construction, so this is a no-op for combo-driven callers.
+function dedupeBySectionId(
+  sections: readonly ComboSection[]
+): readonly ComboSection[] {
+  const seen = new Set<string>();
+  const out: ComboSection[] = [];
+  for (const section of sections) {
+    if (seen.has(section.sectionId)) continue;
+    seen.add(section.sectionId);
+    out.push(section);
+  }
+  return out;
+}
+
 export type SortMode =
   | "rating"
   | "lazy"
@@ -95,8 +113,11 @@ export type OutOfClassEstimate = {
   knownMean: number | null;
 };
 
-export function estimateOutOfClassHours(combo: Combination): OutOfClassEstimate {
-  const total = combo.sections.length;
+export function estimateOutOfClassHours(
+  sections: readonly ComboSection[]
+): OutOfClassEstimate {
+  const deduped = dedupeBySectionId(sections);
+  const total = deduped.length;
   if (total === 0) {
     return {
       hours: 0,
@@ -110,7 +131,7 @@ export function estimateOutOfClassHours(combo: Combination): OutOfClassEstimate 
   let sum = 0;
   let rated = 0;
   const knownValues: KnownHoursEntry[] = [];
-  for (const section of combo.sections) {
+  for (const section of deduped) {
     const h = getSectionHours(section);
     if (h !== null) {
       sum += h;
@@ -226,8 +247,8 @@ function compareForMode(
         // null) sink to the bottom — sorting them by an imputed number
         // would be a lie. Ties on the hours total prefer combos with
         // more rated sections (less imputation = more honest).
-        const aEst = estimateOutOfClassHours(a);
-        const bEst = estimateOutOfClassHours(b);
+        const aEst = estimateOutOfClassHours(a.sections);
+        const bEst = estimateOutOfClassHours(b.sections);
         const aH = aEst.hours;
         const bH = bEst.hours;
         if (aH === null && bH === null) primary = 0;

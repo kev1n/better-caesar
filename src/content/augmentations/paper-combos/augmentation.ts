@@ -157,10 +157,15 @@ export class PaperCombosAugmentation implements Augmentation {
 
     if (enabled) {
       this.mountFeature(doc, grid);
-      this.scheduleLoad(doc);
     } else {
       this.unmountFeature(doc);
     }
+    // Pool load is decoupled from the in-page toggle so the always-visible
+    // hours chip can render from the user's schedule even when the
+    // combinations feature itself is off. The pool drives both the chip
+    // (chipSections fallback in renderAll) and combo enumeration when the
+    // user flips the feature on.
+    this.scheduleLoad(doc);
 
     this.renderAll(doc, grid, enabled);
   }
@@ -269,12 +274,12 @@ export class PaperCombosAugmentation implements Augmentation {
   // Tear down feature side effects (card-hiding, layout overrides, pin
   // buttons) without removing the bar — the user just toggled the
   // feature off in-place and the bar's toggle pill stays so they can
-  // turn it back on.
+  // turn it back on. The hours chip survives — renderAll re-paints it
+  // from the user's full canvas when the feature is off.
   private unmountFeature(doc: Document): void {
     if (!this.featureMounted) return;
     setRootAttribute(doc, false);
     unhideRealCards(doc);
-    removeHoursChip(doc);
     this.detachPinClickHandler();
     this.detachZoneHandlers();
     this.featureMounted = false;
@@ -500,8 +505,14 @@ export class PaperCombosAugmentation implements Augmentation {
     // capture that. The estimator is also called downstream in renderAll
     // to feed the chip, but signature-time computation is the only way
     // to detect a CTEC-cache-only delta without re-rendering on every
-    // mutation.
-    const hoursEst = currentCombo ? estimateOutOfClassHours(currentCombo) : null;
+    // mutation. Mirrors renderAll's chipSections fallback so the
+    // disabled-but-loaded-pool case still invalidates correctly.
+    const hoursSections = currentCombo
+      ? currentCombo.sections
+      : this.pool
+        ? Array.from(this.pool.byId.values())
+        : null;
+    const hoursEst = hoursSections ? estimateOutOfClassHours(hoursSections) : null;
     const hoursSig = hoursEst
       ? `${hoursEst.hours === null ? "null" : hoursEst.hours.toFixed(2)}/${hoursEst.rated}/${hoursEst.total}/${hoursEst.knownSum.toFixed(2)}`
       : "-";
@@ -551,12 +562,21 @@ export class PaperCombosAugmentation implements Augmentation {
     // in different host elements, so paper.nu re-rendering one doesn't
     // wipe the other. Called every renderAll (not gated by the sig
     // dedupe below) so the chip survives React reconciler wipes the
-    // same way zones do. Hidden when the feature is off or no combo
-    // exists — meaningless to show "—" in that case.
-    if (enabled && currentCombo) {
+    // same way zones do.
+    //
+    // Source priority: the active combo when combinations is on,
+    // otherwise every section in the user's canvas. That keeps the chip
+    // visible across both states and reflects exactly what paper.nu is
+    // showing on-screen.
+    const chipSections = currentCombo
+      ? currentCombo.sections
+      : this.pool
+        ? Array.from(this.pool.byId.values())
+        : null;
+    if (chipSections && chipSections.length > 0) {
       ensureHoursChip(doc, {
         visible: true,
-        estimate: estimateOutOfClassHours(currentCombo)
+        estimate: estimateOutOfClassHours(chipSections)
       });
     } else {
       removeHoursChip(doc);
