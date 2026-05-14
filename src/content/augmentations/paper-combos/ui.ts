@@ -11,7 +11,7 @@ import {
   ROOT_ATTR,
   TOP_BAR_ID
 } from "./constants";
-import type { SortMode } from "./scoring";
+import type { OutOfClassEstimate, SortMode } from "./scoring";
 import { isSortMode } from "./scoring";
 import type { ComboPool, Combination, ComboSection } from "./types";
 
@@ -262,10 +262,337 @@ function formatRating(score: number): string {
   return score.toFixed(2);
 }
 
+// Small structured hover popup that explains the star reading — the
+// chip alone doesn't tell the user what scale it's on or how the
+// score is assembled. Mirrors the hours chip's tooltip shape (header
+// title + body copy in a bordered card) so the two surfaces read as
+// the same design family.
+function buildRatingTooltipElement(doc: Document): HTMLElement {
+  const card = el(doc, "div", { class: "bc-paper-combos-rating-tip-card" }, [
+    el(doc, "span", { class: "bc-paper-combos-rating-tip-title" }, [
+      "Combo rating"
+    ]),
+    el(doc, "div", { class: "bc-paper-combos-rating-tip-body" }, [
+      "Mean CTEC instructor rating across this combo's sections, on " +
+        "a 0–6 scale. Sections without cached CTEC data fall back to " +
+        "the neutral midpoint of 3 so missing data doesn't sink an " +
+        "otherwise strong combo."
+    ])
+  ]);
+  return el(doc, "div", { class: "bc-paper-combos-rating-tip" }, [card]);
+}
+
+// Round a CTEC-derived hours value for display. CTEC data is a self-
+// reported survey estimate, so decimals beyond one place imply a
+// precision the source doesn't have. The tooltip uses one decimal
+// (e.g. "5.7") for the formula; the chip headline uses whole numbers.
+function formatHoursTooltip(hours: number): string {
+  return hours.toFixed(1);
+}
+
+const HOURS_CHIP_ID = "bc-paper-combos-hours-chip";
+
+export type HoursChipState = {
+  // Whether the chip should be visible at all. False on non-schedule
+  // paper.nu pages, when the combos feature is off, or when there's no
+  // active combo to summarize — the caller is responsible for hiding
+  // it then (we don't want a chip that shows "— hrs/wk" on /search).
+  visible: boolean;
+  estimate: OutOfClassEstimate | null;
+};
+
+// paper.nu's top sticky header — the flex row that holds the user pill
+// on the right and the About / Map / Notes / Share / Settings buttons.
+// Stable selector: combination of `sticky top-0 z-30 flex w-full` (paper.nu
+// only mounts one element with this exact tailwind signature) plus a
+// guard that one of its descendant buttons reads "About" — the same
+// belt-and-suspenders pattern paper-ctec uses to locate the action
+// toolbar (see findCombosActionHost above). Returns null when the header
+// hasn't rendered yet; the caller treats that as "try again next mutation".
+function findPaperHeaderHost(doc: Document): HTMLElement | null {
+  const candidates = doc.querySelectorAll<HTMLElement>(
+    "div.sticky.top-0.z-30.flex.w-full"
+  );
+  for (const host of Array.from(candidates)) {
+    const labels = Array.from(host.querySelectorAll("button p")).map((p) =>
+      (p.textContent ?? "").trim().toLowerCase()
+    );
+    if (labels.includes("about")) return host;
+  }
+  return null;
+}
+
+function describeChipValue(estimate: OutOfClassEstimate): string {
+  if (estimate.rated === 0) return "— hrs/wk";
+  // Headline is the estimated total — what the user can actually expect
+  // to spend on the full schedule. Fully-rated combos report the
+  // unmodified sum (estimate.hours === estimate.knownSum). Partial-data
+  // combos report the imputed total prefixed with "≈" so the user knows
+  // some sections lean on the per-section mean. The tooltip breaks it
+  // down so the source of every term is visible.
+  if (estimate.hours === null) return "— hrs/wk";
+  const rounded = Math.round(estimate.hours);
+  return estimate.rated === estimate.total
+    ? `${rounded} hrs/wk`
+    : `≈ ${rounded} hrs/wk`;
+}
+
+// Plain-text equivalent of the popup, set as aria-label so screen readers
+// still get the full content. The popup itself is pure-CSS hover-driven
+// and would otherwise be invisible to assistive tech.
+function buildAriaLabel(estimate: OutOfClassEstimate): string {
+  if (estimate.rated === 0) {
+    return (
+      "Out-of-class time: no CTEC data cached for any section yet. " +
+      "Open a course card's analytics panel to populate it."
+    );
+  }
+  const lines: string[] = [];
+  lines.push(
+    `Out-of-class time: ${formatHoursTooltip(estimate.knownSum)} hours per ` +
+      `week known, from ${estimate.rated} of ${estimate.total} sections.`
+  );
+  for (const entry of estimate.knownValues) {
+    lines.push(`${entry.label}: ${formatHoursTooltip(entry.hours)} hours`);
+  }
+  if (estimate.rated < estimate.total && estimate.hours !== null && estimate.knownMean !== null) {
+    const meanText = formatHoursTooltip(estimate.knownMean);
+    for (const entry of estimate.unknownValues) {
+      lines.push(`${entry.label}: estimated ${meanText} hours`);
+    }
+    const unrated = estimate.total - estimate.rated;
+    lines.push(
+      `Estimated total including ${unrated} unrated sections at the mean ` +
+        `of ${meanText} hours: ` +
+        `approximately ${formatHoursTooltip(estimate.hours)} hours per week.`
+    );
+  }
+  return lines.join(". ");
+}
+
+// Custom popup tooltip — pure-CSS hover-driven, instant show/hide via
+// :hover on the chip. Renders structured DOM (not a native `title`) so
+// we can format per-section rows + the formula breakdown and theme it
+// to match the rest of the extension's surfaces.
+function buildHoursTooltipElement(
+  doc: Document,
+  estimate: OutOfClassEstimate
+): HTMLElement {
+  const hasData = estimate.rated > 0;
+  const fullyRated = hasData && estimate.rated === estimate.total;
+
+  const children: HTMLElement[] = [];
+
+  if (!hasData) {
+    children.push(
+      el(doc, "div", { class: "bc-paper-combos-hours-tip-header" }, [
+        el(doc, "span", { class: "bc-paper-combos-hours-tip-title" }, [
+          "No CTEC data yet"
+        ])
+      ])
+    );
+    children.push(
+      el(doc, "div", { class: "bc-paper-combos-hours-tip-sub" }, [
+        "Open a course card's analytics panel on paper.nu to fetch CTEC " +
+          "out-of-class hours for that course. The tile updates as data " +
+          "warms up."
+      ])
+    );
+  } else {
+    // Headline: estimated total — the at-a-glance "what to expect" number.
+    // For fully-rated combos this equals the known sum; for partial-data
+    // combos it's the imputed total (≈). The per-section list and the
+    // formula below this header explain exactly how the number was
+    // assembled, so the headline being an estimate doesn't mislead.
+    const total = estimate.hours ?? estimate.knownSum;
+    children.push(
+      el(doc, "div", { class: "bc-paper-combos-hours-tip-header" }, [
+        el(doc, "span", { class: "bc-paper-combos-hours-tip-title" }, [
+          fullyRated ? "Total time" : "Estimated total"
+        ]),
+        el(doc, "span", { class: "bc-paper-combos-hours-tip-headline" }, [
+          `${fullyRated ? "" : "≈ "}${formatHoursTooltip(total)} hrs/wk`
+        ])
+      ])
+    );
+    children.push(
+      el(doc, "div", { class: "bc-paper-combos-hours-tip-sub" }, [
+        fullyRated
+          ? `All ${estimate.total} section${estimate.total === 1 ? "" : "s"} reporting · CTEC self-reported`
+          : `${estimate.rated} of ${estimate.total} section${estimate.total === 1 ? "" : "s"} reporting · CTEC self-reported`
+      ])
+    );
+
+    children.push(
+      el(doc, "div", { class: "bc-paper-combos-hours-tip-divider" })
+    );
+
+    // Per-section table — one row per rated section. Keeps the
+    // breakdown legible at a glance instead of folded into a sentence.
+    const rows: HTMLElement[] = estimate.knownValues.map((entry) =>
+      el(doc, "div", { class: "bc-paper-combos-hours-tip-row" }, [
+        el(doc, "span", { class: "bc-paper-combos-hours-tip-row-label" }, [
+          entry.label
+        ]),
+        el(doc, "span", { class: "bc-paper-combos-hours-tip-row-value" }, [
+          `${formatHoursTooltip(entry.hours)} hrs`
+        ])
+      ])
+    );
+    children.push(
+      el(doc, "div", { class: "bc-paper-combos-hours-tip-list" }, rows)
+    );
+
+    if (!fullyRated && estimate.hours !== null && estimate.knownMean !== null) {
+      const unrated = estimate.total - estimate.rated;
+      const meanText = formatHoursTooltip(estimate.knownMean);
+      children.push(
+        el(doc, "div", { class: "bc-paper-combos-hours-tip-divider" })
+      );
+      // Estimated-sections list: same row format as the known list so
+      // the user can scan them side-by-side. Value column gets the same
+      // ≈-prefixed mean for every row, since that's the rate we're
+      // assigning. The header line spells out the assigned mean too so
+      // a glance is enough.
+      children.push(
+        el(doc, "div", { class: "bc-paper-combos-hours-tip-subhead" }, [
+          el(doc, "span", { class: "bc-paper-combos-hours-tip-subhead-title" }, [
+            "Estimated"
+          ]),
+          el(doc, "span", { class: "bc-paper-combos-hours-tip-subhead-note" }, [
+            `≈ ${meanText} hrs each · mean of reporting`
+          ])
+        ])
+      );
+      const unknownRows: HTMLElement[] = estimate.unknownValues.map((entry) =>
+        el(
+          doc,
+          "div",
+          {
+            class:
+              "bc-paper-combos-hours-tip-row bc-paper-combos-hours-tip-row--estimated"
+          },
+          [
+            el(doc, "span", { class: "bc-paper-combos-hours-tip-row-label" }, [
+              entry.label
+            ]),
+            el(doc, "span", { class: "bc-paper-combos-hours-tip-row-value" }, [
+              `≈ ${meanText} hrs`
+            ])
+          ]
+        )
+      );
+      children.push(
+        el(doc, "div", { class: "bc-paper-combos-hours-tip-list" }, unknownRows)
+      );
+      children.push(
+        el(doc, "div", { class: "bc-paper-combos-hours-tip-divider" })
+      );
+      children.push(
+        el(doc, "div", { class: "bc-paper-combos-hours-tip-formula" }, [
+          el(doc, "div", { class: "bc-paper-combos-hours-tip-formula-row" }, [
+            el(doc, "span", {}, ["Known"]),
+            el(doc, "span", { class: "bc-paper-combos-hours-tip-formula-value" }, [
+              `${formatHoursTooltip(estimate.knownSum)} hrs/wk`
+            ])
+          ]),
+          el(doc, "div", { class: "bc-paper-combos-hours-tip-formula-note" }, [
+            `${formatHoursTooltip(estimate.knownSum)} known + ` +
+              `(${meanText} mean × ${unrated} unrated) ≈ ` +
+              `${formatHoursTooltip(estimate.hours)}`
+          ])
+        ])
+      );
+    }
+  }
+
+  const card = el(
+    doc,
+    "div",
+    { class: "bc-paper-combos-hours-tip-card" },
+    children
+  );
+  return el(doc, "div", { class: "bc-paper-combos-hours-tip" }, [card]);
+}
+
+// Mount-or-update the always-visible hours chip in paper.nu's top header.
+// Idempotent: first call creates the element, subsequent calls re-bind
+// content + tooltip. Re-parents the chip if paper.nu re-rendered the
+// header (React swapping the whole div, which happens on route changes).
+// Returns the chip element if mounted, null when the host isn't ready
+// yet (caller treats that as "try again next mutation").
+export function ensureHoursChip(
+  doc: Document,
+  state: HoursChipState
+): HTMLElement | null {
+  if (!state.visible || !state.estimate) {
+    removeHoursChip(doc);
+    return null;
+  }
+  const host = findPaperHeaderHost(doc);
+  if (!host) {
+    // Header hasn't rendered; leave any existing chip alone — it'll
+    // be re-targeted next mutation. If there's no existing chip, no-op.
+    return null;
+  }
+
+  let chip = doc.getElementById(HOURS_CHIP_ID);
+  if (!chip) {
+    chip = doc.createElement("div");
+    chip.id = HOURS_CHIP_ID;
+    chip.className = "bc-paper-combos-hours";
+  }
+  if (chip.parentElement !== host) {
+    // Prepend so margin-right:auto (in CSS) can push the existing
+    // About/Map/Notes cluster to the right while we anchor left.
+    host.prepend(chip);
+  } else if (host.firstElementChild !== chip) {
+    // paper.nu re-rendered with the chip still attached but no longer
+    // in slot 0 — reseat to maintain the left-edge anchor.
+    host.prepend(chip);
+  }
+
+  const estimate = state.estimate;
+  const coverage =
+    estimate.rated === 0
+      ? "none"
+      : estimate.rated === estimate.total
+        ? "full"
+        : "partial";
+
+  chip.dataset.coverage = coverage;
+  // Native `title` would compete with the custom popup (browser shows
+  // its own delayed tooltip on hover). Remove it explicitly in case a
+  // previous version left one attached.
+  chip.removeAttribute("title");
+  chip.setAttribute("aria-label", buildAriaLabel(estimate));
+  chip.replaceChildren(
+    el(doc, "span", { class: "bc-paper-combos-hours-label" }, ["Out of class"]),
+    el(doc, "span", { class: "bc-paper-combos-hours-value" }, [
+      describeChipValue(estimate)
+    ]),
+    buildHoursTooltipElement(doc, estimate)
+  );
+  return chip;
+}
+
+export function removeHoursChip(doc: Document): void {
+  const chip = doc.getElementById(HOURS_CHIP_ID);
+  if (chip) chip.remove();
+}
+
 // Factories so we can render two copies (inline + popover) without
 // duplicating the markup inline in renderTopBar. Both copies carry the
 // same data-bc-combos-action attrs, so the delegated click/input
 // handlers fire correctly regardless of which copy the user touched.
+// Strip trailing parenthetical clauses ("Lazy mode (least hours/week)"
+// → "Lazy mode"). The closed-state display uses the short form so a
+// long sort name doesn't push the credits / sort cluster off the right
+// edge of the bar; the open dropdown still shows the full label.
+function stripParenthetical(label: string): string {
+  return label.replace(/\s*\([^)]*\)\s*$/, "").trim();
+}
+
 function buildSortControl(doc: Document, state: TopBarState): HTMLElement {
   const sortSelect = doc.createElement("select");
   sortSelect.className = "bc-paper-combos-sort-select";
@@ -278,9 +605,27 @@ function buildSortControl(doc: Document, state: TopBarState): HTMLElement {
     if (value === state.sortMode) option.selected = true;
     sortSelect.appendChild(option);
   }
+  const currentLabel = state.sortLabels[state.sortMode] ?? "";
+  // Overlay sits on top of the select; the select itself gets
+  // color:transparent in CSS so its native closed-state text stays
+  // hidden. pointer-events:none on the overlay lets clicks pass
+  // through to the select so opening the dropdown still works.
+  const display = el(
+    doc,
+    "span",
+    {
+      class: "bc-paper-combos-sort-display",
+      attrs: { "aria-hidden": "true" }
+    },
+    [stripParenthetical(currentLabel)]
+  );
+  const wrap = el(doc, "div", { class: "bc-paper-combos-sort-wrap" }, [
+    sortSelect,
+    display
+  ]);
   return el(doc, "label", { class: "bc-paper-combos-sort" }, [
     el(doc, "span", {}, ["Sort"]),
-    sortSelect
+    wrap
   ]);
 }
 
@@ -397,12 +742,26 @@ export function renderTopBar(
   // combo has a cached CTEC mean. With zero coverage there's nothing
   // honest to show, and a placeholder "no CTEC" pill is just clutter.
   const rating = state.ratedCount > 0
-    ? el(doc, "span", {
-        class: "bc-paper-combos-rating",
-        dataset: { rated: String(state.ratedCount) }
-      }, [
-        `★ ${formatRating(state.score)}`
-      ])
+    ? el(
+        doc,
+        "span",
+        {
+          class: "bc-paper-combos-rating",
+          dataset: { rated: String(state.ratedCount) },
+          attrs: {
+            "aria-label":
+              "Combo rating: mean CTEC instructor rating on a 0 to 6 scale. " +
+              "Sections without cached CTEC data fall back to the neutral " +
+              "midpoint of 3."
+          }
+        },
+        [
+          el(doc, "span", { class: "bc-paper-combos-rating-value" }, [
+            `★ ${formatRating(state.score)}`
+          ]),
+          buildRatingTooltipElement(doc)
+        ]
+      )
     : null;
 
   // Two-tier collapse: credits hides at 1450px, sort hides at 1150px,

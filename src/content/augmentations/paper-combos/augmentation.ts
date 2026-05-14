@@ -20,6 +20,7 @@ import { loadComboPool, type LoadComboPoolResult } from "./data";
 import {
   DEFAULT_SORT_MODE,
   SORT_MODE_LABELS,
+  estimateOutOfClassHours,
   sortCombinations,
   type SortMode
 } from "./scoring";
@@ -27,7 +28,9 @@ import { injectCombosStyles } from "./styles";
 import type { ComboPool, Combination, ComboSection, CourseGroup } from "./types";
 import {
   applyComboVisibility,
+  ensureHoursChip,
   ensureTopBar,
+  removeHoursChip,
   renderTopBar,
   renderZones,
   setRootAttribute,
@@ -154,10 +157,15 @@ export class PaperCombosAugmentation implements Augmentation {
 
     if (enabled) {
       this.mountFeature(doc, grid);
-      this.scheduleLoad(doc);
     } else {
       this.unmountFeature(doc);
     }
+    // Pool load is decoupled from the in-page toggle so the always-visible
+    // hours chip can render from the user's schedule even when the
+    // combinations feature itself is off. The pool drives both the chip
+    // (chipSections fallback in renderAll) and combo enumeration when the
+    // user flips the feature on.
+    this.scheduleLoad(doc);
 
     this.renderAll(doc, grid, enabled);
   }
@@ -165,6 +173,7 @@ export class PaperCombosAugmentation implements Augmentation {
   cleanup(doc: Document = document): void {
     setRootAttribute(doc, false);
     unhideRealCards(doc);
+    removeHoursChip(doc);
     const bar = doc.getElementById(TOP_BAR_ID);
     if (bar) bar.remove();
     const style = doc.getElementById(STYLE_ID);
@@ -265,7 +274,8 @@ export class PaperCombosAugmentation implements Augmentation {
   // Tear down feature side effects (card-hiding, layout overrides, pin
   // buttons) without removing the bar — the user just toggled the
   // feature off in-place and the bar's toggle pill stays so they can
-  // turn it back on.
+  // turn it back on. The hours chip survives — renderAll re-paints it
+  // from the user's full canvas when the feature is off.
   private unmountFeature(doc: Document): void {
     if (!this.featureMounted) return;
     setRootAttribute(doc, false);
@@ -489,6 +499,23 @@ export class PaperCombosAugmentation implements Augmentation {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
       .join("|");
+    // Include the out-of-class hours estimate in the signature — when the
+    // user's CTEC cache warms in the background, the chip should refresh
+    // even if the section set didn't change. Section IDs alone don't
+    // capture that. The estimator is also called downstream in renderAll
+    // to feed the chip, but signature-time computation is the only way
+    // to detect a CTEC-cache-only delta without re-rendering on every
+    // mutation. Mirrors renderAll's chipSections fallback so the
+    // disabled-but-loaded-pool case still invalidates correctly.
+    const hoursSections = currentCombo
+      ? currentCombo.sections
+      : this.pool
+        ? Array.from(this.pool.byId.values())
+        : null;
+    const hoursEst = hoursSections ? estimateOutOfClassHours(hoursSections) : null;
+    const hoursSig = hoursEst
+      ? `${hoursEst.hours === null ? "null" : hoursEst.hours.toFixed(2)}/${hoursEst.rated}/${hoursEst.total}/${hoursEst.knownSum.toFixed(2)}`
+      : "-";
     const comboSig = currentCombo
       ? `${currentCombo.sectionIds.join(",")}/${currentCombo.score.toFixed(3)}/${currentCombo.ratedCount}`
       : "-";
@@ -507,6 +534,7 @@ export class PaperCombosAugmentation implements Augmentation {
       zoneSig,
       String(this.combos.length),
       comboSig,
+      hoursSig,
       this.lastLoadResult?.state ?? "",
       String(this.lastEnumerate?.truncated ?? false),
       String(this.lastEnumerate?.conflictingPins ?? false)
@@ -527,9 +555,37 @@ export class PaperCombosAugmentation implements Augmentation {
         void this.setFeatureEnabled(next);
       }
     });
-    // Action toolbar hasn't rendered yet — try again next mutation.
-    if (!bar) return;
     const currentCombo = enabled ? this.combos[this.cursor] ?? null : null;
+
+    // Mount/update the always-visible hours chip in paper.nu's sticky
+    // header. Decoupled from the combos bar — the chip and the bar live
+    // in different host elements, so paper.nu re-rendering one doesn't
+    // wipe the other. Called every renderAll (not gated by the sig
+    // dedupe below) so the chip survives React reconciler wipes the
+    // same way zones do.
+    //
+    // Source priority: the active combo when combinations is on,
+    // otherwise every section in the user's canvas. That keeps the chip
+    // visible across both states and reflects exactly what paper.nu is
+    // showing on-screen.
+    const chipSections = currentCombo
+      ? currentCombo.sections
+      : this.pool
+        ? Array.from(this.pool.byId.values())
+        : null;
+    if (chipSections && chipSections.length > 0) {
+      ensureHoursChip(doc, {
+        visible: true,
+        estimate: estimateOutOfClassHours(chipSections)
+      });
+    } else {
+      removeHoursChip(doc);
+    }
+
+    // Action toolbar hasn't rendered yet — try again next mutation. The
+    // hours chip above doesn't depend on the bar host so it stays
+    // serviced even when the bar can't mount yet.
+    if (!bar) return;
 
     // Card-visibility side effects only run when the feature is on.
     // setAttribute doesn't fire our childList-only MutationObserver, so

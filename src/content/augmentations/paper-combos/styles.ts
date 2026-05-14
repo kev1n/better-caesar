@@ -29,7 +29,7 @@ const CSS = `
   flex-wrap: nowrap;
   align-items: center;
   column-gap: 0.5rem;
-  padding: 0.3rem 0.5rem;
+  padding: 0.1rem 0.5rem;
   border-radius: var(--bc-radius-md);
   background: var(--bc-color-bg);
   border: 1px solid var(--bc-color-border);
@@ -55,8 +55,8 @@ const CSS = `
   display: none;
   align-items: center;
   justify-content: center;
-  height: 1.75rem;
-  width: 1.75rem;
+  height: 1.4rem;
+  width: 1.4rem;
   padding: 0;
   border: 1px solid var(--bc-color-border);
   background: var(--bc-color-bg-muted);
@@ -181,7 +181,7 @@ const CSS = `
  * bar surface in either mode), so the controls feel inset. */
 #${TOP_BAR_ID} .bc-paper-combos-input,
 #${TOP_BAR_ID} .bc-paper-combos-sort-select {
-  height: 1.75rem;
+  height: 1.4rem;
   padding: 0 0.45rem;
   border: 1px solid var(--bc-color-border);
   border-radius: var(--bc-radius-sm);
@@ -221,9 +221,9 @@ const CSS = `
 .${FEATURE_TOGGLE_CLASS} {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  height: 1.85rem;
-  padding: 0 0.7rem 0 0.4rem;
+  gap: 0.4rem;
+  height: 1.5rem;
+  padding: 0 0.55rem 0 0.3rem;
   border: 1.5px solid var(--bc-color-accent);
   border-radius: var(--bc-radius-pill);
   background: var(--bc-color-accent-surface-soft);
@@ -246,8 +246,8 @@ const CSS = `
 .${FEATURE_TOGGLE_CLASS} .bc-paper-combos-toggle-track {
   position: relative;
   display: inline-block;
-  width: 1.85rem;
-  height: 1rem;
+  width: 1.7rem;
+  height: 0.9rem;
   border-radius: var(--bc-radius-pill);
   background: var(--bc-color-border);
   transition: background var(--bc-tx-fast) var(--bc-easing);
@@ -258,8 +258,8 @@ const CSS = `
   position: absolute;
   top: 0.1rem;
   left: 0.1rem;
-  width: 0.8rem;
-  height: 0.8rem;
+  width: 0.7rem;
+  height: 0.7rem;
   border-radius: var(--bc-radius-circle);
   background: var(--bc-color-bg);
   box-shadow: var(--bc-shadow-button);
@@ -271,7 +271,7 @@ const CSS = `
 }
 
 .${FEATURE_TOGGLE_CLASS}[data-on="true"] .bc-paper-combos-toggle-thumb {
-  transform: translateX(0.85rem);
+  transform: translateX(0.8rem);
 }
 
 .${FEATURE_TOGGLE_CLASS}[data-on="true"] {
@@ -284,6 +284,288 @@ const CSS = `
   font-size: 0.78rem;
 }
 
+/* Out-of-class hours chip: lives in paper.nu's top sticky header, NOT
+ * the combos bar. Mounts as the first child of the header so it anchors
+ * to the left edge while paper.nu's existing About / Map / Notes /
+ * Share / Settings cluster and user pill stay on the right.
+ *
+ * margin-right:auto is the trick that holds the left anchor across all
+ * three of paper.nu's header layouts:
+ *
+ *   lg (≥1024px): header is flex-row with justify-end. Without the auto
+ *     margin, the chip would pile up at the right with everything else.
+ *     The auto margin absorbs the free space to the chip's right,
+ *     pushing the rest of the items to the right edge while the chip
+ *     stays at the left.
+ *   md (768-1023px): header is flex-row with justify-center. The auto
+ *     margin again absorbs free space and pushes the right cluster to
+ *     the right edge. Chip stays anchored left.
+ *   <md: header is flex-col. margin-right:auto is a no-op in vertical
+ *     flex, so the chip just sits as the first stacked item above the
+ *     buttons. Fine — still "at the top, prominent."
+ *
+ * Visual: neutral muted pill, no accent (informational, not a control).
+ * Tabular numerals keep the value steady as combos cycle. data-coverage
+ * dims the chip in the partial / none states so the eye isn't drawn to
+ * a number that's part-imputed or absent. */
+.bc-paper-combos-hours {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  max-width: 100%;
+  margin-right: auto;
+  padding: 0.2rem 0.65rem;
+  background: var(--bc-color-bg-inset);
+  border: 1px solid var(--bc-color-border-strong);
+  border-radius: var(--bc-radius-pill);
+  font-family: inherit;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--bc-color-text-muted);
+  white-space: nowrap;
+  cursor: default;
+  transition: opacity var(--bc-tx-fast) var(--bc-easing),
+              border-color var(--bc-tx-fast) var(--bc-easing);
+}
+
+.bc-paper-combos-hours:hover {
+  border-color: var(--bc-color-border-strong);
+}
+
+.bc-paper-combos-hours-label {
+  font-size: 0.62rem;
+  font-weight: var(--bc-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--bc-ls-wide);
+  color: var(--bc-color-text-subtle);
+}
+
+.bc-paper-combos-hours-value {
+  font-weight: var(--bc-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--bc-color-text);
+}
+
+/* Coverage states — DO NOT use the opacity property here. The popup
+ * (.bc-paper-combos-hours-tip-card) is a descendant of the chip, and
+ * CSS opacity propagates to descendants, so dimming the chip would
+ * also dim the popup card and make it visibly translucent against
+ * paper.nu's page. Use color tokens instead so the dimming is purely a
+ * chip-surface effect. */
+.bc-paper-combos-hours[data-coverage="partial"] .bc-paper-combos-hours-value,
+.bc-paper-combos-hours[data-coverage="partial"] .bc-paper-combos-hours-label {
+  color: var(--bc-color-text-muted);
+}
+
+.bc-paper-combos-hours[data-coverage="none"] {
+  border-style: dashed;
+}
+.bc-paper-combos-hours[data-coverage="none"] .bc-paper-combos-hours-value,
+.bc-paper-combos-hours[data-coverage="none"] .bc-paper-combos-hours-label {
+  color: var(--bc-color-text-subtle);
+}
+
+@media (max-width: 700px) {
+  .bc-paper-combos-hours-label {
+    display: none;
+  }
+}
+
+/* Custom hover popup — instant show/hide via pure CSS, no browser
+ * native-tooltip delay. Two-layer structure:
+ *   .bc-paper-combos-hours-tip   — invisible positioning wrapper. Sits
+ *     directly below the chip (top:100%) with no actual gap, so moving
+ *     the cursor from the chip down INTO the card never crosses an
+ *     unhovered zone. padding-top inside this wrapper creates the
+ *     visual breathing room while keeping the hover surface continuous.
+ *   .bc-paper-combos-hours-tip-card — the visible box (background,
+ *     border, shadow). Lives inside the wrapper so the wrapper's
+ *     transparent padding-top hover zone connects the chip and card.
+ * Tokens: --bc-color-bg + --bc-color-border-strong + --bc-shadow-tooltip
+ * match the popover used by the kebab menu (#${TOP_BAR_ID} .bc-paper-
+ * combos-popover above), so the surface reads as one design family. */
+.bc-paper-combos-hours-tip {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 50;
+  padding-top: 8px;
+  cursor: default;
+}
+
+.bc-paper-combos-hours:hover .bc-paper-combos-hours-tip,
+.bc-paper-combos-hours:focus-within .bc-paper-combos-hours-tip {
+  display: block;
+}
+
+/* Keep the popup open while the user is highlighting text inside it.
+ * Without this rule, dragging across a row boundary briefly leaves the
+ * chip's :hover surface (paper.nu's header is dense and the cursor can
+ * cross an unhovered seam mid-drag) and the popup snaps closed,
+ * killing the selection. :has(::selection) holds the popup open for
+ * the lifetime of the selection — clicking outside clears the
+ * selection and the popup closes naturally. */
+.bc-paper-combos-hours:has(.bc-paper-combos-hours-tip-card ::selection)
+  .bc-paper-combos-hours-tip {
+  display: block;
+}
+
+.bc-paper-combos-hours-tip-card {
+  min-width: 16rem;
+  max-width: 22rem;
+  padding: 0.75rem 0.85rem;
+  /* paper.nu's header carries user-select:none on its button cluster
+   * and the property inherits into the chip's subtree, so the popup's
+   * text would refuse to select. Force selection back on for the
+   * card's contents — the chip surface itself stays default since
+   * there's nothing useful to copy there. */
+  user-select: text;
+  -webkit-user-select: text;
+  /* Solid, strongly-contrasting surface. We pick --bc-color-bg-app
+   * (NOT bg, bg-muted, or bg-inset) because the bg-* / bg-muted / bg-
+   * inset tokens are all "almost the page background" in at least one
+   * theme — e.g. default light's bg-inset resolves to accent-surface-
+   * row (~#faf7f9), which is visually indistinguishable from paper.nu's
+   * white page and reads as transparency. bg-app is the next level
+   * down: a clear light gray in default, saturated cream in Pencil
+   * light, dark in both dark themes. Reads as a distinct popup
+   * surface against paper.nu's page in every combination. */
+  background: var(--bc-color-bg-app);
+  border: 2px solid var(--bc-color-text);
+  border-radius: var(--bc-radius-md);
+  box-shadow: var(--bc-shadow-tooltip);
+  color: var(--bc-color-text);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.bc-paper-combos-hours-tip-card ::selection {
+  background: var(--bc-color-accent-surface-soft);
+  color: var(--bc-color-text);
+}
+
+.bc-paper-combos-hours-tip-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.2rem;
+}
+
+.bc-paper-combos-hours-tip-title {
+  font-size: 0.66rem;
+  font-weight: var(--bc-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--bc-ls-wide);
+  color: var(--bc-color-text-subtle);
+}
+
+.bc-paper-combos-hours-tip-headline {
+  font-size: 0.95rem;
+  font-weight: var(--bc-fw-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--bc-color-accent);
+}
+
+.bc-paper-combos-hours-tip-sub {
+  color: var(--bc-color-text-muted);
+  font-size: 0.72rem;
+  margin-bottom: 0.55rem;
+}
+
+.bc-paper-combos-hours-tip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.bc-paper-combos-hours-tip-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+}
+
+.bc-paper-combos-hours-tip-row-label {
+  color: var(--bc-color-text);
+  font-weight: var(--bc-fw-medium);
+}
+
+.bc-paper-combos-hours-tip-row-value {
+  color: var(--bc-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Estimated rows: same layout as the known rows so the user can
+ * compare them side-by-side, but the label gets the subtle text tone
+ * to flag "this isn't a CTEC number, it's the imputed mean". */
+.bc-paper-combos-hours-tip-row--estimated .bc-paper-combos-hours-tip-row-label {
+  color: var(--bc-color-text-muted);
+  font-style: italic;
+  font-weight: var(--bc-fw-regular);
+}
+
+.bc-paper-combos-hours-tip-row--estimated .bc-paper-combos-hours-tip-row-value {
+  color: var(--bc-color-text-subtle);
+}
+
+/* Subhead between the known list and the estimated list. Reads as a
+ * mini section title so the user knows the next rows aren't more
+ * CTEC data — they're imputed at the mean of the rows above. */
+.bc-paper-combos-hours-tip-subhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.25rem;
+}
+
+.bc-paper-combos-hours-tip-subhead-title {
+  font-size: 0.66rem;
+  font-weight: var(--bc-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--bc-ls-wide);
+  color: var(--bc-color-text-subtle);
+}
+
+.bc-paper-combos-hours-tip-subhead-note {
+  font-size: 0.7rem;
+  color: var(--bc-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bc-paper-combos-hours-tip-divider {
+  height: 1px;
+  background: var(--bc-color-border-divider);
+  margin: 0.6rem 0;
+}
+
+.bc-paper-combos-hours-tip-formula-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+  font-weight: var(--bc-fw-medium);
+}
+
+.bc-paper-combos-hours-tip-formula-value {
+  color: var(--bc-color-accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--bc-fw-semibold);
+}
+
+.bc-paper-combos-hours-tip-formula-note {
+  color: var(--bc-color-text-subtle);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.15rem;
+}
+
 /* Cycle cluster: wrap prev/counter/next in a single bordered pill so
  * the centered "X / Y" reads as the bar's primary readout. Sits in
  * the visual middle of the bar (flex spacers on both sides push it
@@ -293,7 +575,14 @@ const CSS = `
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.2rem 0.3rem;
+  /* Explicit height + border-box pins the pill to the same height as
+   * the rest of the on-state controls. Without this the inner buttons'
+   * intrinsic 1.4rem + 0.2rem vertical padding measured 1.8rem and
+   * grew the bar taller in the combinations-on state than in
+   * combinations-off (where the 1.65rem toggle is the tallest item). */
+  height: 1.4rem;
+  box-sizing: border-box;
+  padding: 0 0.25rem;
   border: 1px solid var(--bc-color-border-strong);
   background: var(--bc-color-bg);
   border-radius: var(--bc-radius-pill);
@@ -305,9 +594,9 @@ const CSS = `
   border: none;
   background: transparent;
   border-radius: var(--bc-radius-circle);
-  width: 1.6rem;
-  height: 1.6rem;
-  font-size: 0.95rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 0.85rem;
   font-weight: var(--bc-fw-semibold);
   line-height: 1;
   display: inline-flex;
@@ -330,18 +619,20 @@ const CSS = `
 #${TOP_BAR_ID} .bc-paper-combos-counter {
   font-variant-numeric: tabular-nums;
   font-weight: var(--bc-fw-bold);
-  min-width: 4.5rem;
+  min-width: 4rem;
   text-align: center;
-  font-size: 1rem;
+  font-size: 0.82rem;
+  line-height: 1;
   color: var(--bc-color-accent);
-  padding: 0 0.35rem;
+  padding: 0 0.3rem;
   letter-spacing: 0.01em;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-rating {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  height: 1.75rem;
+  height: 1.4rem;
   padding: 0 0.5rem;
   background: var(--bc-color-bg-muted);
   border: 1px solid var(--bc-color-border);
@@ -350,10 +641,85 @@ const CSS = `
   font-size: 0.78rem;
   color: var(--bc-color-text-muted);
   font-variant-numeric: tabular-nums;
+  /* Without this the "★ 4.20" string wraps inside the 1.4rem pill at
+   * narrow widths — the soft break between glyph and number puts the
+   * star on a line above the rating, which spills out of the chip.
+   * Keeping the whole readout on one line lets align-items:center do
+   * its job. */
+  white-space: nowrap;
+  cursor: default;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-rating[data-rated="0"] {
   opacity: 0.55;
+}
+
+/* Explanatory hover popup — keeps users from having to guess what
+ * "★ 4.20" means. Same hover-driven, pure-CSS pattern as the hours
+ * chip's tooltip (instant show via :hover, stays open while text is
+ * selected via :has(::selection)) so both surfaces feel the same. */
+.bc-paper-combos-rating-tip {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 50;
+  padding-top: 8px;
+  cursor: default;
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-rating:hover .bc-paper-combos-rating-tip,
+#${TOP_BAR_ID} .bc-paper-combos-rating:focus-within .bc-paper-combos-rating-tip {
+  display: block;
+}
+
+/* Split into its own rule: regular selector lists aren't forgiving,
+ * so if the browser refuses ::selection inside :has() the entire
+ * comma list above would be dropped — including the basic :hover
+ * trigger. Keep them apart so hover always works even if the
+ * keep-open-while-selecting rule turns out to be unsupported. */
+#${TOP_BAR_ID} .bc-paper-combos-rating:has(.bc-paper-combos-rating-tip-card ::selection)
+  .bc-paper-combos-rating-tip {
+  display: block;
+}
+
+.bc-paper-combos-rating-tip-card {
+  min-width: 14rem;
+  max-width: 20rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--bc-color-bg-app);
+  border: 2px solid var(--bc-color-text);
+  border-radius: var(--bc-radius-md);
+  box-shadow: var(--bc-shadow-tooltip);
+  color: var(--bc-color-text);
+  font-size: 0.78rem;
+  font-weight: var(--bc-fw-regular);
+  line-height: 1.4;
+  white-space: normal;
+  text-align: left;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.bc-paper-combos-rating-tip-card ::selection {
+  background: var(--bc-color-accent-surface-soft);
+  color: var(--bc-color-text);
+}
+
+.bc-paper-combos-rating-tip-title {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: var(--bc-fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--bc-ls-wide);
+  color: var(--bc-color-text-subtle);
+  margin-bottom: 0.3rem;
+  font-variant-numeric: normal;
+}
+
+.bc-paper-combos-rating-tip-body {
+  color: var(--bc-color-text);
+  font-variant-numeric: normal;
 }
 
 /* Combined Credits range: a single pill with [min] – [max] inputs.
@@ -362,7 +728,7 @@ const CSS = `
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  height: 1.75rem;
+  height: 1.4rem;
   padding: 0 0.5rem 0 0.55rem;
   background: var(--bc-color-bg-muted);
   border: 1px solid var(--bc-color-border);
@@ -407,13 +773,13 @@ const CSS = `
 
 #${TOP_BAR_ID} .bc-paper-combos-credits input[type="number"] {
   width: 2.25rem;
-  height: 1.25rem;
+  height: 1.1rem;
   padding: 0;
   border: none;
   background: transparent;
   color: var(--bc-color-text);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: var(--bc-fw-semibold);
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -430,6 +796,48 @@ const CSS = `
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+}
+
+/* Sort select wraps a span overlay so the closed-state display can use
+ * the short label (parenthetical stripped) while the open dropdown
+ * still shows the full label on each option. Without this the long
+ * "Lazy mode (least hours/week)" label sized the native select to its
+ * width and pushed the credits/min/max cluster off the right edge.
+ *
+ * Native option text is hidden by setting color:transparent on the
+ * select; the option color rule (declared earlier above) keeps the
+ * dropdown options readable because options render in the OS-managed
+ * popup layer and use their own color, not the select's.
+ *
+ * width:11rem holds the layout steady when the user cycles between
+ * sort modes — the short labels vary in length (9–21 chars), and a
+ * fixed width avoids the bar reflowing every time. */
+#${TOP_BAR_ID} .bc-paper-combos-sort-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-sort-wrap .bc-paper-combos-sort-select {
+  width: 11rem;
+  color: transparent;
+}
+
+#${TOP_BAR_ID} .bc-paper-combos-sort-display {
+  position: absolute;
+  left: 0.45rem;
+  right: 1.5rem;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  color: var(--bc-color-text);
+  font-size: 0.8rem;
+  line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-sort > span:first-child,

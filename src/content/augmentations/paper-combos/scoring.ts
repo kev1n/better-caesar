@@ -4,8 +4,27 @@ import { buildInstructorLastNameLabel } from "../paper-ctec/identity";
 import { NEUTRAL_RATING_MIDPOINT } from "./constants";
 import type { ComboSection, Combination } from "./types";
 
+// Deduplicate sections by sectionId so the always-visible chip doesn't
+// double-count when the user has multiple sections of the same course on
+// paper.nu's canvas (e.g. stacked alternatives feeding the combinations
+// enumerator). Combinations themselves are already deduped by
+// construction, so this is a no-op for combo-driven callers.
+function dedupeBySectionId(
+  sections: readonly ComboSection[]
+): readonly ComboSection[] {
+  const seen = new Set<string>();
+  const out: ComboSection[] = [];
+  for (const section of sections) {
+    if (seen.has(section.sectionId)) continue;
+    seen.add(section.sectionId);
+    out.push(section);
+  }
+  return out;
+}
+
 export type SortMode =
   | "rating"
+  | "lazy"
   | "early-end"
   | "late-start"
   | "early-start"
@@ -17,6 +36,7 @@ export const DEFAULT_SORT_MODE: SortMode = "rating";
 
 export const SORT_MODE_LABELS: Record<SortMode, string> = {
   rating: "Top CTEC rating",
+  lazy: "Lazy mode (least hours/week)",
   "early-end": "Earliest end of day",
   "late-start": "Latest start (sleep in)",
   "early-start": "Earliest start",
@@ -42,6 +62,120 @@ function getSectionRating(section: ComboSection): number | null {
     getRecentAggregationTerms()
   );
   return aggregate?.metrics.instruction?.mean ?? null;
+}
+
+// CTEC's "Average number of hours per week" prompt — out-of-classroom
+// study time, parsed at ctec-links/reports.ts:802. Same lookup contract
+// as getSectionRating; returns null when no cached aggregate exists or
+// when CTEC respondents skipped the hours question entirely.
+function getSectionHours(section: ComboSection): number | null {
+  const instructor = buildInstructorLastNameLabel(section.instructorNames);
+  if (!instructor) return null;
+  const aggregate = getCachedReportAggregate(
+    {
+      subject: section.subject,
+      catalogNumber: section.catalog,
+      instructor
+    },
+    section.title,
+    getRecentAggregationTerms()
+  );
+  return aggregate?.metrics.hours?.mean ?? null;
+}
+
+export type KnownHoursEntry = {
+  // Section label suitable for a tooltip — "COMP_SCI 211-0" etc.
+  label: string;
+  hours: number;
+};
+
+export type UnknownHoursEntry = {
+  // Section label for sections without cached CTEC hours. The popup
+  // lists these alongside the assigned mean so the user can see which
+  // classes are being imputed and at what rate.
+  label: string;
+};
+
+export type OutOfClassEstimate = {
+  // Imputed total estimated out-of-class hours per week for the combo.
+  // null when zero sections in the combo have cached CTEC hours data —
+  // UI shows a dash instead of a fake number. Imputed sections contribute
+  // the mean of known sections so partial-data combos still rank fairly.
+  // The lazy-mode sort comparator uses this so combos that contain
+  // unrated sections don't artificially float to the top.
+  hours: number | null;
+  rated: number;
+  total: number;
+  // Sum of CTEC hours across sections that have cached data. Used as the
+  // chip's headline number — purely the "what we know" sum, no imputation.
+  // 0 when rated === 0.
+  knownSum: number;
+  // Per-section detail for the chip's tooltip / formula display. Ordered
+  // the same as combo.sections, but only includes sections with cached
+  // hours data.
+  knownValues: KnownHoursEntry[];
+  // Arithmetic mean of knownValues' hours. null when rated === 0. Pulled
+  // out so the chip's tooltip can spell out the formula without redoing
+  // the math.
+  knownMean: number | null;
+  // Sections that don't have cached CTEC hours data. Ordered the same
+  // as combo.sections. Empty when rated === total. The popup renders
+  // these next to the assigned mean so the imputation is transparent.
+  unknownValues: UnknownHoursEntry[];
+};
+
+export function estimateOutOfClassHours(
+  sections: readonly ComboSection[]
+): OutOfClassEstimate {
+  const deduped = dedupeBySectionId(sections);
+  const total = deduped.length;
+  if (total === 0) {
+    return {
+      hours: 0,
+      rated: 0,
+      total: 0,
+      knownSum: 0,
+      knownValues: [],
+      knownMean: null,
+      unknownValues: []
+    };
+  }
+  let sum = 0;
+  let rated = 0;
+  const knownValues: KnownHoursEntry[] = [];
+  const unknownValues: UnknownHoursEntry[] = [];
+  for (const section of deduped) {
+    const label = `${section.subject} ${section.number}`;
+    const h = getSectionHours(section);
+    if (h !== null) {
+      sum += h;
+      rated += 1;
+      knownValues.push({ label, hours: h });
+    } else {
+      unknownValues.push({ label });
+    }
+  }
+  if (rated === 0) {
+    return {
+      hours: null,
+      rated: 0,
+      total,
+      knownSum: 0,
+      knownValues: [],
+      knownMean: null,
+      unknownValues
+    };
+  }
+  const mean = sum / rated;
+  return {
+    hours: sum + mean * (total - rated),
+    rated,
+    total,
+    knownSum: sum,
+    knownValues,
+    knownMean: mean,
+    unknownValues
+  };
 }
 
 // Combination score = mean of available CTEC ratings, with the neutral
@@ -123,6 +257,22 @@ function compareForMode(
       case "rating":
         primary = b.score - a.score;
         break;
+      case "lazy": {
+        // Out-of-class hours asc. Combos with zero hours data (hours ===
+        // null) sink to the bottom — sorting them by an imputed number
+        // would be a lie. Ties on the hours total prefer combos with
+        // more rated sections (less imputation = more honest).
+        const aEst = estimateOutOfClassHours(a.sections);
+        const bEst = estimateOutOfClassHours(b.sections);
+        const aH = aEst.hours;
+        const bH = bEst.hours;
+        if (aH === null && bH === null) primary = 0;
+        else if (aH === null) primary = 1;
+        else if (bH === null) primary = -1;
+        else primary = aH - bH;
+        if (primary === 0) primary = bEst.rated - aEst.rated;
+        break;
+      }
       case "early-end":
         primary = latestEndMinutes(a) - latestEndMinutes(b);
         break;
@@ -175,6 +325,7 @@ export function sortCombinations(
 export function isSortMode(value: string): value is SortMode {
   return (
     value === "rating" ||
+    value === "lazy" ||
     value === "early-end" ||
     value === "late-start" ||
     value === "early-start" ||
