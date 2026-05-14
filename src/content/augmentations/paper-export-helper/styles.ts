@@ -39,6 +39,65 @@ const CSS = `
   line-height: 1.5;
   color: var(--bc-color-text-body-warm);
 }
+.bc-export-helper-intro {
+  margin: 0 0 10px;
+}
+.bc-export-helper-steps {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  counter-reset: bc-export-step;
+}
+.bc-export-helper-steps li {
+  position: relative;
+  margin: 0 0 8px;
+  padding: 0 0 0 28px;
+  counter-increment: bc-export-step;
+}
+.bc-export-helper-steps li::before {
+  content: counter(bc-export-step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bc-color-accent-fill-12);
+  color: var(--bc-color-accent-soft);
+  font-size: var(--bc-font-11);
+  font-weight: var(--bc-fw-bold);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bc-export-helper-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  margin: 0 0 4px;
+  border-radius: var(--bc-radius-lg);
+  background: var(--bc-color-accent-fill-06);
+  font-size: var(--bc-font-12);
+  line-height: 1.45;
+  color: var(--bc-color-text-mauve-cool-alt);
+}
+.bc-export-helper-warning::before {
+  content: "⚠";
+  flex: 0 0 auto;
+  color: var(--bc-color-accent-soft);
+  font-weight: var(--bc-fw-bold);
+}
+.bc-export-helper-help {
+  margin: 10px 0 0;
+  font-size: var(--bc-font-11);
+  color: var(--bc-color-text-muted);
+}
+.bc-export-helper-help a {
+  color: var(--bc-color-accent-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .bc-export-helper-actions {
   display: flex;
   flex-wrap: wrap;

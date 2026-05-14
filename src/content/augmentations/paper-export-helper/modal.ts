@@ -1,4 +1,5 @@
 import { el, injectModalStyles } from "../../framework";
+import { APP_CONTENT, CENTRAL_TIME_WARNING } from "./content";
 import { MODAL_ID } from "./constants";
 import { injectExportHelperStyles } from "./styles";
 import { CALENDAR_APPS, type CalendarApp } from "./types";
@@ -15,8 +16,8 @@ export type ModalHandle = {
 
 // Mount the walkthrough modal into `doc`. Returns a handle the caller
 // uses to drive tab selection or tear the modal down. Idempotent — a
-// second call while the modal is already mounted no-ops and returns the
-// previous handle.
+// second call while the modal is already mounted destroys the old one
+// and returns a fresh handle.
 export function openExportHelperModal(
   doc: Document,
   initialTab: CalendarApp,
@@ -30,6 +31,7 @@ export function openExportHelperModal(
 
   const tabButtons = new Map<CalendarApp, HTMLButtonElement>();
   const bodyEl = el(doc, "div", { class: "bc-export-helper-body" });
+  const actionsEl = el(doc, "div", { class: "bc-export-helper-actions" });
 
   let activeTab: CalendarApp = initialTab;
 
@@ -40,6 +42,7 @@ export function openExportHelperModal(
       btn.setAttribute("aria-selected", String(id === app));
     }
     renderTabContent(bodyEl, app);
+    renderActions(actionsEl, app, callbacks);
   };
 
   const tabsRow = el(doc, "div", {
@@ -85,22 +88,7 @@ export function openExportHelperModal(
     text: "Pick your calendar app to see the steps, then download the .ics file and follow along."
   });
 
-  const downloadBtn = el(doc, "button", {
-    class: "bc-btn bc-btn--primary bc-btn--soft bc-btn--fill",
-    attrs: { type: "button" },
-    text: "Download .ics",
-    on: { click: () => callbacks.onDownload() }
-  });
-  const cancelBtn = el(doc, "button", {
-    class: "bc-btn bc-btn--secondary-accent",
-    attrs: { type: "button" },
-    text: "Cancel",
-    on: { click: () => callbacks.onClose() }
-  });
-  const actions = el(doc, "div", { class: "bc-export-helper-actions" });
-  actions.append(downloadBtn, cancelBtn);
-
-  card.append(closeBtn, eyebrow, title, lede, tabsRow, bodyEl, actions);
+  card.append(closeBtn, eyebrow, title, lede, tabsRow, bodyEl, actionsEl);
 
   const backdrop = el(doc, "div", {
     class: "bc-modal",
@@ -121,11 +109,87 @@ export function openExportHelperModal(
   };
 }
 
-// Per-tab content is wired in a later commit. This placeholder keeps
-// the modal renderable end-to-end today.
-function renderTabContent(host: HTMLElement, _app: CalendarApp): void {
+function renderTabContent(host: HTMLElement, app: CalendarApp): void {
+  const doc = host.ownerDocument;
+  const content = APP_CONTENT[app];
   host.replaceChildren();
+
   host.appendChild(
-    host.ownerDocument.createTextNode("Step-by-step instructions coming soon.")
+    el(doc, "p", {
+      class: "bc-export-helper-intro",
+      text: content.intro
+    })
+  );
+
+  const list = el(doc, "ol", { class: "bc-export-helper-steps" });
+  for (const step of content.steps) {
+    list.appendChild(el(doc, "li", { text: step }));
+  }
+  host.appendChild(list);
+
+  host.appendChild(
+    el(doc, "p", {
+      class: "bc-export-helper-warning",
+      text: CENTRAL_TIME_WARNING
+    })
+  );
+
+  if (content.helpLink) {
+    const help = el(doc, "p", { class: "bc-export-helper-help" });
+    help.appendChild(doc.createTextNode("Need more detail? See "));
+    help.appendChild(
+      el(doc, "a", {
+        text: content.helpLink.label,
+        attrs: {
+          href: content.helpLink.href,
+          target: "_blank",
+          rel: "noopener noreferrer"
+        }
+      })
+    );
+    help.appendChild(doc.createTextNode("."));
+    host.appendChild(help);
+  }
+}
+
+function renderActions(
+  host: HTMLElement,
+  app: CalendarApp,
+  callbacks: ModalCallbacks
+): void {
+  const doc = host.ownerDocument;
+  const content = APP_CONTENT[app];
+  host.replaceChildren();
+
+  host.appendChild(
+    el(doc, "button", {
+      class: "bc-btn bc-btn--primary bc-btn--soft bc-btn--fill",
+      attrs: { type: "button" },
+      text: "Download .ics",
+      on: { click: () => callbacks.onDownload() }
+    })
+  );
+
+  if (content.deepLink) {
+    host.appendChild(
+      el(doc, "a", {
+        class: "bc-btn bc-btn--secondary-accent",
+        attrs: {
+          href: content.deepLink.href,
+          target: "_blank",
+          rel: "noopener noreferrer"
+        },
+        text: content.deepLink.label
+      })
+    );
+  }
+
+  host.appendChild(
+    el(doc, "button", {
+      class: "bc-btn bc-btn--ghost",
+      attrs: { type: "button" },
+      text: "Cancel",
+      on: { click: () => callbacks.onClose() }
+    })
   );
 }
