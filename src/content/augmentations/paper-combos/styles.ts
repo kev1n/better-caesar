@@ -640,6 +640,12 @@ const CSS = `
   font-size: 0.78rem;
   color: var(--bc-color-text-muted);
   font-variant-numeric: tabular-nums;
+  /* Without this the "★ 4.20" string wraps inside the 1.4rem pill at
+   * narrow widths — the soft break between glyph and number puts the
+   * star on a line above the rating, which spills out of the chip.
+   * Keeping the whole readout on one line lets align-items:center do
+   * its job. */
+  white-space: nowrap;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-rating[data-rated="0"] {
