@@ -28,8 +28,6 @@ jobs:
           fi
           echo "VERSION=${TAG_VERSION}" >> "$GITHUB_ENV"
       - name: Build
-        env:
-          BC_BUCKET_SCHEDULE_URL: ${{ secrets.BC_BUCKET_SCHEDULE_URL }}
         run: |
           npm run build:chrome
           npm run build:firefox
