@@ -347,12 +347,23 @@ const CSS = `
   color: var(--bc-color-text);
 }
 
-.bc-paper-combos-hours[data-coverage="partial"] {
-  opacity: 0.85;
+/* Coverage states — DO NOT use the opacity property here. The popup
+ * (.bc-paper-combos-hours-tip-card) is a descendant of the chip, and
+ * CSS opacity propagates to descendants, so dimming the chip would
+ * also dim the popup card and make it visibly translucent against
+ * paper.nu's page. Use color tokens instead so the dimming is purely a
+ * chip-surface effect. */
+.bc-paper-combos-hours[data-coverage="partial"] .bc-paper-combos-hours-value,
+.bc-paper-combos-hours[data-coverage="partial"] .bc-paper-combos-hours-label {
+  color: var(--bc-color-text-muted);
 }
 
 .bc-paper-combos-hours[data-coverage="none"] {
-  opacity: 0.6;
+  border-style: dashed;
+}
+.bc-paper-combos-hours[data-coverage="none"] .bc-paper-combos-hours-value,
+.bc-paper-combos-hours[data-coverage="none"] .bc-paper-combos-hours-label {
+  color: var(--bc-color-text-subtle);
 }
 
 @media (max-width: 700px) {
@@ -393,11 +404,16 @@ const CSS = `
   min-width: 16rem;
   max-width: 22rem;
   padding: 0.75rem 0.85rem;
-  /* Solid surface — paper.nu's page is pure white, so the default
-   * Pencil cream --bc-color-bg reads as a tint rather than a distinct
-   * popup. --bc-color-bg-inset is the next step up in saturation and
-   * gives the card a clear edge against the page in both light/dark. */
-  background: var(--bc-color-bg-inset);
+  /* Solid, strongly-contrasting surface. We pick --bc-color-bg-app
+   * (NOT bg, bg-muted, or bg-inset) because the bg-* / bg-muted / bg-
+   * inset tokens are all "almost the page background" in at least one
+   * theme — e.g. default light's bg-inset resolves to accent-surface-
+   * row (~#faf7f9), which is visually indistinguishable from paper.nu's
+   * white page and reads as transparency. bg-app is the next level
+   * down: a clear light gray in default, saturated cream in Pencil
+   * light, dark in both dark themes. Reads as a distinct popup
+   * surface against paper.nu's page in every combination. */
+  background: var(--bc-color-bg-app);
   border: 2px solid var(--bc-color-text);
   border-radius: var(--bc-radius-md);
   box-shadow: var(--bc-shadow-tooltip);
