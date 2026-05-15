@@ -67,13 +67,6 @@ function loadResultPool(result: LoadComboPoolResult): ComboPool | null {
   return result.state === "ok" ? result.pool : null;
 }
 
-function formatCredits(n: number): string {
-  // Drop trailing .0 for whole-number budgets so the status reads "5
-  // credits" not "5.0 credits".
-  if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n));
-  return n.toFixed(2).replace(/\.?0+$/, "");
-}
-
 function statusFromLoadState(
   result: LoadComboPoolResult | null,
   enumerate: EnumerateResult | null
@@ -88,15 +81,6 @@ function statusFromLoadState(
   }
   if (enumerate?.conflictingPins) {
     return "Pinned sections conflict with each other. Unpin one to continue.";
-  }
-  if (
-    enumerate &&
-    enumerate.combinations.length > 0 &&
-    enumerate.effectiveCredits < enumerate.requestedCredits
-  ) {
-    const want = formatCredits(enumerate.requestedCredits);
-    const got = formatCredits(enumerate.effectiveCredits);
-    return `Couldn't fit ${want} credits without overlap — showing best ${got}-credit schedules.`;
   }
   if (enumerate && enumerate.combinations.length === 1) {
     return "Only one valid combination at this size. Add another section of a course (or lower Max) to see alternatives.";
