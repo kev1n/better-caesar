@@ -141,12 +141,8 @@ export function openExportHelperModal(
     class: "bc-export-helper-title",
     text: "Add your schedule to a calendar"
   });
-  const lede = el(doc, "p", {
-    class: "bc-export-helper-lede",
-    text: "Pick your calendar app to see the steps, then download the .ics file and follow along."
-  });
 
-  card.append(closeBtn, eyebrow, title, lede, tabsRow, bodyEl, actionsEl);
+  card.append(closeBtn, eyebrow, title, tabsRow, bodyEl, actionsEl);
 
   const backdrop = el(doc, "div", {
     class: "bc-modal",
@@ -175,13 +171,6 @@ function renderTabContent(host: HTMLElement, app: CalendarApp): void {
   const content = APP_CONTENT[app];
   host.replaceChildren();
 
-  host.appendChild(
-    el(doc, "p", {
-      class: "bc-export-helper-intro",
-      text: content.intro
-    })
-  );
-
   const list = el(doc, "ol", { class: "bc-export-helper-steps" });
   for (const step of content.steps) {
     list.appendChild(el(doc, "li", { text: step }));
@@ -197,7 +186,6 @@ function renderTabContent(host: HTMLElement, app: CalendarApp): void {
 
   if (content.helpLink) {
     const help = el(doc, "p", { class: "bc-export-helper-help" });
-    help.appendChild(doc.createTextNode("Need more detail? See "));
     help.appendChild(
       el(doc, "a", {
         text: content.helpLink.label,
@@ -208,7 +196,6 @@ function renderTabContent(host: HTMLElement, app: CalendarApp): void {
         }
       })
     );
-    help.appendChild(doc.createTextNode("."));
     host.appendChild(help);
   }
 }

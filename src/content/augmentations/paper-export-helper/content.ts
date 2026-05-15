@@ -6,7 +6,6 @@ export type AppLink = {
 };
 
 export type AppContent = {
-  intro: string;
   steps: ReadonlyArray<string>;
   deepLink: AppLink | null;
   // Apple Calendar has no web import flow, so it gets a help link
@@ -14,17 +13,16 @@ export type AppContent = {
   helpLink: AppLink | null;
 };
 
-// Step copy is intentionally short — long instructions in a modal are
-// skipped. Each step starts with an imperative verb. Step 1 always
-// points back at our own Download button so the flow reads top-to-bottom.
+// Step copy is intentionally terse — three lines max per tab. Step 1
+// always points back at our own Download button so the flow reads
+// top-to-bottom. Step 2 names what happens next (auto-open) so the
+// new tab isn't surprising.
 export const APP_CONTENT: Record<CalendarApp, AppContent> = {
   google: {
-    intro: "Import the .ics file into your Google Calendar from any computer browser.",
     steps: [
-      "Click Download .ics below to save the schedule file.",
-      "Google Calendar's Import & Export page opens automatically (or use the link below).",
-      "Under Import, click Select file from your computer and pick the file you just downloaded.",
-      "Choose which calendar to add the events to, then click Import."
+      "Download the .ics.",
+      "Google Calendar's import page opens — click Select file and pick the .ics.",
+      "Choose a destination calendar, then Import."
     ],
     deepLink: {
       label: "Open Google Calendar Import",
@@ -36,12 +34,10 @@ export const APP_CONTENT: Record<CalendarApp, AppContent> = {
     }
   },
   apple: {
-    intro: "Apple Calendar doesn't have a web import flow, so the steps differ by device.",
     steps: [
-      "Click Download .ics below to save the schedule file.",
-      "On a Mac: open Calendar, then File → Import… and pick the .ics file.",
-      "On iPhone or iPad: open the file from Files or your Downloads — iOS will prompt you to add events to a calendar.",
-      "Pick the calendar you want the events to land in and confirm."
+      "Download the .ics.",
+      "Mac: open Calendar, then File → Import…",
+      "iPhone/iPad: open the file from Files or Downloads."
     ],
     deepLink: null,
     helpLink: {
@@ -50,12 +46,10 @@ export const APP_CONTENT: Record<CalendarApp, AppContent> = {
     }
   },
   outlook: {
-    intro: "Import the .ics file into Outlook on the web — works for personal and Northwestern accounts.",
     steps: [
-      "Click Download .ics below to save the schedule file.",
-      "Outlook's Add Calendar page opens automatically (or use the link below).",
-      "Choose Upload from file, then select the .ics file you just downloaded.",
-      "Pick which calendar to add events to and click Import."
+      "Download the .ics.",
+      "Outlook's Add Calendar page opens — choose Upload from file and pick the .ics.",
+      "Choose a destination calendar, then Import."
     ],
     deepLink: {
       label: "Open Outlook Add Calendar",
@@ -69,4 +63,4 @@ export const APP_CONTENT: Record<CalendarApp, AppContent> = {
 };
 
 export const CENTRAL_TIME_WARNING =
-  "Make sure your calendar's time zone is set to Central Time (Chicago) before importing — otherwise classes will land at the wrong hour.";
+  "Set your calendar's time zone to Central Time (Chicago) before importing.";

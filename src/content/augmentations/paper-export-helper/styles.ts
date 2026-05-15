@@ -90,16 +90,10 @@ const CSS = `
   color: var(--bc-color-text-muted);
 }
 .bc-export-helper-title {
-  margin: 0 0 4px;
+  margin: 0 0 10px;
   font-size: var(--bc-font-18);
   font-weight: var(--bc-fw-extrabold);
   color: var(--bc-color-accent-soft);
-}
-.bc-export-helper-lede {
-  margin: 0 0 14px;
-  font-size: var(--bc-font-13);
-  line-height: 1.5;
-  color: var(--bc-color-text-body-warm);
 }
 .bc-export-helper-tabs {
   margin: 4px 0 14px;
@@ -116,9 +110,6 @@ const CSS = `
   font-size: var(--bc-font-13);
   line-height: 1.5;
   color: var(--bc-color-text-body-warm);
-}
-.bc-export-helper-intro {
-  margin: 0 0 10px;
 }
 .bc-export-helper-steps {
   margin: 0 0 12px;
@@ -167,9 +158,10 @@ const CSS = `
   font-weight: var(--bc-fw-bold);
 }
 .bc-export-helper-help {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   font-size: var(--bc-font-11);
   color: var(--bc-color-text-muted);
+  text-align: right;
 }
 .bc-export-helper-help a {
   color: var(--bc-color-accent-soft);
