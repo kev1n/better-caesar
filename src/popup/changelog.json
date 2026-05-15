@@ -11,6 +11,17 @@
   },
   "entries": [
     {
+      "version": "0.9.4",
+      "date": "2026-05-15",
+      "headline": "Spot pencil at a glance on Paper.nu",
+      "items": [
+        {
+          "kind": "feat",
+          "text": "Paper.nu's logo now wears a small \"with pencil\" tag and a tiny pencil icon — an at-a-glance reminder that the extension is on the page."
+        }
+      ]
+    },
+    {
       "version": "0.9.3",
       "date": "2026-05-15",
       "headline": "Find the calendar export easily",

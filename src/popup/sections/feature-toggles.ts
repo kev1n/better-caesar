@@ -79,6 +79,11 @@ export const FEATURE_SECTIONS: FeatureSection[] = [
     groupId: GROUP_PAPER_ID,
     features: [
       {
+        id: "paper-brand",
+        label: "\"with pencil\" Brand Mark",
+        description: "Adds a small \"with pencil\" tag next to Paper.nu's logo so you can tell at a glance the extension is active."
+      },
+      {
         id: "paper-ctec",
         label: "CTEC Integration",
         description: "Loads CTEC summaries into schedule cards and the expanded analytics panel."
