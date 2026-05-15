@@ -1,5 +1,10 @@
 import { el, injectModalStyles } from "../../framework";
-import { LANDING_URL, MODAL_ID } from "./constants";
+import {
+  JASON_LINKEDIN_URL,
+  KEVIN_LINKEDIN_URL,
+  LANDING_URL,
+  MODAL_ID
+} from "./constants";
 import { PENCIL_SVG_MARKUP } from "./pencil-svg";
 import { injectPaperBrandStyles } from "./styles";
 
@@ -56,11 +61,29 @@ export function openAboutModal(
     text: "A handcrafted layer of Paper.nu and CAESAR upgrades for Northwestern students."
   });
 
+  // Names link out to LinkedIn but keep the credit line's handwriting
+  // font and accent color (no blue underline, no default `a` styling).
+  // The `.bc-paper-brand-about-credit-link` class wipes the browser
+  // default and inherits font + color from the surrounding paragraph.
   const credit = el(doc, "p", { class: "bc-paper-brand-about-credit" }, [
     "designed and developed by ",
-    el(doc, "strong", { text: "Kevin Wang" }),
+    el(doc, "a", {
+      class: "bc-paper-brand-about-credit-link",
+      attrs: {
+        href: KEVIN_LINKEDIN_URL,
+        target: "_blank",
+        rel: "noopener noreferrer"
+      }
+    }, [el(doc, "strong", { text: "Kevin Wang" })]),
     " and ",
-    el(doc, "strong", { text: "Jason Latz" }),
+    el(doc, "a", {
+      class: "bc-paper-brand-about-credit-link",
+      attrs: {
+        href: JASON_LINKEDIN_URL,
+        target: "_blank",
+        rel: "noopener noreferrer"
+      }
+    }, [el(doc, "strong", { text: "Jason Latz" })]),
     "."
   ]);
 

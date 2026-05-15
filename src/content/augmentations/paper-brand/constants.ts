@@ -15,3 +15,6 @@ export const HOST_MARKER_ATTR = "data-bc-pencil-brand";
 export const MARK_MARKER_ATTR = "data-bc-pencil-brand-mark";
 
 export const LANDING_URL = "https://pencil.nu";
+
+export const KEVIN_LINKEDIN_URL = "https://www.linkedin.com/in/kevin-wang-08836a175/";
+export const JASON_LINKEDIN_URL = "https://linkedin.com/in/jasonlatz";

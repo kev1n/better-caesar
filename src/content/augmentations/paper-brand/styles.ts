@@ -143,6 +143,26 @@ button[${HOST_MARKER_ATTR}="1"] {
   font-weight: 700;
   color: var(--bc-color-accent);
 }
+/* Names link out to LinkedIn but keep the handwriting + accent vibe —
+   no blue, no underline, no default <a> styling. Hover adds a subtle
+   handwritten underline for affordance without breaking the look. */
+.bc-paper-brand-about-credit-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: var(--bc-radius-sm);
+}
+.bc-paper-brand-about-credit-link:hover strong,
+.bc-paper-brand-about-credit-link:focus-visible strong {
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--bc-color-accent);
+}
+.bc-paper-brand-about-credit-link:focus-visible {
+  outline: 2px solid var(--bc-color-accent);
+  outline-offset: 2px;
+}
 .bc-paper-brand-about-cta {
   display: inline-flex;
   align-items: center;
