@@ -18,3 +18,11 @@ export const LANDING_URL = "https://pencil.nu";
 
 export const KEVIN_LINKEDIN_URL = "https://www.linkedin.com/in/kevin-wang-08836a175/";
 export const JASON_LINKEDIN_URL = "https://linkedin.com/in/jasonlatz";
+
+// Same Google Forms URL the popup's "Leave feedback" link uses
+// (src/popup/popup.html). Keeping the constant local to paper-brand
+// rather than hoisting it — feedback URLs are uncommon enough that
+// duplicating one literal across two surfaces is better than threading
+// a shared module just for it.
+export const FEEDBACK_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSc34UX2cWyPx3jwgYDxyU7P7nx_--G91b1cepX1t1xS6tI7-w/viewform?usp=dialog";

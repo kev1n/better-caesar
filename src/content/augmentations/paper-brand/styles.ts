@@ -163,12 +163,16 @@ button[${HOST_MARKER_ATTR}="1"] {
   outline: 2px solid var(--bc-color-accent);
   outline-offset: 2px;
 }
+.bc-paper-brand-about-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
 .bc-paper-brand-about-cta {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  margin-bottom: 14px;
 }
 .bc-paper-brand-about-disclaimer {
   margin: 0;

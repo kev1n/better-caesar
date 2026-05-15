@@ -1,5 +1,6 @@
 import { el, injectModalStyles } from "../../framework";
 import {
+  FEEDBACK_URL,
   JASON_LINKEDIN_URL,
   KEVIN_LINKEDIN_URL,
   LANDING_URL,
@@ -102,6 +103,20 @@ export function openAboutModal(
     text: "Learn More"
   });
 
+  const feedbackBtn = el(doc, "a", {
+    class: "bc-btn bc-btn--secondary-accent bc-btn--fill bc-paper-brand-about-cta",
+    attrs: {
+      href: FEEDBACK_URL,
+      target: "_blank",
+      rel: "noopener noreferrer"
+    },
+    text: "Leave feedback"
+  });
+
+  const actions = el(doc, "div", {
+    class: "bc-paper-brand-about-actions"
+  }, [visitBtn, feedbackBtn]);
+
   const card = el(
     doc,
     "div",
@@ -117,7 +132,7 @@ export function openAboutModal(
       versionLine,
       lede,
       credit,
-      visitBtn,
+      actions,
       disclaimer
     ]
   );
