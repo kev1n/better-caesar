@@ -96,6 +96,11 @@ export const FEATURE_SECTIONS: FeatureSection[] = [
         description: "Hides Paper.nu search results for courses you've already completed or transferred. In-progress courses stay visible, and repeatable courses (396/397, seminars, independent study) are never filtered."
       },
       {
+        id: "paper-export-helper",
+        label: "Calendar Export Walkthrough",
+        description: "When you click Paper.nu's \"Export schedule to calendar\" button, opens a step-by-step guide for importing the .ics file into Google Calendar, Apple Calendar, or Outlook."
+      },
+      {
         id: "prereq-filter",
         label: "Prereq Filter (Experimental)",
         description: "Paints eligibility badges on Paper.nu search results + schedule cards based on your CAESAR course history. Data quality caveat: Paper.nu's data is sometimes out of sync with the actual course requirements."
