@@ -66,6 +66,11 @@ export const FEATURE_SECTIONS: FeatureSection[] = [
     blurb: "Enhance the Paper schedule and section panel with Northwestern CTEC data.",
     features: [
       {
+        id: "paper-brand",
+        label: "\"with pencil\" Brand Mark",
+        description: "Adds a small \"with pencil\" tag next to Paper.nu's logo so you can tell at a glance the extension is active."
+      },
+      {
         id: "paper-ctec",
         label: "CTEC Integration",
         description: "Loads CTEC summaries into schedule cards and the expanded analytics panel."

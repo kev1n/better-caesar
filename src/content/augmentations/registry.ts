@@ -3,6 +3,7 @@ import type { Augmentation } from "../framework";
 import { classSearchAugmentation } from "./class-search";
 import { ctecLinksAugmentation } from "./ctec-links";
 import { enrollmentNavigationAugmentation } from "./enrollment-navigation";
+import { paperBrandAugmentation } from "./paper-brand";
 import { paperCombosAugmentation } from "./paper-combos";
 import { paperCtecAugmentation } from "./paper-ctec";
 import { paperExportHelperAugmentation } from "./paper-export-helper";
@@ -19,6 +20,7 @@ export const augmentationRegistry: Augmentation[] = [
   enrollmentNavigationAugmentation,
   classSearchAugmentation,
   ctecLinksAugmentation,
+  paperBrandAugmentation,
   paperCtecAugmentation,
   paperCombosAugmentation,
   paperExportHelperAugmentation,
