@@ -93,8 +93,8 @@ button[${HOST_MARKER_ATTR}="1"] {
    modal opens), so the framework's modal stylesheet ends up later in the
    cascade and would otherwise win the tie. */
 .bc-modal-card.bc-paper-brand-about-card {
-  width: min(380px, 100%);
-  padding: 26px 24px 22px;
+  width: min(460px, 100%);
+  padding: 26px 28px 22px;
   text-align: center;
 }
 .bc-paper-brand-about-icon {
