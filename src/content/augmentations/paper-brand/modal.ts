@@ -67,7 +67,7 @@ export function openAboutModal(
   // The `.bc-paper-brand-about-credit-link` class wipes the browser
   // default and inherits font + color from the surrounding paragraph.
   const credit = el(doc, "p", { class: "bc-paper-brand-about-credit" }, [
-    "designed and developed by ",
+    "designed & developed by ",
     el(doc, "a", {
       class: "bc-paper-brand-about-credit-link",
       attrs: {
@@ -76,7 +76,7 @@ export function openAboutModal(
         rel: "noopener noreferrer"
       }
     }, [el(doc, "strong", { text: "Kevin Wang" })]),
-    " and ",
+    " & ",
     el(doc, "a", {
       class: "bc-paper-brand-about-credit-link",
       attrs: {
