@@ -175,6 +175,15 @@ export function cardStyles(): string {
                   background var(--bc-tx-base) var(--bc-easing),
                   box-shadow var(--bc-tx-base) var(--bc-easing);
     }
+    /* Wrapped label so the text can truncate with an ellipsis when two
+       classes share a timeslot and each card collapses to ~half width —
+       without the wrapper, white-space:nowrap on the chip lets "Load CTEC"
+       spill past the card's right edge. */
+    .${WIDGET_CLASS}-chip-button-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     button.${WIDGET_CLASS}-chip-button.is-muted {
       background: var(--bc-color-accent-surface-soft);
       border: 1px solid var(--bc-color-accent-border-45);
