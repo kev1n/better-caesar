@@ -1,6 +1,9 @@
 import type { Augmentation } from "../../framework";
 import { BUTTON_BOUND_ATTR, FEATURE_ID } from "./constants";
-import { findExportButton, waitForDownloadButton } from "./detection";
+import {
+  findExportToCalendarButton,
+  waitForDownloadButton
+} from "./detection";
 import { openExportHelperModal, type ModalHandle } from "./modal";
 import { loadLastTab, saveLastTab } from "./storage";
 import { removeExportHelperStyles } from "./styles";
@@ -19,8 +22,8 @@ export class PaperExportHelperAugmentation implements Augmentation {
   private boundButton: HTMLButtonElement | null = null;
   private modal: ModalHandle | null = null;
   // Set true by the modal's "Download" CTA so the next native click on
-  // the EXPORT button is allowed to flow through. Cleared back to false
-  // after the click resolves.
+  // the "Export to calendar" button is allowed to flow through. Cleared
+  // back to false after the click resolves.
   private allowNativeClickThrough = false;
   // Pre-warmed on construction so the click handler can read it
   // synchronously without an await. Falls back to DEFAULT until the
@@ -36,7 +39,12 @@ export class PaperExportHelperAugmentation implements Augmentation {
   run(doc: Document = document): void {
     if (!isPaperHost()) return;
 
-    const button = findExportButton(doc);
+    // The button only exists in the DOM while paper.nu's EXPORT
+    // dropdown is open. The AugmentationRunner's mutation-driven
+    // re-ticks pick it up as soon as it mounts, and the
+    // BUTTON_BOUND_ATTR marker keeps the bind idempotent across the
+    // re-mounts React does when the dropdown closes and reopens.
+    const button = findExportToCalendarButton(doc);
     if (!button) return;
     if (button === this.boundButton) return;
     if (button.hasAttribute(BUTTON_BOUND_ATTR)) {
@@ -93,7 +101,8 @@ export class PaperExportHelperAugmentation implements Augmentation {
   }
 
   // Walk paper.nu's own export flow on the user's behalf:
-  //   1. Bypass-click EXPORT so paper.nu's React handler opens its modal.
+  //   1. Bypass-click "Export to calendar" so paper.nu's React handler
+  //      opens its calendar modal.
   //   2. Wait for the Download button to mount inside that modal.
   //   3. Click it — that's the call that actually triggers the .ics
   //      download (paper.nu builds and saves the file from its in-memory
@@ -103,7 +112,7 @@ export class PaperExportHelperAugmentation implements Augmentation {
   //   5. Close our modal last.
   //
   // If anything fails, we still tear down our modal so the user isn't
-  // stuck — they can re-click EXPORT to try again.
+  // stuck — they can re-open the EXPORT dropdown and try again.
   private async triggerNativeDownload(): Promise<void> {
     const button = this.boundButton;
     if (!button) {

@@ -1,39 +1,42 @@
-// Two button-finders for paper.nu's export flow:
+// Three button-finders for paper.nu's export flow:
 //
-//   1) findExportButton — the top-level EXPORT button on the schedule view.
-//      Anchors on the <p>EXPORT</p> label inside the button. This is the
-//      one we intercept so our walkthrough takes over paper.nu's native
-//      modal entirely.
+//   EXPORT (top-level button on the schedule view)
+//     ↓ click — opens a dropdown menu with several export options
+//   "Export to calendar" (item inside the dropdown)
+//     ↓ click — opens paper.nu's own calendar export modal
+//   "Download" (button inside that modal)
+//     ↓ click — triggers the .ics file save
 //
-//   2) findDownloadButton — the "Download" button inside paper.nu's
-//      OWN export modal (the one EXPORT opens). We only use this AFTER
-//      the user clicks our "Download .ics" CTA: bypass-clicking EXPORT
-//      re-opens paper.nu's modal, then we click its Download button to
-//      kick off the actual .ics export.
+// We intercept "Export to calendar" rather than EXPORT itself: paper.nu's
+// dropdown may carry other export options we don't want to preempt, and
+// the "Export to calendar" button is what semantically maps to our
+// walkthrough.
 
-const EXPORT_LABEL_RE = /^\s*export\s*$/i;
+const EXPORT_TO_CALENDAR_RE = /^\s*export\s+to\s+calendar\s*$/i;
 const DOWNLOAD_BUTTON_RE = /^\s*download\s*$/i;
 
-export function findExportButton(doc: Document): HTMLButtonElement | null {
+export function findExportToCalendarButton(
+  doc: Document
+): HTMLButtonElement | null {
   for (const btn of Array.from(
     doc.querySelectorAll<HTMLButtonElement>("button")
   )) {
-    // Paper.nu's button has a child <p>EXPORT</p> (their convention for
-    // icon+label buttons). Matching on the inner <p> text is more stable
-    // than matching the button's full textContent (which also picks up
-    // the SVG's accessible label, when paper.nu adds one).
+    // Paper.nu nests the label in a <p> inside the button. Matching on
+    // the inner <p> text is more stable than matching the button's full
+    // textContent (which also picks up the SVG's accessible label, if
+    // any).
     const labelEl = btn.querySelector("p");
     if (!labelEl) continue;
-    if (EXPORT_LABEL_RE.test(labelEl.textContent ?? "")) return btn;
+    if (EXPORT_TO_CALENDAR_RE.test(labelEl.textContent ?? "")) return btn;
   }
   return null;
 }
 
 // Search the whole document for a Download button. Paper.nu's modal
-// mounts as a portal at the end of <body>, not inside the EXPORT
-// button's subtree, so we can't scope the lookup. The export modal is
-// only open transiently, so this won't collide with stray "Download"
-// buttons elsewhere on the page outside that window.
+// mounts at body level, not inside the EXPORT button's subtree, so we
+// can't scope the lookup. The export modal is only open transiently
+// during our chained download, so this won't collide with stray
+// "Download" buttons elsewhere on the page outside that window.
 export function findDownloadButton(
   doc: Document
 ): HTMLButtonElement | HTMLAnchorElement | null {
@@ -47,8 +50,8 @@ export function findDownloadButton(
 
 // Poll for the Download button to appear in the DOM. Paper.nu opens
 // its export modal asynchronously (React render + portal mount), so a
-// click on EXPORT doesn't put the Download button in the tree until
-// the next frame or two. Resolves with null on timeout.
+// click on "Export to calendar" doesn't put the Download button in the
+// tree until the next frame or two. Resolves with null on timeout.
 export function waitForDownloadButton(
   doc: Document,
   timeoutMs: number
