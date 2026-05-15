@@ -11,35 +11,21 @@
   },
   "entries": [
     {
-      "version": "0.9.4",
+      "version": "0.9.5",
       "date": "2026-05-15",
-      "headline": "Spot pencil at a glance on Paper.nu",
+      "headline": "Get your schedule into your calendar",
       "items": [
+        {
+          "kind": "feat",
+          "text": "Export your Paper.nu schedule straight to Google Calendar, Apple Calendar, or Outlook — a step-by-step walkthrough opens after you hit Download, with one-click jumps to each calendar's import page."
+        },
+        {
+          "kind": "feat",
+          "text": "Paper.nu's EXPORT button now glows so you can find it at a glance."
+        },
         {
           "kind": "feat",
           "text": "Paper.nu's logo now wears a small \"with pencil\" tag and a tiny pencil icon — an at-a-glance reminder that the extension is on the page."
-        }
-      ]
-    },
-    {
-      "version": "0.9.3",
-      "date": "2026-05-15",
-      "headline": "Find the calendar export easily",
-      "items": [
-        {
-          "kind": "feat",
-          "text": "The EXPORT button on Paper.nu now glows purple so you can find it at a glance — pairs with the calendar-export walkthrough."
-        }
-      ]
-    },
-    {
-      "version": "0.9.2",
-      "date": "2026-05-14",
-      "headline": "Easier schedule-to-calendar exports",
-      "items": [
-        {
-          "kind": "feat",
-          "text": "When you click Paper.nu's \"Export schedule to calendar\" Download button, get a step-by-step walkthrough for adding the file to Google Calendar, Apple Calendar, or Outlook — with one-click jumps straight to the import page."
         }
       ]
     },
