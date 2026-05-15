@@ -40,6 +40,30 @@ const CSS = `
 [${HIGHLIGHT_ATTR}="1"]:active {
   transform: translateY(0);
 }
+/* Dark mode: paper.nu's dark surface eats the low-alpha purple wash and
+   makes paper-deep text unreadable. Brighten both the gradient and the
+   text so the highlight reads. Light lavender is derived from
+   --bc-color-paper mixed with white so the purple identity is preserved
+   regardless of which theme the user is on. */
+[data-bc-mode="dark"] [${HIGHLIGHT_ATTR}="1"] {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--bc-color-paper) 55%, transparent) 0%,
+    color-mix(in srgb, var(--bc-color-paper) 28%, transparent) 100%
+  ) !important;
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--bc-color-paper) 70%, white 10%),
+    0 4px 12px color-mix(in srgb, var(--bc-color-paper) 50%, transparent) !important;
+  color: color-mix(in srgb, var(--bc-color-paper) 25%, white) !important;
+}
+[data-bc-mode="dark"] [${HIGHLIGHT_ATTR}="1"]:hover {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--bc-color-paper) 70%, transparent) 0%,
+    color-mix(in srgb, var(--bc-color-paper) 40%, transparent) 100%
+  ) !important;
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--bc-color-paper) 85%, white 15%),
+    0 6px 16px color-mix(in srgb, var(--bc-color-paper) 60%, transparent) !important;
+}
 
 .bc-export-helper-card {
   width: min(520px, 100%);
@@ -67,6 +91,13 @@ const CSS = `
 }
 .bc-export-helper-tabs {
   margin: 4px 0 14px;
+  display: flex;
+  width: 100%;
+}
+.bc-export-helper-tabs .bc-tab {
+  flex: 1 1 0;
+  justify-content: center;
+  text-align: center;
 }
 .bc-export-helper-body {
   margin: 0 0 16px;
