@@ -76,7 +76,7 @@ export function openAboutModal(
       target: "_blank",
       rel: "noopener noreferrer"
     },
-    text: "Visit pencil.nu →"
+    text: "Learn More"
   });
 
   const card = el(
