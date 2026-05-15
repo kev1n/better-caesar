@@ -85,8 +85,14 @@ button[${HOST_MARKER_ATTR}="1"] {
 
 /* About modal — uses framework's .bc-modal-card chrome, plus pencil-themed
    typography and the centered icon tile. The card stays comfortably narrow
-   so the credit reads like a name plate, not a wall of text. */
-.bc-paper-brand-about-card {
+   so the credit reads like a name plate, not a wall of text.
+
+   The compound .bc-modal-card.bc-paper-brand-about-card selector beats the
+   framework's .bc-modal-card text-align: left rule on specificity — needed
+   because paper-brand styles get injected on initial run() (before the
+   modal opens), so the framework's modal stylesheet ends up later in the
+   cascade and would otherwise win the tie. */
+.bc-modal-card.bc-paper-brand-about-card {
   width: min(380px, 100%);
   padding: 26px 24px 22px;
   text-align: center;
