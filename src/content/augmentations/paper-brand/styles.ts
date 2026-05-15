@@ -14,7 +14,7 @@ import { HOST_MARKER_ATTR, MARK_MARKER_ATTR, STYLE_ID } from "./constants";
 const CSS = `
 button[${HOST_MARKER_ATTR}="1"] {
   flex-direction: row !important;
-  justify-content: flex-start !important;
+  justify-content: center !important;
   align-items: center !important;
   gap: 6px;
   flex-wrap: nowrap;
