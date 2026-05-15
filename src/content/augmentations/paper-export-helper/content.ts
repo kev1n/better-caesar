@@ -22,7 +22,7 @@ export const APP_CONTENT: Record<CalendarApp, AppContent> = {
     intro: "Import the .ics file into your Google Calendar from any computer browser.",
     steps: [
       "Click Download .ics below to save the schedule file.",
-      "Open Google Calendar's Import & Export page (link below).",
+      "Google Calendar's Import & Export page opens automatically (or use the link below).",
       "Under Import, click Select file from your computer and pick the file you just downloaded.",
       "Choose which calendar to add the events to, then click Import."
     ],
@@ -53,13 +53,13 @@ export const APP_CONTENT: Record<CalendarApp, AppContent> = {
     intro: "Import the .ics file into Outlook on the web — works for personal and Northwestern accounts.",
     steps: [
       "Click Download .ics below to save the schedule file.",
-      "Open Outlook on the web (link below) and switch to the Calendar view.",
-      "Click Add calendar in the left sidebar, then choose Upload from file.",
-      "Select the .ics file, pick which calendar to add events to, and click Import."
+      "Outlook's Add Calendar page opens automatically (or use the link below).",
+      "Choose Upload from file, then select the .ics file you just downloaded.",
+      "Pick which calendar to add events to and click Import."
     ],
     deepLink: {
-      label: "Open Outlook Calendar",
-      href: "https://outlook.office.com/calendar/"
+      label: "Open Outlook Add Calendar",
+      href: "https://outlook.cloud.microsoft/calendar/addcalendar"
     },
     helpLink: {
       label: "Microsoft's full instructions",

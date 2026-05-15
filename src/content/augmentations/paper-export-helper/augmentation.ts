@@ -1,4 +1,5 @@
 import type { Augmentation } from "../../framework";
+import { APP_CONTENT } from "./content";
 import { BUTTON_BOUND_ATTR, FEATURE_ID, HIGHLIGHT_ATTR } from "./constants";
 import {
   findExportButton,
@@ -66,6 +67,9 @@ export class PaperExportHelperAugmentation implements Augmentation {
     // the re-mounts React does when the dropdown closes and reopens.
     const button = findExportToCalendarButton(doc);
     if (!button) return;
+    if (!button.hasAttribute(HIGHLIGHT_ATTR)) {
+      button.setAttribute(HIGHLIGHT_ATTR, "1");
+    }
     if (button === this.boundButton) return;
     if (button.hasAttribute(BUTTON_BOUND_ATTR)) {
       // React swapped the element identity but the marker survived;
@@ -145,6 +149,14 @@ export class PaperExportHelperAugmentation implements Augmentation {
   private async triggerNativeDownload(): Promise<void> {
     const modal = this.modal;
     if (!modal) return;
+    // Open the destination calendar's import page in a new tab while
+    // we're still inside the original user gesture from the Download
+    // click — popup blockers reject window.open after the first await.
+    // Apple has no deepLink so nothing opens for that tab.
+    const deepLink = APP_CONTENT[this.cachedLastTab].deepLink;
+    if (deepLink) {
+      window.open(deepLink.href, "_blank", "noopener,noreferrer");
+    }
     const button = this.boundButton;
     if (!button) {
       modal.setDownloadState("error");

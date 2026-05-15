@@ -1,5 +1,5 @@
 import { ensureStyle } from "../../framework/dom";
-import { HIGHLIGHT_ATTR, STYLE_ID } from "./constants";
+import { BUTTON_BOUND_ATTR, HIGHLIGHT_ATTR, STYLE_ID } from "./constants";
 
 // Layout-only styles for the walkthrough modal — backdrop and card
 // chrome come from `injectModalStyles()` in `framework/modal.ts`, tab
@@ -7,10 +7,12 @@ import { HIGHLIGHT_ATTR, STYLE_ID } from "./constants";
 // file fills the gaps: wider card, scrollable step list, footer row.
 //
 // Also defines the purple-gradient highlight applied to paper.nu's
-// top-level EXPORT button via the [data-bc-export-highlight] marker.
-// Purple is derived from `--bc-color-paper` (the Northwestern brand
-// purple, defined identically in every theme) via color-mix() so the
-// effect stays purple regardless of which theme the user is on.
+// top-level EXPORT button and the "Export to calendar" item inside its
+// dropdown via the [data-bc-export-highlight] marker — both surfaces
+// get the same treatment so the user can see they're pencil.nu entry
+// points. Purple is derived from `--bc-color-paper` (the Northwestern
+// brand purple, defined identically in every theme) via color-mix() so
+// the effect stays purple regardless of which theme the user is on.
 const CSS = `
 [${HIGHLIGHT_ATTR}="1"] {
   background: linear-gradient(135deg,
@@ -63,6 +65,16 @@ const CSS = `
   box-shadow:
     0 0 0 1.5px color-mix(in srgb, var(--bc-color-paper) 85%, white 15%),
     0 6px 16px color-mix(in srgb, var(--bc-color-paper) 60%, transparent) !important;
+}
+/* "Export to calendar" dropdown item — same purple wash, no ring. The
+   ring reads as a hard chip on the menu item; only the top-level
+   EXPORT button should carry it. Scoped by the BUTTON_BOUND_ATTR
+   marker, which only the dropdown item gets. */
+[${BUTTON_BOUND_ATTR}][${HIGHLIGHT_ATTR}="1"],
+[${BUTTON_BOUND_ATTR}][${HIGHLIGHT_ATTR}="1"]:hover,
+[data-bc-mode="dark"] [${BUTTON_BOUND_ATTR}][${HIGHLIGHT_ATTR}="1"],
+[data-bc-mode="dark"] [${BUTTON_BOUND_ATTR}][${HIGHLIGHT_ATTR}="1"]:hover {
+  box-shadow: none !important;
 }
 
 .bc-export-helper-card {

@@ -626,12 +626,18 @@ const CSS = `
   color: var(--bc-color-accent);
   padding: 0 0.3rem;
   letter-spacing: 0.01em;
+  /* The counter text is padded with leading spaces in renderTopBar so
+   * "1 / 100" and "100 / 100" line up to the same character count.
+   * white-space:pre preserves those spaces; without it the browser
+   * collapses them and the counter shrinks/grows as the user cycles. */
+  white-space: pre;
 }
 
 #${TOP_BAR_ID} .bc-paper-combos-rating {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   height: 1.4rem;
   padding: 0 0.5rem;
   background: var(--bc-color-bg-muted);
@@ -650,6 +656,21 @@ const CSS = `
   cursor: default;
 }
 
+/* Lock the value span to a fixed width so the chip never resizes based
+ * on the rendered text. tabular-nums equalizes digit glyphs but not the
+ * "?" placeholder used when there's no CTEC coverage — "★ 4.20" and
+ * "★ ?.??" would otherwise measure differently and shift the centered
+ * cycle cluster sideways every time the user cycled between rated and
+ * unrated combos. inline-block + fixed width + center alignment lets
+ * any 6-character readout sit cleanly in the same slot. */
+#${TOP_BAR_ID} .bc-paper-combos-rating-value {
+  display: inline-block;
+  width: 2.9rem;
+  text-align: center;
+}
+
+/* Zero CTEC coverage: the chip still shows "★ ?.??" — readable but
+ * dimmed so it doesn't compete with rated chips for attention. */
 #${TOP_BAR_ID} .bc-paper-combos-rating[data-rated="0"] {
   opacity: 0.55;
 }

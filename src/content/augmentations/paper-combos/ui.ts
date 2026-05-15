@@ -716,6 +716,15 @@ export function renderTopBar(
   // browser still fires the click event so the user gets feedback (and
   // we don't run into the trap where a disabled button silently swallows
   // the only interaction in the bar).
+  // Pad the cursor so "1 / 100" and "100 / 100" occupy the same width.
+  // Without this the counter shrinks/grows as the user cycles within a
+  // single render, jolting the centered cycle+rating cluster sideways
+  // on every click. .bc-paper-combos-counter sets white-space: pre so
+  // the leading spaces survive in HTML.
+  const counterText = state.total === 0
+    ? "0 / 0"
+    : `${String(state.cursor + 1).padStart(String(state.total).length, " ")} / ${state.total}${state.truncated ? "+" : ""}`;
+
   const cycle = el(doc, "div", { class: "bc-paper-combos-cycle" }, [
     el(doc, "button", {
       attrs: {
@@ -724,11 +733,7 @@ export function renderTopBar(
         [ACTION_ATTR]: "prev"
       }
     }, ["←"]),
-    el(doc, "span", { class: "bc-paper-combos-counter" }, [
-      state.total === 0
-        ? "0 / 0"
-        : `${state.cursor + 1} / ${state.total}${state.truncated ? "+" : ""}`
-    ]),
+    el(doc, "span", { class: "bc-paper-combos-counter" }, [counterText]),
     el(doc, "button", {
       attrs: {
         type: "button",
@@ -738,31 +743,38 @@ export function renderTopBar(
     }, ["→"])
   ]);
 
-  // Rating chip only appears when at least one section in the active
-  // combo has a cached CTEC mean. With zero coverage there's nothing
-  // honest to show, and a placeholder "no CTEC" pill is just clutter.
-  const rating = state.ratedCount > 0
-    ? el(
-        doc,
-        "span",
-        {
-          class: "bc-paper-combos-rating",
-          dataset: { rated: String(state.ratedCount) },
-          attrs: {
-            "aria-label":
-              "Combo rating: mean CTEC instructor rating on a 0 to 6 scale. " +
+  // Rating chip is always rendered. When the active combo has zero CTEC
+  // coverage we show "★ ?.??" instead of a real number — keeps the
+  // chip's surface visible (so the user always knows where to look),
+  // preserves layout (the digit width matches "4.20" thanks to tabular-
+  // nums treating "?" as a digit slot via the placeholder span), and
+  // signals "data unknown" rather than fabricating a midpoint reading.
+  const ratingText = state.ratedCount > 0
+    ? `★ ${formatRating(state.score)}`
+    : "★ ?.??";
+  const rating = el(
+    doc,
+    "span",
+    {
+      class: "bc-paper-combos-rating",
+      dataset: { rated: String(state.ratedCount) },
+      attrs: {
+        "aria-label":
+          state.ratedCount > 0
+            ? "Combo rating: mean CTEC instructor rating on a 0 to 6 scale. " +
               "Sections without cached CTEC data fall back to the neutral " +
               "midpoint of 3."
-          }
-        },
-        [
-          el(doc, "span", { class: "bc-paper-combos-rating-value" }, [
-            `★ ${formatRating(state.score)}`
-          ]),
-          buildRatingTooltipElement(doc)
-        ]
-      )
-    : null;
+            : "Combo rating unavailable: no sections in this combo have " +
+              "cached CTEC data yet."
+      }
+    },
+    [
+      el(doc, "span", { class: "bc-paper-combos-rating-value" }, [
+        ratingText
+      ]),
+      buildRatingTooltipElement(doc)
+    ]
+  );
 
   // Two-tier collapse: credits hides at 1450px, sort hides at 1150px,
   // each then surfaces inside a popover under the kebab. Render TWO
