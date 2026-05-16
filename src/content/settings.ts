@@ -40,6 +40,7 @@ export const FEATURE_GROUPS: Record<string, "caesar" | "paper"> = {
   "ctec-links": "caesar",
   "enrollment-navigation": "caesar",
   "class-search": "caesar",
+  "paper-brand": "paper",
   "paper-ctec": "paper",
   "paper-ctec-single-summary-card": "paper",
   "paper-ctec-compact-cards": "paper",
@@ -49,8 +50,16 @@ export const FEATURE_GROUPS: Record<string, "caesar" | "paper"> = {
   "paper-combos": "paper",
   "paper-combos-active": "paper",
   "paper-hide-taken": "paper",
+  // The mount augmentation id is distinct from the feature id so the
+  // runner doesn't tear the inline switch row down when the user flips
+  // the feature itself off. The group/master toggles need to gate the
+  // mount id too, otherwise the always-mounted switch row survives
+  // group-off — group cascade still works through the mount id because
+  // settings[mountId] is never written, only the feature id is.
+  "paper-hide-taken-mount": "paper",
   "paper-export-helper": "paper",
   "prereq-filter": "paper",
+  "prereq-filter-mount": "paper",
   "prereq-filter-unknown-as-eligible": "paper"
 };
 
